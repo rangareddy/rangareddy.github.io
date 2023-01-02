@@ -4,6 +4,7 @@ title: Happy New Year 2023
 categories: Others
 tags: Miscellaneous
 author: Ranga Reddy
+permalink: /:year/:month/:day/:title/
 ---
 
 * content
@@ -15,4 +16,6 @@ I want to wish **Happy New Year 2023** to you and your family.
 
 Lets Rock this year.
 
-![Ranga Image](https://github.com/rangareddy/rangareddy.github.io/blob/master/_posts/images/Ranga_1.jpeg) 
+<p align='center'>
+	<img src="{{ site.baseurl }}{% link assets/images/Ranga1.jpeg %}" width='600px' height='500px' />
+</p>

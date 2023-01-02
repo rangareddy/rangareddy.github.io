@@ -50,3 +50,6 @@ plugins:
   - jekyll-sitemap
   - jekyll-feed
   - jemoji
+
+include:
+  - _media
