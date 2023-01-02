@@ -15,4 +15,4 @@ I want to wish **Happy New Year 2023** to you and your family.
 
 Lets Rock this year.
 
-![Ranga Image](./images/Ranga_1.jpeg) 
+![Ranga Image](https://github.com/rangareddy/rangareddy.github.io/blob/master/_posts/images/Ranga_1.jpeg) 
