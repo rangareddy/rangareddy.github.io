@@ -11,6 +11,10 @@ type: page
 
 ## About Ranga Reddy
 
+<p align='center'>
+	<img src="{{ site.baseurl }}{% link assets/images/Ranga1.jpeg %}" width='600px' height='500px' />
+</p>
+
 **Mr. Ranga Reddy** is a India based, **Senior Software Engineer** working with **Cloudera**. He is expertise is in **Big Data** and **Full Stack Developer**. He has 8+ years of experience in designing, developing and leading large multi-tiered enterprise solutions in various domains - TTH & Manufacturing. He has earlier worked with **Dell R&D**, **Mindtree** and **ITApp**.
 
 **Ranga Reddy** has extensive experience in **Big Data** technologies like Spark, Storm, Kafka, Hive, Hdfs, Sqoop, **Java Based technologies** like Spring, Hibernate, **Application servers** like Tomcat, **NoSql databases** like HBase, Cassandra and **RDBMS systems** like Oracle and MySQL. He is always keen to know about new technologies, new updates in the current technologies and trends in the market. His current interests include Data Engineering.
@@ -22,3 +26,7 @@ He is conversant with all phases of software development cycles involving Projec
 - **Contact:** rangareddy.avula@gmail.com
 - **GitHub:** <https://github.com/rangareddy>
 - **LinkedIn:** <https://www.linkedin.com/in/ranga-reddy-big-data-developer/>
+
+## Know even more about me?
+
+You can download my updated [Resume]({{ site.baseurl }}{% link assets/others/Ranga_Reddy_Data_Engineer.pdf %})

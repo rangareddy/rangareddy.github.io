@@ -27,11 +27,14 @@ disqus_shortname: rangareddy1988
 markdown: kramdown
 
 kramdown:
+  auto_ids: true
   input: GFM
   syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    guess_lang: true
 
-# port
-# port: 1234
+syntax_highlighter_style: colorful
+markdown_ext: markdown,mkdown,mkdn,mkd,md
 
 # url
 category_dir: category/
@@ -46,10 +49,18 @@ paginate: 10
 
 plugins:
   - jekyll-paginate
+  - jekyll-readme-index
   - jekyll-github-metadata
   - jekyll-sitemap
   - jekyll-feed
   - jemoji
 
 include:
-  - _media
+  - _data
+
+exclude:
+  - _drafts
+  - README.md
+  - LICENSE
+  - Gemfile
+  - Gemfile.lock
