@@ -1,22 +1,25 @@
 ---
 layout: post
-title:  Spark Logs Extractor
+title:  Spark Logs Extractor tool
 categories: Spark
 tags: Spark Utilities
 author: Ranga Reddy
+date: "2021-08-27 00:00:00 +0530"
 ---
 
 * content
 {:toc}
 
-**Spark Logs Extractor** is a simple shell script tool used to collect the **Spark Application** and **Event Logs** with the **compressed** format.
+## Spark Logs Extractor
 
-**Note:** As of now by using this tool, we can collect the Spark logs in **HDP, CDH** and **CDP** clusters only.
+**Spark Logs Extractor** is a simple shell script tool used to collect the *Spark* **Application Logs** and **Event Logs** with the **compressed** format.
 
 **Advantages:**
 
 1. Spark logs will collect automatically without running any command.
 2. After collecting logs, logs will be compressed into a single file.
+
+## Usage
 
 The following are steps to use this tool:
 
@@ -37,4 +40,4 @@ While Runing the **spark_logs_extractor.sh** script, provide the **application_i
 sh spark_logs_extractor.sh <application_id>
 ```
 
-**Note:** Replace **application_id** with your **spark application id**.
+> Replace **application_id** with your **spark application id**.

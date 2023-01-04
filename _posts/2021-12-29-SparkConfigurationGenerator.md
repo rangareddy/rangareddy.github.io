@@ -1,15 +1,18 @@
 ---
 layout: post
-title: Spark Configuration Generator
+title: Spark Configuration Generator tool
 categories: Spark
 tags: Spark Utilities Generator
 author: Ranga Reddy
+date: "2021-12-29 00:00:00 +0530"
 ---
 
 * content
 {:toc}
 
-## Spark Configuration Generator tool
+## Spark Configuration Generator
+
+Spark Configuration Generator tool will generate the spark configuration based on hardware configuration.
 
 <html lang="en">
    <head>

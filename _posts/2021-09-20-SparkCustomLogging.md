@@ -4,24 +4,29 @@ title:  Spark with custom logging
 categories: Spark
 tags: Spark Utilities Logging
 author: Ranga Reddy
+date: "2021-09-20 00:00:00 +0530"
 ---
 
 * content
 {:toc}
 
-By default, Spark uses **$SPARK_HOME/conf/log4j.properties** file to configure log4j. This log4j configuration set at cluster level.
+## Spark Custom Logging
 
-If we want to run the Spark application with custom log4j configuration, then we need to follow the following steps:
+By default, Spark uses **$SPARK_HOME/conf/log4j.properties** file to configure *log4j* and this log4j configuration set at cluster level. Sometimes you need to troubleshoot or fix the performance issues then you need to customize the logs. This blog post will help how to customize the Spark logs for both driver and executor.
 
-## Specify the single custom `log4j.properties` for driver and executors
+## Usage
 
-### Step1: Copy the `log4.properties` to temporary directory for example `/tmp`
+The following are steps to customize the logs:
+
+### 1. Specify the single custom `log4j.properties` for driver and executors
+
+**Step1:** Copy the `log4.properties` to temporary directory for example `/tmp`
 
 ```sh
 cp $SPARK_HOME/conf/log4.properties /tmp
 ```
 
-### Step2: Update the `log4j.properties` file
+**Step2:** Update the `log4j.properties` file
 
 > In the following properties, i have modified logging level from INFO to DEBUG mode.
 
@@ -48,9 +53,9 @@ log4j.logger.org.apache.spark.repl.Main=${shell.log.level}
 log4j.logger.org.apache.spark.api.python.PythonGatewayServer=${shell.log.level}
 ```
 
-### Step3: Run the Spark Application
+**Step3:** Run the Spark Application
 
-### Client mode
+**Client mode**
 
 ```sh
 spark-submit \
@@ -64,7 +69,7 @@ spark-submit \
   /opt/cloudera/parcels/CDH/lib/spark/examples/jars/spark-example*.jar 10
 ```
 
-### Cluster mode
+**Cluster mode**
 
 ```sh
 spark-submit \
@@ -78,23 +83,23 @@ spark-submit \
   /opt/cloudera/parcels/CDH/lib/spark/examples/jars/spark-example*.jar 10
 ```
 
-## Specify the different custom `log4j.properties` for driver and executors
+### 2. Specify the different custom `log4j.properties` for driver and executors
 
-### Step1: For driver, create the seperate `log4j.properties` file say `log4j_driver.properties` and update the configuration
+**Step1:** For driver, create the seperate `log4j.properties` file say `log4j_driver.properties` and update the configuration
 
 ```sh
 cp $SPARK_HOME/conf/log4.properties /tmp/log4j_driver.properties
 ```
 
-### Step2: For executor, create the seperate `log4j.properties` file say `log4j_executor.properties` and update the configuration
+**Step2:** For executor, create the seperate `log4j.properties` file say `log4j_executor.properties` and update the configuration
 
 ```sh
 cp $SPARK_HOME/conf/log4.properties /tmp/log4j_executor.properties
 ```
 
-### Step3: Run the Spark Application
+**Step3:** Run the Spark Application
 
-#### Client mode
+**Client mode**
 
 ```sh
 spark-submit \
@@ -108,7 +113,7 @@ spark-submit \
   /opt/cloudera/parcels/CDH/lib/spark/examples/jars/spark-example*.jar 10
 ```
 
-#### Cluster mode
+**Cluster mode**
 
 ```sh
 spark-submit \

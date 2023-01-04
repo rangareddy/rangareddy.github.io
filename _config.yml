@@ -6,7 +6,9 @@ url: "https://rangareddy.github.io" # the base hostname & protocol for your site
 avatar: https://avatars.githubusercontent.com/u/5094273?v=4
 timezone: Asia/Kolkata
 
-permalink: /:year/:month/:day/:title/
+#permalink: /:year/:month/:day/:title/
+
+permalink: /:title/
 
 # other links
 twitter_username: avula_ranga
@@ -32,6 +34,7 @@ kramdown:
   syntax_highlighter: rouge
   syntax_highlighter_opts:
     guess_lang: true
+    default_lang: plaintext
 
 syntax_highlighter_style: colorful
 markdown_ext: markdown,mkdown,mkdn,mkd,md
