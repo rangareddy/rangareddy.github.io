@@ -33,7 +33,10 @@ Spark Configuration Generator tool will generate the spark configuration based o
       <script type="text/javascript">
 
          $(document).ready(function() {
-
+            let br_delimeter = " \\<br>"
+            let space_delimeter = "&nbsp;&nbsp;&nbsp;&nbsp;";
+            let delimeter = br_delimeter + space_delimeter
+            var sparkSubmitCommand = ""
             function hide_configuration() {
                $("#spark_configuration_id").hide();
                $("#spark_submit_container_id").hide();   
@@ -51,7 +54,7 @@ Spark Configuration Generator tool will generate the spark configuration based o
             $("#generate-spark-configuration").click(function(){
                
                var sparkConfList = []
-
+               sparkSubmitCommand = ""
                var totalNodes = $("#totalNodes").val().trim();
                var coresPerNode = $("#coresPerNode").val().trim();
                var memoryPerNode = $("#memoryPerNode").val().trim();
@@ -120,9 +123,7 @@ Spark Configuration Generator tool will generate the spark configuration based o
                   var balancedApproch = {"name": "Balanced", "executor-cores": executorCores, "num-executors": totalExecutors, "executor-memory": executorMemory, "executor-memoryOverhead": memoryOverHead}
                   sparkConfList.push(balancedApproch)
 
-                  var delimeter = " \\<br>&nbsp;&nbsp;&nbsp;&nbsp;";
-
-                  var sparkSubmitCommand = "spark-shell"+delimeter+
+                  sparkSubmitCommand = "spark-shell"+delimeter+
                      "--conf spark.master=yarn"+ delimeter +
                      "--conf spark.submit.deployMode=client"+ delimeter +
                      "--conf spark.executor.cores="+balancedApproch["executor-cores"] + delimeter +
@@ -158,14 +159,11 @@ Spark Configuration Generator tool will generate the spark configuration based o
                $("#spark_configuration_id").show();
             });
 
+            $("#copy-spark-submit").click(function () {
+               var copiedSparkSubmitCmd = sparkSubmitCommand.replaceAll(space_delimeter, "\t").replaceAll("\<br>", "\n");         
+               navigator.clipboard.writeText(copiedSparkSubmitCmd);
+            });
          });
-
-         
-         function myFunction() {
-           var copyText = document.getElementById("myInput").innerText;
-           navigator.clipboard.writeText(copyText);
-         }
-
       </script>
    </head>
    <body>
@@ -233,7 +231,7 @@ Spark Configuration Generator tool will generate the spark configuration based o
                   </div>
                   <div class="card-footer">
                      <p class="card-text" id='spark_submit_hide_id' style="display:none;"></p>
-                     <button type="button" id='copy-spark-submit' onclick="myFunction()" class="btn btn-info">Copy Shell Command</button>
+                     <button type="button" id='copy-spark-submit' class="btn btn-info">Copy Shell Command</button>
                   </div>
                </div>
             </div>
