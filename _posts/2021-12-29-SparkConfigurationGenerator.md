@@ -12,7 +12,7 @@ date: "2021-12-29 00:00:00 +0530"
 
 ## Spark Configuration Generator
 
-Spark Configuration Generator tool will generate the spark configuration based on hardware configuration.
+**Spark Configuration Generator** tool will generate the **spark configuration** based on **hardware configuration**.
 
 <html lang="en">
    <head>
@@ -21,6 +21,7 @@ Spark Configuration Generator tool will generate the spark configuration based o
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
       <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+      <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
 
       <style>
          .square {
@@ -159,9 +160,9 @@ Spark Configuration Generator tool will generate the spark configuration based o
                $("#spark_configuration_id").show();
             });
 
-            $("#copy-spark-submit").click(function () {
-               var copiedSparkSubmitCmd = sparkSubmitCommand.replaceAll(space_delimeter, "\t").replaceAll("\<br>", "\n");         
-               navigator.clipboard.writeText(copiedSparkSubmitCmd);
+            $("#copy-spark-shell").click(function (e) {  
+               e.preventDefault();
+               copy_text_to_clipboard('spark_submit_id', 'spark-shell command copied!');
             });
          });
       </script>
@@ -231,7 +232,7 @@ Spark Configuration Generator tool will generate the spark configuration based o
                   </div>
                   <div class="card-footer">
                      <p class="card-text" id='spark_submit_hide_id' style="display:none;"></p>
-                     <button type="button" id='copy-spark-submit' class="btn btn-info">Copy Shell Command</button>
+                     <button type="button" id='copy-spark-shell' class="btn btn-info">Copy Shell Command</button>
                   </div>
                </div>
             </div>

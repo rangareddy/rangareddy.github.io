@@ -12,7 +12,7 @@ date: "2023-01-05 11:40:00 +0530"
 
 ## Spark Submit Command Formatter
 
-* Used to format the Spark Submit command and generate it in beautiful format.
+Used to **format** the **Spark Submit** command and generate it in beautiful format.
 
 <html lang="en">
    <head>
@@ -21,19 +21,20 @@ date: "2023-01-05 11:40:00 +0530"
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
       <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+      <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
 
       <style>
          #spark_submit_config_txt {
-           overflow: scroll;
-		   resize: vertical;
-		   width: 100%;
-           background-color: #F9E98B;
+           	overflow: scroll;
+		   	resize: vertical;
+		   	width: 100%;
+           	background-color: #F9E98B;
          }
       </style>
 
       <script type="text/javascript">
 
-         $(document).ready(function() {
+      	$(document).ready(function() {
 
          	function validateAndHide() {
             	var spark_submit_cmd_val = $("#spark_submit_config_txt").val();
@@ -43,7 +44,7 @@ date: "2023-01-05 11:40:00 +0530"
 	         		$("#spark_submit_cmd_add_parameter_container").hide();
 	         		$("#spark_submit_config_txt").focus();
             	}
-	        }
+	        	}
 
 	        function validateAndShow() {
             	var spark_submit_cmd_val = $("#spark_submit_config_txt").val().trim();
@@ -60,11 +61,17 @@ date: "2023-01-05 11:40:00 +0530"
          	var delimeter = br_delimeter + space_delimeter
          	var sparkSubmitCommand = ""
          	let sparkConfigMapObj = {
-				"master":"spark.master", "deploy-mode":"spark.submit.deployMode", "driver-cores" : "spark.driver.cores", "executor-cores": "spark.executor.cores", "driver-memory": "spark.driver.memory" ,"executor-memory": "spark.executor.memory", "num-executors": "spark.executor.instances", "principal": "spark.yarn.principal", "keytab": "spark.yarn.keytab", "queue":"spark.yarn.queue", "jars":"spark.jars", "name":"spark.app.name",
-				"class":"class", "files" :"spark.yarn.dist.files", "driver-java-options": "spark.driver.extraJavaOptions", "driver-class-path": "spark.driver.extraClassPath", "driver-library-path":"spark.driver.extraLibraryPath", "executor-java-options": "spark.executor.extraJavaOptions", "executor-class-path": "spark.executor.extraClassPath", "executor-library-path":"spark.executor.extraLibraryPath"
-			}
-			var jarFileName = ""
-			var className = ""
+					"master":"spark.master", "deploy-mode":"spark.submit.deployMode", "driver-cores" : "spark.driver.cores", "executor-cores": "spark.executor.cores", "driver-memory": "spark.driver.memory" ,"executor-memory": "spark.executor.memory", "num-executors": "spark.executor.instances", "principal": "spark.yarn.principal", "keytab": "spark.yarn.keytab", "queue":"spark.yarn.queue", "jars":"spark.jars", "name":"spark.app.name",
+					"class":"class", "files" :"spark.yarn.dist.files", "driver-java-options": "spark.driver.extraJavaOptions", "driver-class-path": "spark.driver.extraClassPath", "driver-library-path":"spark.driver.extraLibraryPath", "executor-java-options": "spark.executor.extraJavaOptions", "executor-class-path": "spark.executor.extraClassPath", "executor-library-path":"spark.executor.extraLibraryPath"
+				}
+				var jarFileName = ""
+				var className = ""
+
+				$("#sample_spark_submit_config").click(function () {
+					var sample_spark_submit_cmd = "spark-submit --class org.apache.spark.examples.SparkPi --master yarn --deploy-mode cluster --num-executors 1";
+					sample_spark_submit_cmd += " --driver-memory 512m --executor-memory 512m --driver-cores 1 --executor-cores 2 $SPARK_HOME/examples/jars/spark-examples_*.jar 1000";
+					$("#spark_submit_config_txt").val(sample_spark_submit_cmd);
+				});
 
          	$("#format_spark_submit_config").click(function () {
                 var spark_submit_config_txt = $("#spark_submit_config_txt").val();
@@ -83,9 +90,9 @@ date: "2023-01-05 11:40:00 +0530"
 					let sparkConfigArray = Object.entries(sparkConfigMapObj)
 					let sparkConfigMap = new Map(sparkConfigArray);
 
-					const sparkSubmitArray = spark_submit_config_txt.split("--");
+					const sparkSubmitArray = spark_submit_config_txt.replaceAll("\\\n", "").split("--");
 					for (let i = 0; i < sparkSubmitArray.length; i++) {
-						let sparkSubmitParameterArray = sparkSubmitArray[i].trim().split(" ");
+						let sparkSubmitParameterArray = sparkSubmitArray[i].replace(/\s\s+/g, ' ').trim().split(" ");
 						if(sparkSubmitParameterArray.length > 1) {
 							let parameterName = sparkSubmitParameterArray[0];
 							let parameterValue = sparkSubmitParameterArray[1];
@@ -108,18 +115,17 @@ date: "2023-01-05 11:40:00 +0530"
 							} else if ( parameterName != 'spark-submit') {
 								commandLineArgs.push({"name": parameterName, "value": parameterValue})
 							}
-							if(sparkSubmitParameterArray.length > 2 && sparkSubmitParameterArray[2].endsWith(".jar")) {
-								jarFileName = sparkSubmitParameterArray[2]
-								if(sparkSubmitParameterArray.length > 3) {
-									for(j=3; j < sparkSubmitParameterArray.length; j++){
-										commandLineArgs.push({"name": sparkSubmitParameterArray[j], "value": ""})
+							if(sparkSubmitParameterArray.length > 2) {
+								if(sparkSubmitParameterArray[2].endsWith(".jar") || sparkSubmitParameterArray[2].endsWith(".py")) {
+									jarFileName = sparkSubmitParameterArray[2]
+									if(sparkSubmitParameterArray.length > 3) {
+										for(j=3; j < sparkSubmitParameterArray.length; j++){
+											commandLineArgs.push({"name": sparkSubmitParameterArray[j], "value": ""})
+										}
 									}
 								}
 							}
-
-						} else {
-							console.log(sparkSubmitParameterArray)
-						}
+						} 
 					}
 
 					for (i = 0; i < sparkSparkArgs.length; i++) {
@@ -157,11 +163,10 @@ date: "2023-01-05 11:40:00 +0530"
 
 					$("#spark_submit_cmd_parameter_container").show();
 
-	                sparkSubmitCommand += "spark-submit"+delimeter;
+					sparkSubmitCommand += "spark-submit"+delimeter;
+					var sparkSubmitArgsLen = sparkSparkArgs.length;
 
-	                var sparkSubmitArgsLen = sparkSparkArgs.length;
-
-	                for (i = 0; i < sparkSubmitArgsLen; i++) {
+	            for (i = 0; i < sparkSubmitArgsLen; i++) {
 						var data = sparkSparkArgs[i];
 
                    		var name = data["name"];
@@ -174,9 +179,13 @@ date: "2023-01-05 11:40:00 +0530"
                    		}
                    		sparkSubmitCommand += delimeter;
 					}
-					
-					sparkSubmitCommand += "--class "+className + delimeter;
+
+					if(className) {
+						sparkSubmitCommand += "--class "+className + delimeter;
+					}
 					sparkSubmitCommand += jarFileName;
+					
+
 					commandLineArgsLen = commandLineArgs.length;
 					for (i = 0; i < commandLineArgsLen; i++) {
 						var data = commandLineArgs[i];
@@ -206,9 +215,9 @@ date: "2023-01-05 11:40:00 +0530"
                	validateAndHide();
             });
 
-            $("#copy-spark-submit").click(function () {
-                var copiedSparkSubmitCmd = sparkSubmitCommand.replaceAll(space_delimeter, "\t").replaceAll("\<br>", "\n");         
-           		navigator.clipboard.writeText(copiedSparkSubmitCmd);
+            $("#copy-spark-submit").click(function (e) {  
+            	e.preventDefault();
+	            copy_text_to_clipboard('spark_submit_id', 'spark-submit command copied!');
             });
          });
       </script>
@@ -218,13 +227,16 @@ date: "2023-01-05 11:40:00 +0530"
    			<div class="row" id="spark_submit_cmd_container" style="margin-top: 10px;">
    				<div class="col-md-12">
    					<div class="card">
-   						<h4 class="card-header" style="color: sienna;">Spark Submit Command</h4>
+   						<div class="card-header">
+   							<span style='float: left;'><h4  style="color: sienna;">Spark Submit Command</h4></span>
+   							<span style='float: right;'><button type="button" id='sample_spark_submit_config' class="btn btn-success">Load Sample Command</button></span>
+   						</div>
    						<div class="card-body">
    							<textarea id="spark_submit_config_txt" placeholder='Enter or Paste the Spark Submit command' rows="7"></textarea>
    						</div>
    						<div class="card-footer">
-   							<span style="margin-right: 12px;"><button type="button" id='format_spark_submit_config' class="btn btn-primary">Format</button></span>
-                    		<span><button type="button" id='reset_spark_submit_config' class="btn btn-warning">Reset</button></span>
+   							<span style="margin-right: 12px;"><button type="button" id='format_spark_submit_config' class="btn btn-primary">Format Command</button></span>
+                    		<span><button type="button" id='reset_spark_submit_config' class="btn btn-warning">Reset Command</button></span>
    						</div>
    					</div>
    				</div>
@@ -238,7 +250,7 @@ date: "2023-01-05 11:40:00 +0530"
 	                  </div>
 	                  <div class="card-footer">
 	                     <p class="card-text" id='spark_submit_hide_id' style="display:none;"></p>
-	                     <button type="button" id='copy-spark-submit' class="btn btn-info">Copy Spark Command</button>
+	                     <button type="button" id='copy-spark-submit' class="btn btn-danger">Copy Spark Submit Command</button>
 	                  </div>
 	               </div>
 	            </div>
