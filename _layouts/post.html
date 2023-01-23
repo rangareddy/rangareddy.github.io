@@ -35,6 +35,11 @@ layout: default
         </article>
         <hr>
 
+        <div class="label-card">
+            {% include donate.html %}
+        </div>
+        <hr>
+
         {% assign hasSimilar = '' %}
         {% for post in site.related_posts %}
         {% assign postHasSimilar = false %}
