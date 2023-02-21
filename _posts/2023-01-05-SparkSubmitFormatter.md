@@ -18,11 +18,10 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
    <head>
       <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
       <title>Spark Configuration Generator</title>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css">
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-      <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
-      <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
-
+      <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
+	   <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
+	   <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
+	   <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
       <style>
          #spark_submit_config_txt {
            	overflow: scroll;
@@ -31,7 +30,6 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
            	background-color: #F9E98B;
          }
       </style>
-
       <script type="text/javascript">
 
       	$(document).ready(function() {
