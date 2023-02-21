@@ -95,8 +95,9 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
 
 						const sparkSubmitArray = spark_submit_config_txt.replaceAll("\\\n", "").split("--");
 						for (let i = 0; i < sparkSubmitArray.length; i++) {
-							let sparkSubmitParameterArray = sparkSubmitArray[i].replace(/\s\s+/g, ' ').trim().split(" ");
-							if(sparkSubmitParameterArray.length > 1) {
+							let sparkSubmitParameterArray = sparkSubmitArray[i].replace(/\s\s+/g, ' ').replaceAll('\"','').trim().split(" ");
+							let spark_submit_param_arr_len = sparkSubmitParameterArray.length;
+							if(spark_submit_param_arr_len > 1) {
 								let parameterName = sparkSubmitParameterArray[0];
 								let parameterValue = sparkSubmitParameterArray[1];
 								let is_config_param = parameterName == 'conf';
@@ -104,7 +105,15 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
 								if (is_config_param) {
 									let index = parameterValue.indexOf("=")
 									parameterName = parameterValue.substring(0,index)
-									parameterValue = parameterValue.substring(index+1)
+									if(spark_submit_param_arr_len > 2) {
+										let strArray = new Array()
+										for (let j = 2; j < spark_submit_param_arr_len; j++) {
+											strArray[j-2] = sparkSubmitParameterArray[j]
+										}
+										parameterValue = '\"' + strArray.join(" ") + '\"'
+									} else {
+										parameterValue = parameterValue.substring(index+1)
+									}
 								} 
 
 								var is_valid_spark_builtin_param = sparkConfigMap.has(parameterName)

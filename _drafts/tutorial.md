@@ -7,7 +7,7 @@ Step1: Install Ruby
 ```sh
 brew install ruby
 #brew uninstall ruby
-echo 'export PATH="/usr/local/opt/ruby/bin:/usr/local/lib/ruby/gems/3.1.0/bin:$PATH"' >> ~/.bash_profile
+echo 'export PATH="$PATH:/usr/local/opt/ruby/bin:/usr/local/lib/ruby/gems/3.1.0/bin"' >> ~/.bash_profile
 ```
 
 2. Using Ruby Install
@@ -17,8 +17,20 @@ $ brew install chruby ruby-install
 #$ ruby-install --update
 $ ruby-install 3.1.3
 $ ruby-install ruby 3.1.3
-echo 'export PATH="~/.rubies/ruby-3.1.3/bin:$PATH"' >> ~/.bash_profile
+
+echo 'export RUBY_HOME=~/.rubies/ruby-3.1.3'
+echo 'export PATH=$PATH:$RUBY_HOME/bin' >> ~/.bash_profile
+
+(or)
+
+echo "source $(brew --prefix)/opt/chruby/share/chruby/chruby.sh" >> ~/.zshrc
+echo "source $(brew --prefix)/opt/chruby/share/chruby/auto.sh" >> ~/.zshrc
+echo "chruby ruby-3.1.3" >> ~/.zshrc
 ```
+
+Reference: 
+
+https://www.moncefbelyamani.com/how-to-install-xcode-homebrew-git-rvm-ruby-on-mac/
 
 3. Using RBENV
 
@@ -39,7 +51,7 @@ $ ruby -v
 
 $ which gem
 $ gem -v
-#$ gem update --system
+$ gem update --system
 ```
 
 Step3: Install the Jekyll and Bundler using gem
