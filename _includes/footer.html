@@ -1,30 +1,33 @@
 <footer class="site-footer">
+    <div>
+        Copyright &copy;<script>document.write(new Date().getFullYear())</script> Ranga Reddy All rights reserved.
+    </div>
     <div class="wrapper">
         <p class="contact">
             Contact me at: 
 
             {% if site.github_username %}
-            <a href="https://github.com/{{site.github_username}}" title="GitHub"><i class="fa fa-github" aria-hidden="true"></i></a> 
+                <a href="https://github.com/{{site.github_username}}" title="GitHub"><i class="fa fa-github" aria-hidden="true"></i></a> 
             {% endif %} 
 
             {% if site.email %}
-            <a href="mailto:{{site.email}}" title="email"><i class="fa fa-envelope-o" aria-hidden="true"></i></a> 
+                <a href="mailto:{{site.email}}" title="email"><i class="fa fa-envelope-o" aria-hidden="true"></i></a> 
             {% endif %} 
 
             {% if site.twitter_username %}
-            <a href="https://twitter.com/{{site.twitter_username}}" title="Twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a> 
+                <a href="https://twitter.com/{{site.twitter_username}}" title="Twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a> 
             {% endif %} 
 
             {% if site.facebook_username %}
-            <a href="https://www.facebook.com/{{site.facebook_username}}" title="Facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a> 
+                <a href="https://www.facebook.com/{{site.facebook_username}}" title="Facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a> 
             {% endif %} 
 
             {% if site.linkedIn_username%}
-            <a href="https://www.linkedin.com/in/{{site.linkedIn_username}}" title="LinkedIn"><i class="fa fa-linkedin" aria-hidden="true"></i></a> 
+                <a href="https://www.linkedin.com/in/{{site.linkedIn_username}}" title="LinkedIn"><i class="fa fa-linkedin" aria-hidden="true"></i></a> 
             {% endif %}
 
             {% if site.footer-links.stackoverflow %}
-            <a href="http://stackoverflow.com/{{ site.footer-links.stackoverflow }}"><i class="svg-icon stackoverflow"></i></a>
+                <a href="http://stackoverflow.com/{{ site.footer-links.stackoverflow }}"><i class="svg-icon stackoverflow"></i></a>
             {% endif %}
 
             {% if site.footer-links.youtube %}
