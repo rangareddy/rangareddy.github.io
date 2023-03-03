@@ -2,7 +2,7 @@
 layout: post
 title: Enable Verbose class output for the Spark applications
 categories: Spark
-tags: Spark Verbose
+tags: Spark Troubleshoot
 author: Ranga Reddy
 date: "2021-10-21 00:00:00 +0530"
 ---
