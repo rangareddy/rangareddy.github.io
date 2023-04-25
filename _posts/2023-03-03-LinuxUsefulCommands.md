@@ -82,6 +82,8 @@ killall -9 chrome
 ### All steps in single line
 
 ```sh
-ps -ef | grep java | grep -v grep | awk '{print $2}' | xargs kill
+export PROCESS_NAME=java
+ps -ef | grep $PROCESS_NAME | grep -v grep | awk '{print $2}' | xargs kill
 ```
+
 
