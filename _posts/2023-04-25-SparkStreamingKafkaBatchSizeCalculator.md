@@ -58,7 +58,9 @@ Used to calculate the Spark Streaming Kafka Batch Size.
       <div class="row" id="kafka_batch_size_config" style="margin-top: 10px;">
         <div class="col-md-12">
           <div class="card">
-            <h5 class="card-header">Spark Streaming Kafka Batch Size Configuration</h5>
+            <div class="card-header">
+              <h5>Spark Streaming Kafka Batch Size Configuration</h5>
+            </div> <!-- card-header -->
             <div class="card-body">
               <div class="row" style='margin-top: 10px;'>
                 <div class="col-sm-4">
@@ -68,19 +70,7 @@ Used to calculate the Spark Streaming Kafka Batch Size.
                 </div>
                 <div class="col-sm-4">
                   <div class="form-group">
-                    <input type="number" class="form-control" id="numPartitions" name="numPartitions" min="1" step="3" value="5" required>
-                  </div>
-                </div>
-              </div>
-              <div class="row" style='margin-top: 10px;'>
-                <div class="col-sm-4">
-                  <div class="form-group">
-                    <label for="maxRatePerPartition">Max Rate Per Partition (records/sec):</label>
-                  </div>
-                </div>
-                <div class="col-sm-4">
-                  <div class="form-group">
-                    <input type="number" class="form-control" id="maxRatePerPartition" name="maxRatePerPartition" min="1" step="3" value="100" required>
+                    <input type="number" class="form-control" id="numPartitions" name="numPartitions" min="1" step="1" value="5" required>
                   </div>
                 </div>
               </div>
@@ -92,45 +82,60 @@ Used to calculate the Spark Streaming Kafka Batch Size.
                 </div>
                 <div class="col-sm-4">
                   <div class="form-group">        
-                    <input type="number" class="form-control" id="batchDuration" name="batchDuration" min="1" step="3" value="2" required>
+                    <input type="number" class="form-control" id="batchDuration" name="batchDuration" min="1" step="1" value="2" required>
                   </div>
                 </div>
               </div>
-            </div> <!-- card-body -->
-            <div class="card-footer" id='spark_configuration_button'>
-              <span style="margin-right: 10px;">
-                <button type="button" id='calculate-batch-size' class="btn btn-primary">Calculate Batch Size</button>
-              </span>
-              <span style="margin-right: 10px;">
-                <button type="button" id='reset-batch-size' class="btn btn-warning">Reset</button>
-              </span>
-            </div> <!-- card-footer -->
-          </div>
-        </div>
-      </div>
-      <!-- kafka_batch_size_config -->
-      <div class="row" id='kafka_batch_size_ouput_config' style="margin-top: 10px;">
-        <div class="col-md-12">
-          <div class="card">
-            <div class="card-body">
-               <div class="row">
+              <div class="row" style='margin-top: 10px;'>
                 <div class="col-sm-4">
                   <div class="form-group">
-                    <label for="batchSize">Maximum Kafka Messages to Fetch per Batch</label>
+                    <label for="maxRatePerPartition">Max Rate Per Partition (records/sec):</label>
                   </div>
                 </div>
                 <div class="col-sm-4">
-                  <div class="form-group">        
-                   <input type="number" class="form-control" id="batchSize" name="batchSize" readonly>
+                  <div class="form-group">
+                    <input type="number" class="form-control" id="maxRatePerPartition" name="maxRatePerPartition" min="1" step="1" value="100" required>
+                  </div>
+              </div>
+              </div>
+            </div> <!-- card-body -->
+            <div class="card-footer" id='kafka_batch_size_button_config'>
+              <div class="row">
+                <div class="col-sm-3">
+                  <div class="form-group">
+                    <button type="button" id='calculate-batch-size' class="btn btn-primary">Calculate Batch Size</button>
+                  </div>
+                </div>
+                <div class="col-sm-3">
+                  <div class="form-group">
+                    <button type="button" id='reset-batch-size' class="btn btn-warning">Reset Config</button>
+                  </div>
+                </div>
+              </div>
+            </div> <!-- card-footer -->
+          </div> <!-- card -->
+        </div>
+      </div> <!-- kafka_batch_size_config -->
+      <div class="row" id='kafka_batch_size_ouput_config' style="margin-top: 10px;">
+          <div class="col-md-12">
+            <div class="card">
+              <div class="card-body">
+                 <div class="row">
+                  <div class="col-sm-4">
+                    <div class="form-group">
+                      <label for="batchSize">Maximum Kafka Messages to Fetch per Batch is </label>
+                    </div>
+                  </div>
+                  <div class="col-sm-4">
+                    <div class="form-group">        
+                     <input type="number" class="form-control" id="batchSize" name="batchSize" readonly>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <!-- kafka_batch_size_ouput_config-->
-    </div>
-    <!-- container-fluid -->
+      </div> <!-- kafka_batch_size_ouput_config-->
+    </div> <!-- container-fluid -->
   </body>
 </html>
