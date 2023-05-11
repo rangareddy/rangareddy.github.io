@@ -24,26 +24,28 @@ date: "2021-12-29 00:00:00 +0530"
     <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
     <link href="{{ site.baseurl }}{% link css/jquery.dataTables.css %}" rel="stylesheet">
     <script src="{{ site.baseurl }}{% link js/jquery.dataTables.js %}"></script>
-    <!--<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.css" />
-    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.js"></script>-->
     <script type="text/javascript">
       $(document).ready(function() {
-        let br_delimeter = " \\ <br> "
+        let br_delimeter = " \\ <br> ";
         let space_delimeter = "&nbsp;&nbsp;&nbsp;&nbsp;";
-        let delimeter = br_delimeter + space_delimeter
-        var sparkSubmitCommand = ""
+        let delimeter = br_delimeter + space_delimeter;
+        var sparkSubmitCommand = "";
+        var spark_configuration_table;
 
         function hide_configuration() {
           $("#spark_configuration_id").hide();
           $("#spark_submit_container_id").hide();
         }
+        
         hide_configuration();
         $("#reset-spark-configuration").click(function() {
           $("#totalNodes").val("10");
           $("#coresPerNode").val("16");
           $("#memoryPerNode").val("64");
           hide_configuration();
+          spark_configuration_table.destroy();
         });
+
         $("#generate-spark-configuration").click(function() {
           var sparkConfList = []
           sparkSubmitCommand = ""
@@ -121,13 +123,14 @@ date: "2021-12-29 00:00:00 +0530"
           }
           $("#spark_configuration_id").show();
 
-          $('#spark_configuration_table').DataTable( {
+          spark_configuration_table = $('#spark_configuration_table').DataTable( {
               data: sparkConfList,
+              createdRow: function (row, data, index) {
+                
+              },
               columns: [
                 { "data": "name",
                   render: function (data, type, row, meta) {
-                      console.log(row)
-                      console.log(data)
                         return type === 'display'
                             ? ('<span>'+ data + '</span> <p><progress value="' + row["executor-cores"] + '" max="'+ coresPerNode +'"></progress> </p>') : data;
                   }
@@ -137,7 +140,6 @@ date: "2021-12-29 00:00:00 +0530"
                 { "data": "executor-memory" },
                 { "data": "executor-memoryOverhead"}
               ],
-              select: true,
               responsive: true,
               paging: false,
               searching: false,
@@ -215,7 +217,7 @@ date: "2021-12-29 00:00:00 +0530"
           <div class="card">
             <h5 class="card-header">Spark Configuration Approches</h5>
             <div class="card-body">
-              <table id="spark_configuration_table" class="table table-striped table-responsive">
+              <table id="spark_configuration_table" class="table table-striped table-responsive" style="width:100%">
                 <thead>
                     <tr>
                         <th>Executor Approch Type</th>

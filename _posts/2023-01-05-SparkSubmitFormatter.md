@@ -22,6 +22,8 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
     <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
     <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
     <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
+    <link href="{{ site.baseurl }}{% link css/jquery.dataTables.css %}" rel="stylesheet">
+    <script src="{{ site.baseurl }}{% link js/jquery.dataTables.js %}"></script>
     <style>
       #spark_submit_config_txt {
         overflow: scroll;
@@ -32,6 +34,9 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
     </style>
     <script type="text/javascript">
       $(document).ready(function() {
+        var spark_submit_cmd_line_parameter_table;
+        var spark_submit_cmd_parameter_table;
+
         function validateAndHide() {
           var spark_submit_cmd_val = $("#spark_submit_config_txt").val();
           if (!spark_submit_cmd_val) {
@@ -42,12 +47,26 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           }
         }
 
-        function validateAndShow() {
+        function hide_table_containers() {
+          $("#spark_submit_cmd_parameter_container").hide();
+          $("#spark_submit_cmd_add_parameter_container").hide();
+        }
+
+        function show_table_containers() {
+          $("#spark_submit_cmd_parameter_container").show();
+          $("#spark_submit_cmd_add_parameter_container").show();
+        }
+
+        function validateAndShow(build_type) {
           var spark_submit_cmd_val = $("#spark_submit_config_txt").val().trim();
           if (spark_submit_cmd_val) {
             $("#spark_submit_cmd_format_container").show();
-            $("#spark_submit_cmd_parameter_container").show();
-            $("#spark_submit_cmd_add_parameter_container").show();
+          }
+
+          if ('minify' == build_type) {
+            hide_table_containers();
+          } else {
+            show_table_containers();
           }
         }
         validateAndHide();
@@ -81,13 +100,25 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           "packages": "packages",
           "repositories": "repositories"
         }
+
         $("#sample_spark_submit_config").click(function() {
           var sample_spark_submit_cmd = "spark-submit --class org.apache.spark.examples.SparkPi --master yarn --deploy-mode cluster --num-executors 1";
           sample_spark_submit_cmd += " --driver-memory 512m --executor-memory 512m --driver-cores 1 --executor-cores 2 $SPARK_HOME/examples/jars/spark-examples_*.jar 1000";
           $("#spark_submit_config_txt").val(sample_spark_submit_cmd);
+          hide_table_containers();
+          $("#spark_submit_cmd_format_container").hide();
         });
 
         function build_spark_submit(build_type) {
+
+          if(spark_submit_cmd_parameter_table) {
+            spark_submit_cmd_parameter_table.destroy()
+          }
+
+          if(spark_submit_cmd_line_parameter_table) {
+            spark_submit_cmd_line_parameter_table.destroy()
+          }
+
           var jarFileName = ""
           var className = ""
           var base_spark_class = ""
@@ -95,10 +126,6 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           if (spark_submit_config_txt) {
             sparkSubmitCommand = ""
             spark_submit_config_txt = spark_submit_config_txt.replace("org.apache.spark.deploy.SparkSubmit", "spark-submit").trim()
-            var table = " < table class = \"table table-bordered\" id=\"spark_submit_cmd_parameter_table\">";
-            table += " < thead class = 'thead-light' > ";
-            table += " < tr > < th scope = \"col\" class=\"text-center\">Parameter Name</th> < th scope = \"col\" class=\"text-center\">Parameter Value</th> < /tr>";
-            table += " < /thead> < tbody > ";
             var sparkSparkArgs = []
             var commandLineArgs = []
             let sparkConfigArray = Object.entries(sparkConfigMapObj)
@@ -160,33 +187,41 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
               }
             }
 
-            for (i = 0; i < sparkSparkArgs.length; i++) {
-              var data = sparkSparkArgs[i];
-              var name = data["name"];
-              var value = data["value"];
-              var is_valid_spark_builtin_param = sparkConfigMap.has(name)
-              if (is_valid_spark_builtin_param) {
-                table += " < tr > < td class = \"text-left\">" + sparkConfigMap.get(name) + "</td> < td class = \"text-left\">" + value + "</td> < /tr>";
-              } else {
-                table += " < tr > < td class = \"text-left\">" + name + "</td> < td class = \"text-left\">" + value + "</td> < /tr>";
-              }
-            }
-            table += " < /tbody> < /table>";
-            $("#spark_submit_cmd_parameter_table").html(table);
+            spark_submit_cmd_parameter_table = $('#spark_submit_cmd_parameter_table').DataTable( {
+              data: sparkSparkArgs,
+              columns: [
+                { "data": "name",
+                  render: function (data, type, row, meta) {
+                    var is_valid_spark_builtin_param = sparkConfigMap.has(data)
+                    if (is_valid_spark_builtin_param) {
+                      data = sparkConfigMap.get(data);
+                    } 
+                    return type === 'display' ? ('<span>'+ data + '</span>') : data;
+                  }
+                },
+                { "data": "value"}
+              ],
+              responsive: true,
+              paging: true,
+              searching: true,
+              ordering:  true,
+              info: false
+            });
             
             if (commandLineArgs.length > 0) {
-              var table = " < table class = \"table table-bordered\" id=\"spark_submit_cmd_line_parameter_table\">";
-              table += " < thead class = 'thead-light' > ";
-              table += " < tr > < th scope = \"col\" class=\"text-center\">Parameter Name</th> < th scope = \"col\" class=\"text-center\">Parameter Value</th> < /tr>";
-              table += " < /thead> < tbody > ";
-              for (i = 0; i < commandLineArgs.length; i++) {
-                var data = commandLineArgs[i];
-                var name = data["name"];
-                var value = data["value"];
-                table += " < tr > < td class = \"text-left\">" + name + "</td> < td class = \"text-left\">" + value + "</td> < /tr>";
-              }
-              table += " < /tbody> < /table>";
-              $("#spark_submit_cmd_line_parameter_table").html(table);
+              spark_submit_cmd_line_parameter_table = $('#spark_submit_cmd_line_parameter_table').DataTable( {
+              data: commandLineArgs,
+              columns: [
+                { "data": "name" },
+                { "data": "value" }
+              ],
+              responsive: true,
+              paging: true,
+              searching: true,
+              ordering:  true,
+              info: false
+            });
+
             }
             $("#spark_submit_cmd_parameter_container").show();
             if (base_spark_class) {
@@ -232,7 +267,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
               $("#spark_submit_cmd_text").html(sparkSubmitCommand);
               $("#spark_submit_hide_id").html(sparkSubmitCommand.replaceAll(delimeter, " "));
             }
-            validateAndShow();
+            validateAndShow(build_type);
             if (commandLineArgsLen < 1) {
               $("#spark_submit_cmd_add_parameter_container").hide();
             }
@@ -282,7 +317,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
                 <button type="button" id='format_spark_submit_config' class="btn btn-primary">Format</button>
               </span>
               <span style="margin-right: 12px;">
-                <button type="button" id='minify_spark_submit_config' class="btn btn-info">Monify</button>
+                <button type="button" id='minify_spark_submit_config' class="btn btn-info">Minify</button>
               </span>
               <span style="margin-right: 12px;">
                 <button type="button" id='reset_spark_submit_config' class="btn btn-warning">Reset</button>
@@ -312,7 +347,14 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           <div class="card">
             <h4 class="card-header" style="color: corol;">Spark Submit Command Parameters</h4>
             <div class="card-body">
-              <div id='spark_submit_cmd_parameter_table' class="table-responsive"></div>
+              <table id="spark_submit_cmd_parameter_table" class="table table-striped table-responsive" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Parameter Name</th>
+                        <th>Parameter Value</th>
+                    </tr>
+                </thead>
+              </table>
             </div>
           </div>
         </div>
@@ -323,7 +365,14 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           <div class="card">
             <h4 class="card-header" style="color: fuchsia;">Spark Submit Additional (Command Line) Parameters</h4>
             <div class="card-body">
-              <div id='spark_submit_cmd_line_parameter_table' class="table-responsive"></div>
+              <table id="spark_submit_cmd_line_parameter_table" class="table table-striped table-responsive" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Parameter Name</th>
+                        <th>Parameter Value</th>
+                    </tr>
+                </thead>
+              </table>
             </div>
           </div>
         </div>
