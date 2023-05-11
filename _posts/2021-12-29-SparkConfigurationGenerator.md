@@ -22,9 +22,13 @@ date: "2021-12-29 00:00:00 +0530"
     <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
     <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
     <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
+    <link href="{{ site.baseurl }}{% link css/jquery.dataTables.css %}" rel="stylesheet">
+    <script src="{{ site.baseurl }}{% link js/jquery.dataTables.js %}"></script>
+    <!--<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.css" />
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.js"></script>-->
     <script type="text/javascript">
       $(document).ready(function() {
-        let br_delimeter = " \\ < br > "
+        let br_delimeter = " \\ <br> "
         let space_delimeter = "&nbsp;&nbsp;&nbsp;&nbsp;";
         let delimeter = br_delimeter + space_delimeter
         var sparkSubmitCommand = ""
@@ -115,25 +119,33 @@ date: "2021-12-29 00:00:00 +0530"
             $("#spark_submit_hide_id").html(sparkSubmitCommand.replaceAll(delimeter, " "));
             $("#spark_submit_container_id").show();
           }
-          var table = " < table class = \"table table-bordered\" id=\"spark_configuration_tab\">";
-          table += " < thead class = 'thead-light' > ";
-          table += " < tr > < th scope = \"col\" class=\"text-center\">Executor Approch Type</th> < th scope = \"col\" class=\"text-center\">Executor Cores < br > (spark.executor.cores) < /th> < th scope = \"col\" class=\"text-center\">Number of Executors < br > (spark.executor.instances) < /th> < th scope = \"col\" class=\"text-center\">Executor Memory in GB < br > (spark.executor.memory) < /th> < th scope = \"col\" class=\"text-center\">Executor Memory Overhead in GB < br > (spark.executor.memoryOverhead) < /th> < /tr>";
-          table += " < /thead> < tbody > ";
-          for (i = 0; i < sparkConfList.length; i++) {
-            var data = sparkConfList[i];
-            var approchName = data["name"];
-            if (approchName === "Balanced") {
-              table += " < tr class = \"table-success\"> < th scope = \"row\"'> < i class = \"bi bi-calendar2-check\"></i>&nbsp;&nbsp;" + data["name"] + " < /th>";
-            } else {
-              table += " < tr class = \"table-warning\"> < th scope = \"row\"> < i class = \"bi bi-calendar-x\"></i>&nbsp;&nbsp;" + data["name"] + " < /th>";
-            }
-            table += " < td class = \"text-center\">" + data["executor-cores"] + "</td> < td class = \"text-center\">" + data["num-executors"] + "</td>";
-            table += " < td class = \"text-center\">" + data["executor-memory"] + "</td> < td class = \"text-center\">" + data["executor-memoryOverhead"] + "</td> < /tr>";
-          }
-          table += " < /tbody> < /table>";
-          $("#spark_configuration_table").html(table);
           $("#spark_configuration_id").show();
+
+          $('#spark_configuration_table').DataTable( {
+              data: sparkConfList,
+              columns: [
+                { "data": "name",
+                  render: function (data, type, row, meta) {
+                      console.log(row)
+                      console.log(data)
+                        return type === 'display'
+                            ? ('<span>'+ data + '</span> <p><progress value="' + row["executor-cores"] + '" max="'+ coresPerNode +'"></progress> </p>') : data;
+                  }
+                },
+                { "data": "executor-cores"},
+                { "data": "num-executors" },
+                { "data": "executor-memory" },
+                { "data": "executor-memoryOverhead"}
+              ],
+              select: true,
+              responsive: true,
+              paging: false,
+              searching: false,
+              ordering:  false,
+              info: false
+          } );
         });
+
         $("#copy-spark-shell").click(function(e) {
           e.preventDefault();
           copy_text_to_clipboard('spark_submit_id', 'spark-shell command copied!');
@@ -202,8 +214,18 @@ date: "2021-12-29 00:00:00 +0530"
         <div class="col-md-12">
           <div class="card">
             <h5 class="card-header">Spark Configuration Approches</h5>
-            <div class="card-body" style="margin-bottom: -20px;">
-              <div id='spark_configuration_table' class="table-responsive"></div>
+            <div class="card-body">
+              <table id="spark_configuration_table" class="table table-striped table-responsive">
+                <thead>
+                    <tr>
+                        <th>Executor Approch Type</th>
+                        <th>Executor Cores <br> (spark.executor.cores)</th>
+                        <th>Number of Executors <br> (spark.executor.instances)</th>
+                        <th>Executor Memory in GB <br> (spark.executor.memory)</th>
+                        <th>Executor Memory Overhead in GB<br> (spark.executor.memoryOverhead)</th>
+                    </tr>
+                </thead>
+              </table>
             </div>
             <!--<div class="card-footer"></div>-->
           </div>

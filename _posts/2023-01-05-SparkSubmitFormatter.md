@@ -51,7 +51,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           }
         }
         validateAndHide();
-        var br_delimeter = " \\ < br > "
+        var br_delimeter = " \\ <br> "
         var space_delimeter = "&nbsp;&nbsp;&nbsp;&nbsp;";
         var delimeter = br_delimeter + space_delimeter
         var sparkSubmitCommand = ""
@@ -159,6 +159,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
                 base_spark_class = sparkSubmitParameterArray[0]
               }
             }
+
             for (i = 0; i < sparkSparkArgs.length; i++) {
               var data = sparkSparkArgs[i];
               var name = data["name"];
@@ -172,6 +173,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
             }
             table += " < /tbody> < /table>";
             $("#spark_submit_cmd_parameter_table").html(table);
+            
             if (commandLineArgs.length > 0) {
               var table = " < table class = \"table table-bordered\" id=\"spark_submit_cmd_line_parameter_table\">";
               table += " < thead class = 'thead-light' > ";
