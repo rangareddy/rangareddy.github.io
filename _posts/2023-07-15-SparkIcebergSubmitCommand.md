@@ -2,17 +2,17 @@
 layout: post
 title: Spark Submit Command generator using Iceberg Catalog
 categories: Spark
-tags: Spark Utilities Streaming
+tags: Spark Utilities Iceberg
 author: Ranga Reddy
-date: "2023-04-25 17:00:00 +0530"
+date: "2023-07-15 12:00:00 +0530"
 ---
 
 * content
 {:toc}
 
-## Spark Submit Command generator using Iceberg Catalog
+## Spark Submit Command generator using different Iceberg Catalog(s)
 
-Used to generate the Spark Submit Command using Iceberg Catalog.
+This tool is used to generate or build the Spark Submit Command using Iceberg Catalog(s).
 
 <html lang="en">
   <head>
