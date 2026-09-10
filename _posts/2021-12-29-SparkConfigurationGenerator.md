@@ -14,6 +14,13 @@ tool_tables: true
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Enter total nodes, cores per node and memory per node; the tool returns executor count, executor cores, executor memory and memory overhead.
+> * It offers three shapes: Tiny (one core per executor), Fat (one executor per node using every core) and Balanced (five cores per executor).
+> * The Balanced calculation reserves one core per node for the OS and node manager, subtracts one executor for the YARN ApplicationMaster, and sets `spark.executor.memoryOverhead` to 10% of the per-executor memory.
+> * Five cores per executor is a convention, not a derived number. Treat every output as a starting point and confirm it against your own stage metrics in the Spark UI.
+
 ## Spark Configuration Generator
 
 **Spark Configuration Generator** tool will generate the **spark configuration** based on **hardware configuration**.
@@ -31,7 +38,7 @@ tool_tables: true
           $("#spark_configuration_id").hide();
           $("#spark_submit_container_id").hide();
         }
-        
+
         hide_configuration();
         $("#reset-spark-configuration").click(function() {
           $("#totalNodes").val("10");
@@ -121,7 +128,7 @@ tool_tables: true
           spark_configuration_table = $('#spark_configuration_table').DataTable( {
               data: sparkConfList,
               createdRow: function (row, data, index) {
-                
+
               },
               columns: [
                 { "data": "name",
@@ -138,7 +145,7 @@ tool_tables: true
               responsive: true,
               paging: false,
               searching: false,
-              ordering:  false,
+              ordering: false,
               info: false
           } );
         });
@@ -248,3 +255,10 @@ tool_tables: true
     </div>
     <!-- container-fluid -->
 </div>
+
+## References
+
+* [Spark configuration reference](https://spark.apache.org/docs/latest/configuration.html) for the executor memory and core properties this tool emits
+* [Running Spark on YARN](https://spark.apache.org/docs/latest/running-on-yarn.html) for the ApplicationMaster overhead and container sizing rules
+* [Spark tuning guide](https://spark.apache.org/docs/latest/tuning.html) for memory management and the data-locality trade-offs behind the defaults
+* [Spark JVM troubleshooting playbook]({% post_url 2026-09-10-SparkTroubleshootingPlaybook %}) for the JVM flags that go alongside these sizes

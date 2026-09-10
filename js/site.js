@@ -189,6 +189,31 @@
     });
   }());
 
+  /* ------------------------------------------------------------ mermaid -- */
+  (function mermaidDiagrams() {
+    if (typeof window.mermaid === 'undefined') return;
+    // kramdown + rouge render ```mermaid as a highlighted code block, so the
+    // source has to be lifted back out before mermaid can draw it.
+    var blocks = $$('.prose .language-mermaid');
+    if (!blocks.length) return;
+
+    blocks.forEach(function (block) {
+      var code = block.querySelector('code') || block;
+      var pre = document.createElement('pre');
+      pre.className = 'mermaid';
+      pre.textContent = code.innerText;
+      block.parentNode.replaceChild(pre, block);
+    });
+
+    var dark = root.getAttribute('data-theme') === 'dark';
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: dark ? 'dark' : 'default',
+      themeVariables: { fontFamily: 'Inter, system-ui, sans-serif' }
+    });
+    window.mermaid.run({ querySelector: 'pre.mermaid' });
+  }());
+
   /* -------------------------------------------------------- external links */
   (function externalLinks() {
     var host = window.location.host;

@@ -190,3 +190,20 @@
 @media (hover: none) {
   .copy-btn { opacity: 1; }
 }
+
+/* ------------------------------------------------------------- mermaid -- */
+.prose pre.mermaid {
+  margin: 1.8em 0;
+  padding: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  overflow-x: auto;
+  text-align: center;
+  line-height: normal;
+
+  /* before mermaid.run() replaces it, keep the raw source from flashing */
+  &:not([data-processed]) { color: transparent; }
+
+  svg { max-width: 100%; height: auto; }
+}

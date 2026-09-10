@@ -17,6 +17,13 @@ tool_assets: true
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Pick a Spark version and the tool offers only the Iceberg releases that actually support it, read from each release's own build, then only the Scala versions Iceberg publishes a runtime for.
+> * Spark 4.x is Scala 2.13 only, so no `_2.12` Iceberg runtime exists for it. The tool will not let you build that coordinate.
+> * It emits the `--packages` coordinate, the `IcebergSparkSessionExtensions` config, and the catalog configs for Hive, Hadoop, REST or JDBC.
+> * `SparkSessionCatalog` is used for Hive so Iceberg and existing Hive tables coexist under one catalog name; every other type gets `SparkCatalog`.
+
 ## Spark Submit Command generator using different Iceberg Catalog(s)
 
 This tool is used to generate or build the Spark Submit Command using Iceberg Catalog(s).
@@ -41,12 +48,12 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 			var ICEBERG_SUPPORT = {
 				"1.11.0": ["3.4", "3.5", "4.0", "4.1"],
 				"1.10.2": ["3.4", "3.5", "4.0"],
-				"1.9.2":  ["3.4", "3.5"],
-				"1.8.1":  ["3.3", "3.4", "3.5"],
-				"1.7.2":  ["3.3", "3.4", "3.5"],
-				"1.6.1":  ["3.3", "3.4", "3.5"],
-				"1.5.2":  ["3.3", "3.4", "3.5"],
-				"1.4.3":  ["3.2", "3.3", "3.4", "3.5"]
+				"1.9.2": ["3.4", "3.5"],
+				"1.8.1": ["3.3", "3.4", "3.5"],
+				"1.7.2": ["3.3", "3.4", "3.5"],
+				"1.6.1": ["3.3", "3.4", "3.5"],
+				"1.5.2": ["3.3", "3.4", "3.5"],
+				"1.4.3": ["3.2", "3.3", "3.4", "3.5"]
 			};
 
 			function scalaVersionsFor(sparkVersion) {
@@ -106,7 +113,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 					$("#catalog-type").focus();
 					return
 				}
-				
+
 				var dependencies = "org.apache.iceberg:iceberg-spark-runtime-"+ sparkVersion + "_" + scalaVersion + ":" + icebergVersion;
 
 				var command = "spark-shell \\ </br>";
@@ -120,7 +127,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 				} else {
 				  command += "&emsp;--conf spark.sql.catalog." + catalogName + "=org.apache.iceberg.spark.SparkCatalog" + " \\ </br>";
 				}
-				
+
 				command += "&emsp;--conf spark.sql.catalog." + catalogName + ".type=" + catalogType + " \\ </br>";
 				if( "hive" === catalogType) {
 					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".uri=" + $("#metastore-uri").val();
@@ -156,7 +163,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
     --conf spark.sql.catalog.jdbc.jdbc.verifyServerCertificate=true \
     --conf spark.sql.catalog.jdbc.jdbc.useSSL=true \
     --conf spark.sql.catalog.jdbc.jdbc.user=$DB_USERNAME \
-    --conf spark.sql.catalog.jdbc.jdbc.password=$DB_PASSWORD 
+    --conf spark.sql.catalog.jdbc.jdbc.password=$DB_PASSWORD
 
 	spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.3.0 \
     --conf spark.sql.catalog.my_catalog=org.apache.iceberg.spark.SparkCatalog \
@@ -166,7 +173,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
     --conf spark.sql.catalog.my_catalog.jdbc.verifyServerCertificate=true \
     --conf spark.sql.catalog.my_catalog.jdbc.useSSL=true \
     --conf spark.sql.catalog.my_catalog.jdbc.user=admin \
-    --conf spark.sql.catalog.my_catalog.jdbc.password=pass 
+    --conf spark.sql.catalog.my_catalog.jdbc.password=pass
 */
 
   </script>
@@ -366,6 +373,13 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 	            </div>
 	          </div>
 	        </div>
-	    </div>  <!-- spark_iceberg_submit_cmd_container -->
+	    </div> <!-- spark_iceberg_submit_cmd_container -->
 	</div> <!--container-fluid -->
 </div>
+
+## References
+
+* [Iceberg Spark getting started](https://iceberg.apache.org/docs/latest/spark-getting-started/) for the runtime coordinate and session extensions
+* [Iceberg Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration.html) for catalog properties and the `SparkCatalog` versus `SparkSessionCatalog` choice
+* [`CatalogUtil.java` at apache-iceberg-1.11.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/core/src/main/java/org/apache/iceberg/CatalogUtil.java), the accepted `type` values
+* [Iceberg `gradle.properties` at apache-iceberg-1.11.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/gradle.properties), the Spark and Scala support matrix this tool encodes

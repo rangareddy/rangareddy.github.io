@@ -103,10 +103,11 @@ can see the switch in the shipped templates:
 
 This matters more than a rename. If you hand a Log4j 2 runtime a Log4j 1.x
 properties file, or point it at a file with the old `-Dlog4j.configuration`
-flag, Log4j 2 does not fail. It falls back to its default configuration and logs
-at the default level, so you get a working application and none of the logging
-you asked for. Every "my custom log4j.properties is being ignored" ticket I have
-seen since 2022 was this.
+flag, Log4j 2 does not error out. It ignores the unknown property, falls back to
+its normal configuration lookup, and logs at whatever level that finds. You get
+a working application and none of the logging you asked for, which is the shape
+of most "my custom log4j.properties is being ignored" reports on Spark 3.3 and
+later.
 
 Spark 4.2.0 also ships `log4j2-json-layout.properties.template` and a
 `spark.log.structuredLogging.enabled` config (default `false`) if you want JSON

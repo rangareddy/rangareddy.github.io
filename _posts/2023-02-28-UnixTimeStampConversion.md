@@ -13,6 +13,12 @@ tool_assets: true
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Convert an epoch timestamp to a readable date and back, in either seconds or milliseconds.
+> * The current epoch time is shown live in both units, which is usually what you need when reading a log line.
+> * Epoch time counts from `1970-01-01 00:00:00 UTC`, so a value that looks a few hours off is almost always a timezone assumption rather than a bad timestamp.
+
 ## Epoch and Unix Timestamp Converter
 
 A simple tool to convert an epoch/unix timestamp into a human readable date vice versa. It also displays the current epoch/unix timestamp in both seconds and milliseconds.
@@ -194,3 +200,9 @@ Epoch also known as Unix timestamps, is the number of seconds that have elapsed 
     </div>
 
 </div>
+
+## References
+
+* [Unix time on Wikipedia](https://en.wikipedia.org/wiki/Unix_time) for the definition and the leap-second caveats
+* [`java.time.Instant`](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/Instant.html) for the JVM-side conversion used by most data tools
+* [Spark datetime patterns](https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html) for formatting epoch columns in Spark SQL

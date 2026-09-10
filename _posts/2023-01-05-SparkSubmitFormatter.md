@@ -14,6 +14,12 @@ tool_tables: true
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Paste a `spark-submit` command written on one line and get it back split across lines with a trailing backslash per argument, or minified back to one line.
+> * Every `--conf` and flag is also broken out into an editable table, so you can review, change or delete individual settings and regenerate.
+> * Useful when reviewing a command from a ticket or a CI job definition, where a single long line hides duplicated or contradictory `--conf` entries.
+
 ## Spark Submit Command Formatter/Minifier
 
 Used to **format/minify** the **Spark Submit** command and generate it in beautiful/minify format.
@@ -190,7 +196,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
                     var is_valid_spark_builtin_param = sparkConfigMap.has(data)
                     if (is_valid_spark_builtin_param) {
                       data = sparkConfigMap.get(data);
-                    } 
+                    }
                     return type === 'display' ? ('<span>'+ data + '</span>') : data;
                   }
                 },
@@ -199,10 +205,10 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
               responsive: true,
               paging: true,
               searching: true,
-              ordering:  true,
+              ordering: true,
               info: false
             });
-            
+
             if (commandLineArgs.length > 0) {
               spark_submit_cmd_line_parameter_table = $('#spark_submit_cmd_line_parameter_table').DataTable( {
               data: commandLineArgs,
@@ -213,7 +219,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
               responsive: true,
               paging: true,
               searching: true,
-              ordering:  true,
+              ordering: true,
               info: false
             });
 
@@ -374,3 +380,10 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
     </div>
     <!-- container-fluid -->
 </div>
+
+## References
+
+* [Submitting applications](https://spark.apache.org/docs/latest/submitting-applications.html) for the `spark-submit` argument reference
+* [Spark configuration reference](https://spark.apache.org/docs/latest/configuration.html) for what each `--conf` key means and its precedence
+* [Spark Configuration Generator]({% post_url 2021-12-29-SparkConfigurationGenerator %}) to work out the executor sizes before formatting the command
+* [Spark JVM troubleshooting playbook]({% post_url 2026-09-10-SparkTroubleshootingPlaybook %}) for the `extraJavaOptions` gotchas a long command tends to hide

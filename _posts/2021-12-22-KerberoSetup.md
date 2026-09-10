@@ -11,6 +11,13 @@ description: >-
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Kerberos is the authentication standard across the Hadoop ecosystem, so setting up a KDC is a prerequisite for securing HDFS, YARN, Hive and Spark.
+> * You install `krb5-workstation` on every node and `krb5-server` on one, then configure `kdc.conf` (KDC behaviour) and `krb5.conf` (client behaviour) to agree on the realm.
+> * `kdb5_util create -s` builds the principal database; the ACL file decides who may administer it; `kadmin.local` creates the first admin.
+> * Services authenticate with keytabs rather than passwords, which is why the last step is exporting one and testing `kinit -kt` from a client machine.
+
 ## Kerberos
 
 Kerberos is a secure authentication method developed by MIT that allows two services located in a non-secured network to authenticate themselves in a secure way. Kerberos, which is based on a **ticketing system**, serves as both **Authentication Server** and as **Ticket Granting Server \(TGS\)**.
@@ -210,3 +217,10 @@ Create a kerberos ticket
 Check if ticket created
 
 `$ klist`
+
+## References
+
+* [MIT Kerberos documentation](https://web.mit.edu/kerberos/krb5-latest/doc/) for `kdc.conf`, `krb5.conf` and `kadmin` reference
+* [Kerberos V5 System Administrator's Guide](https://web.mit.edu/kerberos/krb5-latest/doc/admin/index.html) for realm and database administration
+* [Hadoop in secure mode](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SecureMode.html) for how Hadoop services consume the keytabs created here
+* [Spark security](https://spark.apache.org/docs/latest/security.html) for delegation tokens and `--principal` / `--keytab` on a Kerberized cluster

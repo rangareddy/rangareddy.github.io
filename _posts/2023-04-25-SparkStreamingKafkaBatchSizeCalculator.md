@@ -13,6 +13,13 @@ tool_assets: true
 * content
 {:toc}
 
+> **TL;DR**
+>
+> * Enter the Kafka partition count, the batch duration in seconds and the max rate per partition; the tool returns the maximum messages one batch will fetch.
+> * The arithmetic is `partitions x batch duration x max rate per partition`, which is the ceiling `spark.streaming.kafka.maxRatePerPartition` imposes on a DStream batch.
+> * Use it to size a batch against what your job can actually process in one interval. A ceiling above your throughput means growing scheduling delay, not faster ingestion.
+> * For Structured Streaming the equivalent knob is `maxOffsetsPerTrigger`, which caps offsets per trigger across the whole topic rather than per partition.
+
 ## Spark Streaming Kafka Batch Size Calculator
 
 Used to calculate the Spark Streaming Kafka Batch Size.
@@ -31,7 +38,7 @@ Used to calculate the Spark Streaming Kafka Batch Size.
           $("#maxRatePerPartition").val(100)
           $("#batchDuration").val(2)
         });
-        
+
         $("#calculate-batch-size").click(function() {
             hide_configuration();
             var numPartitions = parseInt($("#numPartitions").val());
@@ -74,7 +81,7 @@ Used to calculate the Spark Streaming Kafka Batch Size.
                   </div>
                 </div>
                 <div class="col-sm-4">
-                  <div class="form-group">        
+                  <div class="form-group">
                     <input type="number" class="form-control" id="batchDuration" name="batchDuration" min="1" step="1" value="2" required>
                   </div>
                 </div>
@@ -120,7 +127,7 @@ Used to calculate the Spark Streaming Kafka Batch Size.
                     </div>
                   </div>
                   <div class="col-sm-4">
-                    <div class="form-group">        
+                    <div class="form-group">
                      <input type="number" class="form-control" id="batchSize" name="batchSize" readonly>
                     </div>
                   </div>
@@ -131,3 +138,9 @@ Used to calculate the Spark Streaming Kafka Batch Size.
       </div> <!-- kafka_batch_size_ouput_config-->
     </div> <!-- container-fluid -->
 </div>
+
+## References
+
+* [Spark Streaming and Kafka integration](https://spark.apache.org/docs/latest/streaming-kafka-0-10-integration.html) for `spark.streaming.kafka.maxRatePerPartition` and backpressure
+* [Structured Streaming and Kafka integration](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html) for `maxOffsetsPerTrigger`, the current equivalent
+* [Structured Streaming programming guide](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html) for trigger intervals and processing-time semantics
