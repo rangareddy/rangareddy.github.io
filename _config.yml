@@ -2,11 +2,11 @@
 # Site settings
 # ---------------------------------------------------------------------------
 title: Ranga Reddy
-tagline: Data Engineering, Apache Spark and the Lakehouse
-brief-intro: Senior Software Engineer
+tagline: Apache Hudi, Iceberg and Spark internals
+brief-intro: Senior Data Engineer
 description: >-
-  Hands-on notes, troubleshooting guides and interactive tools for Apache Spark,
-  Iceberg, Kafka, Parquet and the Linux stack that runs underneath them.
+  Hands-on notes, production troubleshooting and interactive tools for Apache
+  Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.
 
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://rangareddy.github.io" # the base hostname & protocol for your site
@@ -26,8 +26,11 @@ twitter_username: avula_ranga
 facebook_username: rangareddy.avula
 github_username: rangareddy
 email: rangareddy.avula@gmail.com
-linkedIn_username: ranga-reddy-big-data-developer/
+linkedIn_username: rangareddy1988/
 stackoverflow: users/1918962/ranga-reddy
+cloudera_community: https://community.cloudera.com/t5/tkb/usercontributedarticlespage/user-id/78612/tkb-id/CommunityArticles
+hudi_contributions: https://github.com/apache/hudi/graphs/contributors?all=1
+resume: /assets/others/Ranga_Reddy_Data_Engineer.pdf
 
 description_footer: You can contact me
 
@@ -68,6 +71,7 @@ paginate_path: "/blog/page:num/"
 
 plugins:
   - jekyll-paginate
+  - jekyll-redirect-from
   - jekyll-readme-index
   - jekyll-github-metadata
   - jekyll-sitemap

@@ -16,8 +16,8 @@
        alt="Portrait of {{ site.author }}" loading="lazy">
   <h2 class="panel__title panel__title--plain">{{ site.author }}</h2>
   <p class="panel__note">{{ site.brief-intro }}</p>
-  <a class="btn btn--ghost btn--sm" href="{{ '/about/' | relative_url }}">
-    About me {% include icon.html name="arrow-right" %}
+  <a class="btn btn--ghost btn--sm" href="{{ site.resume | relative_url }}">
+    {% include icon.html name="archive" %}Download CV
   </a>
 </section>
 {%- endif %}

@@ -146,6 +146,16 @@
   gap: 0.4em;
 
   .icon { width: 0.98em; height: 0.98em; }
+
+  &--updated {
+    padding: 0.05rem 0.5rem;
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+
+    .icon { color: var(--accent); }
+  }
 }
 
 /* ----------------------------------------------------------------- cards -- */

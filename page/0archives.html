@@ -5,6 +5,9 @@ permalink: /archive/
 icon: archive
 type: page
 description: Every post, newest first, grouped by year.
+redirect_from:
+  - /HappyNewYear/
+  - /LinuxUsefulCommands/
 ---
 
 {%- assign years = site.posts | group_by_exp: "post", "post.date | date: '%Y'" -%}

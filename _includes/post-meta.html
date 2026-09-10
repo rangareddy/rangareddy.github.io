@@ -9,6 +9,11 @@
     {% include icon.html name="calendar" %}
     <time datetime="{{ p.date | date_to_xmlschema }}">{{ p.date | date: "%b %-d, %Y" }}</time>
   </span>
+  {%- if p.updated %}
+  <span class="meta__item meta__item--updated" title="Substantially revised on this date">
+    {% include icon.html name="sparkles" %}Updated {{ p.updated | date: "%b %-d, %Y" }}
+  </span>
+  {%- endif %}
   {%- if p.kind == "tool" %}
   <span class="meta__item">{% include icon.html name="tool" %}Interactive tool</span>
   {%- else %}

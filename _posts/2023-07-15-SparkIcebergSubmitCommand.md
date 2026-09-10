@@ -4,8 +4,12 @@ categories: Spark
 tags: Spark Utilities Iceberg
 author: Ranga Reddy
 date: "2023-07-15 12:00:00 +0530"
+updated: "2026-09-10 10:00:00 +0530"
 description: >-
-  Pick a catalog type (hive, hadoop, glue, jdbc, rest or nessie) plus Spark, Iceberg and Scala versions, and get the full spark-shell command with the right iceberg-spark-runtime coordinates and catalog configs.
+  Pick a catalog type (Hive, Hadoop, REST or JDBC) plus Spark, Iceberg and Scala
+  versions, and get the spark-shell command with the right iceberg-spark-runtime
+  coordinates and catalog configs. Version pairs come from each Iceberg release's
+  own build, up to Iceberg 1.11.0 on Spark 4.1.
 kind: tool
 tool_assets: true
 ---
@@ -30,84 +34,45 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 		        $("#" + selectedType+"-catalog").show();
 		    });
 
+			// Support matrix read from each Iceberg release's gradle.properties
+			// (systemProp.knownSparkVersions) at its apache-iceberg-<v> tag, plus
+			// settings.gradle for the Scala suffixes. Spark 4.x runtimes are
+			// published for Scala 2.13 only.
+			var ICEBERG_SUPPORT = {
+				"1.11.0": ["3.4", "3.5", "4.0", "4.1"],
+				"1.10.2": ["3.4", "3.5", "4.0"],
+				"1.9.2":  ["3.4", "3.5"],
+				"1.8.1":  ["3.3", "3.4", "3.5"],
+				"1.7.2":  ["3.3", "3.4", "3.5"],
+				"1.6.1":  ["3.3", "3.4", "3.5"],
+				"1.5.2":  ["3.3", "3.4", "3.5"],
+				"1.4.3":  ["3.2", "3.3", "3.4", "3.5"]
+			};
+
+			function scalaVersionsFor(sparkVersion) {
+				// Spark 4 dropped Scala 2.12, so Iceberg only ships _2.13 runtimes.
+				return sparkVersion.indexOf("4.") === 0 ? ["2.13"] : ["2.12", "2.13"];
+			}
+
+			function setOptions(selectId, values, placeholder) {
+				var $sel = $(selectId);
+				$sel.empty();
+				$sel.append($("<option>", { disabled: true, selected: true, value: "", text: placeholder }));
+				values.forEach(function(v) {
+					$sel.append($("<option>", { value: v, text: v }));
+				});
+			}
+
 			$("#spark-version").change(function() {
-				$('#iceberg-version').attr('disabled', true);
-		    	var sparkVersion = $(this).val();
-		    	$("#iceberg-version > option").each(function() {
-	    			var icebergVersion=this.text;
-	    			$("#iceberg-version option[value='"+icebergVersion+"']").show();
+				var sparkVersion = $(this).val();
+				var supported = Object.keys(ICEBERG_SUPPORT).filter(function(iceberg) {
+					return ICEBERG_SUPPORT[iceberg].indexOf(sparkVersion) >= 0;
 				});
-				$('#iceberg-version').prop('selectedIndex',0);
-
-		    	if("3.0" === sparkVersion) {
-		    		$("#iceberg-version > option").each(function() {
-		    			var icebergVersion=this.text;
-		    			if(['0.14.0', '0.14.1', '1.0.0'].indexOf(icebergVersion) >= 0 ) {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").show();
-		    			} else {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").hide();
-		    			}
-					});
-		    	} else if("3.3" === sparkVersion) {
-		    		$("#iceberg-version > option").each(function() {
-		    			var icebergVersion=this.text;
-		    			if(['0.13.0', '0.13.1', '0.13.2'].indexOf(icebergVersion) >= 0 ) {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").hide();
-		    			} else {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").show();
-		    			}
-					});
-		    	} else if("3.4" === sparkVersion) {
-		    		$("#iceberg-version > option").each(function() {
-		    			var icebergVersion=this.text;
-		    			if(['1.3.0'].indexOf(icebergVersion) >= 0 ) {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").show();
-		    			} else {
-		    				$("#iceberg-version option[value='"+icebergVersion+"']").hide();
-		    			}
-					});
-		    	}
-		    	$('#iceberg-version').attr('disabled', false);
-		    	$('#scala-version').attr('disabled', true);
-		    	$('#scala-version').prop('selectedIndex',0);
-		    });
-
-			// iceberg-spark-runtime-3.0 - 0.14.0 to 1.0.0 - Scala version - 2.12
-			// iceberg-spark-runtime-3.1 - 0.13.0 to 1.3.0 - Scala version - 2.12
-			// iceberg-spark-runtime-3.2 - 0.13.0 to 1.3.0 - Scala version - 2.12 and 2.13 (0.13.x only supports 2.12)
-			// iceberg-spark-runtime-3.3 - 0.14.0 to 1.3.0 - Scala version - 2.12 and 2.13
-			// iceberg-spark-runtime-3.4 - 1.3.0 - Scala version - 2.12 and 2.13
-
-		    $("#iceberg-version").change(function() {
-		    	$('#scala-version').attr('disabled', true);
-		    	$("#scala-version > option").each(function() {
-		    		var scalaVersion=this.text;
-		    		$("#scala-version option[value='"+scalaVersion+"']").show();
-				});
-				$('#scala-version').prop('selectedIndex',0);
-		    	var icebergVersion = $(this).val();
-		    	var sparkVersion = $("#spark-version").val();
-		    	if(["3.0", "3.1"].indexOf(sparkVersion) >= 0) {
-					$("#scala-version > option").each(function() {
-		    			var scalaVersion=this.text;
-		    			if(['2.12'].indexOf(scalaVersion) >= 0 ) {
-		    				$("#scala-version option[value='"+scalaVersion+"']").show();
-		    			} else {
-		    				$("#scala-version option[value='"+scalaVersion+"']").hide();
-		    			}
-					});
-		    	} else if ("3.2" === sparkVersion && ['0.13.0', '0.13.1', '0.13.2'].indexOf(icebergVersion) >= 0 ) {
-		    		$("#scala-version > option").each(function() {
-		    			var scalaVersion=this.text;
-		    			if(['2.12'].indexOf(scalaVersion) >= 0 ) {
-		    				$("#scala-version option[value='"+scalaVersion+"']").show();
-		    			} else {
-		    				$("#scala-version option[value='"+scalaVersion+"']").hide();
-		    			}
-					});
-		    	}
-		    	$('#scala-version').attr('disabled', false);
-		    });
+				setOptions("#iceberg-version", supported, "Select Iceberg Version");
+				setOptions("#scala-version", scalaVersionsFor(sparkVersion), "Select Scala Version");
+				$("#iceberg-version").attr("disabled", supported.length === 0);
+				$("#scala-version").attr("disabled", false);
+			});
 
 		    $("#generate_spark_submit_cmd").click(function() {
 		        var catalogType = $("#catalog-type").val();
@@ -163,6 +128,13 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".warehouse=" + $("#warehouse-url").val();
 				} else if("rest" === catalogType) {
 					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".uri=" + $("#rest-uri").val();
+				} else if("jdbc" === catalogType) {
+					// JdbcCatalog reads connection settings under the "jdbc." prefix
+					// (JdbcCatalog.PROPERTY_PREFIX); uri and warehouse are top level.
+					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".uri=" + $("#jdbc-uri").val() + " \\ </br>";
+					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".warehouse=" + $("#jdbc-warehouse").val() + " \\ </br>";
+					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".jdbc.user=" + $("#jdbc-user").val() + " \\ </br>";
+					command += "&emsp;--conf spark.sql.catalog." + catalogName + ".jdbc.password=$ICEBERG_CATALOG_PASSWORD";
 				}
 
 				// Display the generated command
@@ -229,11 +201,12 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 			                  	<div class="form-group">
 			                    	<select class="form-control" id="spark-version">
 			                    		<option disabled selected value>Select Spark Version</option>
-								        <option value="3.0">3.0</option>
-								        <option value="3.1">3.1</option>
 								        <option value="3.2">3.2</option>
 								        <option value="3.3">3.3</option>
 								        <option value="3.4">3.4</option>
+								        <option value="3.5">3.5</option>
+								        <option value="4.0">4.0</option>
+								        <option value="4.1">4.1</option>
 							      	</select>
 			                  	</div>
 			                </div>
@@ -248,16 +221,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 			                  	<div class="form-group">
 								    <select class="form-control" id="iceberg-version">
 								    	<option disabled selected value>Select Iceberg Version</option>
-								        <option value="0.13.0">0.13.0</option>
-								      	<option value="0.13.1">0.13.1</option>
-								        <option value="0.13.2">0.13.2</option>
-								        <option value="0.14.0">0.14.0</option>
-								      	<option value="0.14.1">0.14.1</option>
-								        <option value="1.0.0">1.0.0</option>
-								        <option value="1.1.0">1.1.0</option>
-								        <option value="1.2.0">1.2.0</option>
-								        <option value="1.2.1">1.2.1</option>
-								        <option value="1.3.0">1.3.0</option>
+										<!-- populated from ICEBERG_SUPPORT when a Spark version is picked -->
 								    </select>
 			                  	</div>
 			                </div>
@@ -291,9 +255,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 								        <option value="hive">Hive</option>
 								        <option value="hadoop">Hadoop</option>
 								        <option value="rest">REST</option>
-								        <option value="jdbc">Jdbc</option>
-								        <!--<option value="glue">AWS Glue</option>
-								        <option value="nessie">Nessie</option> -->
+								        <option value="jdbc">JDBC</option>
 						      		</select>
 			                  	</div>
 			                </div>
@@ -328,6 +290,39 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 			                  	<input type="text" id="rest-uri" name="rest-uri" class="form-control" value='http://localhost:8080'>
 			                </div>
 					    </div>
+					    <div class="row catalog-log-div" id="jdbc-catalog" style="margin-top: 10px; display: none;">
+			                <div class="col-sm-4">
+			                  	<div class="form-group">
+			                    	<label for="jdbc-uri">JDBC URI:</label>
+			                  	</div>
+			                </div>
+			                <div class="col-sm-8">
+			                  	<div class="form-group">
+			                    	<input type="text" class="form-control" id="jdbc-uri" value="jdbc:postgresql://catalog-db.internal:5432/iceberg">
+			                  	</div>
+			                </div>
+			                <div class="col-sm-4">
+			                  	<div class="form-group">
+			                    	<label for="jdbc-warehouse">Warehouse:</label>
+			                  	</div>
+			                </div>
+			                <div class="col-sm-8">
+			                  	<div class="form-group">
+			                    	<input type="text" class="form-control" id="jdbc-warehouse" value="s3://lakehouse-prod/warehouse">
+			                  	</div>
+			                </div>
+			                <div class="col-sm-4">
+			                  	<div class="form-group">
+			                    	<label for="jdbc-user">JDBC user:</label>
+			                  	</div>
+			                </div>
+			                <div class="col-sm-8">
+			                  	<div class="form-group">
+			                    	<input type="text" class="form-control" id="jdbc-user" value="iceberg_catalog">
+			                  	</div>
+			                </div>
+					    </div>
+
 					    <div class="row" style='margin-top: 10px;' id="test-catalog" style="display: none;">
 						    <div class="form-group catalog-log-div" id="hadoop" style="display: none;">
 						    	spark.sql.catalog.hadoop_prod.warehouse = hdfs://nn:8020/warehouse/path*/
