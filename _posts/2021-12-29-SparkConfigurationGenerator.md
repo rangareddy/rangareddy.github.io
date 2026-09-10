@@ -1,10 +1,14 @@
 ---
-layout: post
 title: Spark Configuration Generator tool
 categories: Spark
 tags: Spark Utilities Generator
 author: Ranga Reddy
 date: "2021-12-29 00:00:00 +0530"
+description: >-
+  Enter the node count, cores per node and memory per node for your cluster and get back executor count, executor cores, executor memory and memory overhead, ready to paste into spark-shell.
+kind: tool
+tool_assets: true
+tool_tables: true
 ---
 
 * content
@@ -14,16 +18,7 @@ date: "2021-12-29 00:00:00 +0530"
 
 **Spark Configuration Generator** tool will generate the **spark configuration** based on **hardware configuration**.
 
-<html lang="en">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Spark Configuration Generator</title>
-    <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
-    <link href="{{ site.baseurl }}{% link css/jquery.dataTables.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/jquery.dataTables.js %}"></script>
+<div class="tool-widget">
     <script type="text/javascript">
       $(document).ready(function() {
         let br_delimeter = " \\ <br> ";
@@ -154,8 +149,6 @@ date: "2021-12-29 00:00:00 +0530"
         });
       });
     </script>
-  </head>
-  <body>
     <div class="container-fluid">
       <div class="row" id="hardware-config-row" style="margin-top: 10px;">
         <div class="col-md-12">
@@ -254,5 +247,4 @@ date: "2021-12-29 00:00:00 +0530"
       <!-- row -->
     </div>
     <!-- container-fluid -->
-  </body>
-</html>
+</div>

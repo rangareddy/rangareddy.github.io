@@ -1,10 +1,11 @@
 ---
-layout: post
 title: Parquet Tools
 categories: Tools
 tags: Tools Parquet
 author: Ranga Reddy
 date: "2023-01-12 00:00:00 +0530"
+description: >-
+  Pull data and metadata out of Parquet files on local disk, HDFS or S3 with parquet-tools: getting the jar, then the cat, head, schema, meta, dump, merge, rowcount and size commands.
 ---
 
 * content

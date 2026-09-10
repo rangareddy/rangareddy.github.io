@@ -1,10 +1,13 @@
 ---
-layout: post
 title: Spark Submit Command generator using Iceberg Catalog
 categories: Spark
 tags: Spark Utilities Iceberg
 author: Ranga Reddy
 date: "2023-07-15 12:00:00 +0530"
+description: >-
+  Pick a catalog type (hive, hadoop, glue, jdbc, rest or nessie) plus Spark, Iceberg and Scala versions, and get the full spark-shell command with the right iceberg-spark-runtime coordinates and catalog configs.
+kind: tool
+tool_assets: true
 ---
 
 * content
@@ -14,15 +17,7 @@ date: "2023-07-15 12:00:00 +0530"
 
 This tool is used to generate or build the Spark Submit Command using Iceberg Catalog(s).
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spark Submit Command generator using Iceberg Catalog</title>
-    <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
+<div class="tool-widget">
     <script type="text/javascript">
       	$(document).ready(function() {
 
@@ -203,9 +198,7 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 */
 
   </script>
-</head>
 
-<body>
 	<div class="container-fluid">
         <div class="row" id="spark_iceberg_generator_container" style="margin-top: 10px;">
         	<div class="col-md-12">
@@ -380,5 +373,4 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 	        </div>
 	    </div>  <!-- spark_iceberg_submit_cmd_container -->
 	</div> <!--container-fluid -->
-</body>
-</html>
+</div>

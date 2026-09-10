@@ -1,10 +1,11 @@
 ---
-layout: post
 title: Linux Useful Commands
 categories: Linux
 tags: Miscellaneous Linux
 author: Ranga Reddy
 date: "2023-03-03 00:00:00 +0530"
+description: >-
+  Linux one-liners worth keeping close, starting with finding a process by name and killing every matching process by id or by name.
 ---
 
 * content

@@ -1,24 +1,19 @@
 ---
 layout: default
 ---
-<div class="page clearfix" post>
-    <div class="left">
-        <h1>{{page.title}}</h1>
-        <hr>
-        {{content}}
+
+<div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="page-head">
+      <h1 class="page-head__title">{{ page.title }}</h1>
+      {%- if page.description %}
+      <p class="page-head__lede">{{ page.description }}</p>
+      {%- endif %}
+    </header>
+    <div class="prose" id="postBody">
+      {{ content }}
     </div>
-    <button class="anchor"><i class="fa fa-anchor"></i></button>
-    <div class="right">
-        <div class="wrap">
-            <!-- Content -->
-            <div class="side content">
-                <div>
-                    Content
-                </div>
-                <ul id="content-side" class="content-ul">
-                </ul>
-            </div>
-        </div>
-    </div>
+  </article>
+
+  {% include sidebar.html toc=true show="profile,recent" %}
 </div>
-<script src="{{ " /js/pageContent.js " | prepend: site.baseurl }}" charset="utf-8"></script>

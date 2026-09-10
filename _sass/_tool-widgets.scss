@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Embedded tool widgets
+   Several posts ship a Bootstrap 5 + jQuery widget inside the article body.
+   Bootstrap loads before main.css, so this layer re-points the widget at the
+   site's own tokens: without it the widgets would stay light while the rest of
+   the page is dark.
+   ========================================================================== */
+
+.tool-widget {
+  margin: 1.8em 0;
+  color: var(--text);
+  font-family: var(--font-sans);
+
+  /* prose rules must not reshape the widget's own lists and tables */
+  ul, ol { padding-left: 0; margin: 0; list-style: none; }
+  li { margin-bottom: 0; }
+  code { white-space: normal; }
+  img { margin: 0; border: 0; box-shadow: none; }
+
+  .container-fluid, .container { padding: 0; }
+  .row { margin-left: 0; margin-right: 0; }
+  [class^="col-"], [class*=" col-"] { padding-left: 0; padding-right: 0; }
+
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  /* ------------------------------------------------------------- cards -- */
+  .card {
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-header {
+    padding: 0.7rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .card-body { padding: 1.1rem; }
+
+  /* ------------------------------------------------------------ tables -- */
+  .table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text);
+    --bs-table-border-color: var(--border);
+    --bs-table-striped-bg: var(--surface-2);
+    --bs-table-striped-color: var(--text);
+    --bs-table-hover-bg: var(--surface-2);
+    --bs-table-hover-color: var(--text);
+    color: var(--text);
+    border-color: var(--border);
+    margin-bottom: 0;
+  }
+
+  .table > :not(caption) > * > * {
+    border-color: var(--border);
+    background-color: transparent;
+    color: var(--text);
+  }
+
+  thead th, .thead-light th, thead.thead-light th {
+    background: var(--surface-2) !important;
+    color: var(--text-2) !important;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  /* -------------------------------------------------------- form fields -- */
+  .form-control, .form-select, .form-control-plaintext,
+  input[type="text"], input[type="number"], input[type="search"], select, textarea {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    background-color: var(--surface);
+    color: var(--text);
+
+    &::placeholder { color: var(--text-3); }
+
+    &:focus {
+      border-color: var(--brand);
+      background-color: var(--surface);
+      color: var(--text);
+      box-shadow: 0 0 0 3px var(--brand-ring);
+    }
+
+    &:disabled, &[readonly] {
+      background-color: var(--surface-2);
+      color: var(--text-3);
+    }
+  }
+
+  .form-select {
+    /* Bootstrap's chevron is a dark data-uri; recolour it for dark mode */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23788' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  }
+
+  label, .form-label, .col-form-label { color: var(--text-2); font-weight: 600; }
+
+  .input-group-text {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+
+  /* ------------------------------------------------------------- alerts -- */
+  .alert {
+    border-radius: var(--r);
+    border-color: var(--border);
+  }
+
+  /* ------------------------------------------------------- output panes -- */
+  pre, .tool-output {
+    border: 1px solid var(--code-border);
+    border-radius: var(--r);
+    background: var(--code-bg);
+    color: var(--code-ink);
+  }
+}
+
+/* ---------------------------------------------------------- DataTables -- */
+.tool-widget {
+  .dataTables_wrapper {
+    color: var(--text-2);
+
+    .dataTables_length, .dataTables_filter, .dataTables_info,
+    .dataTables_paginate, .dataTables_processing {
+      color: var(--text-2);
+    }
+
+    .dataTables_paginate .paginate_button {
+      color: var(--text-2) !important;
+      border-color: var(--border);
+
+      &:hover {
+        border-color: var(--brand-ring);
+        background: var(--surface-2);
+        color: var(--brand) !important;
+      }
+
+      &.current, &.current:hover {
+        border-color: var(--brand-ring);
+        background: var(--brand-soft);
+        color: var(--brand-ink) !important;
+      }
+    }
+  }
+
+  table.dataTable {
+    color: var(--text);
+    border-color: var(--border);
+
+    tbody tr { background-color: transparent; }
+    tbody tr:hover { background-color: var(--surface-2); }
+    thead th, thead td { border-bottom-color: var(--border); }
+  }
+}

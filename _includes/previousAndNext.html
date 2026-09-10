@@ -1,12 +1,18 @@
-<div class="post-recent">
-    <span class="pre" style="width: 50%; float: left;">
-        {% if page.previous %}
-        <p><strong>Previous</strong> <a href="{{ page.previous.url | prepend: site.baseurl }}">{{ page.previous.title }}</a></p>
-        {% endif %}
-    </span>
-    <span class="nex" style="width: 50%; float: right; text-align: right;">
-        {% if page.next %}
-        <p><strong>Next</strong> <a href="{{ page.next.url | prepend: site.baseurl }}">{{ page.next.title }}</a></p>
-        {% endif %}
-    </span>
-</div>
+{%- if page.previous or page.next %}
+<nav class="post-nav" aria-label="Previous and next post">
+  {%- if page.previous %}
+  <a class="post-nav__link post-nav__link--prev" href="{{ page.previous.url | relative_url }}" rel="prev">
+    <span class="post-nav__label">{% include icon.html name="arrow-left" %}Previous</span>
+    <span class="post-nav__title">{{ page.previous.title }}</span>
+  </a>
+  {%- else %}
+  <span></span>
+  {%- endif %}
+  {%- if page.next %}
+  <a class="post-nav__link post-nav__link--next" href="{{ page.next.url | relative_url }}" rel="next">
+    <span class="post-nav__label">Next{% include icon.html name="arrow-right" %}</span>
+    <span class="post-nav__title">{{ page.next.title }}</span>
+  </a>
+  {%- endif %}
+</nav>
+{%- endif %}

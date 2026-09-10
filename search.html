@@ -1,0 +1,28 @@
+---
+layout: default
+title: Search
+permalink: /search/
+description: Search every post and tool on this site.
+---
+
+<div class="shell layout layout--with-rail">
+  <div class="layout__main">
+    <header class="page-head">
+      <h1 class="page-head__title">Search</h1>
+      <p class="page-head__lede">Titles, summaries, tags and post text. Everything runs in your browser.</p>
+    </header>
+
+    <form class="search" role="search" onsubmit="return false;">
+      <label class="search__field">
+        {% include icon.html name="search" %}
+        <input type="search" id="searchInput" placeholder="Try &ldquo;iceberg&rdquo;, &ldquo;log4j&rdquo; or &ldquo;kerberos&rdquo;"
+               autocomplete="off" aria-describedby="searchStatus">
+      </label>
+      <p class="search__status" id="searchStatus" role="status">Loading the index&hellip;</p>
+    </form>
+
+    <div class="post-list" id="searchResults" data-index="{{ '/search.json' | relative_url }}"></div>
+  </div>
+
+  {% include sidebar.html show="recent,categories,tags" %}
+</div>

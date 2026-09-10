@@ -1,10 +1,13 @@
 ---
-layout: post
 title: Spark Streaming Kafka Batch Size Calculator
 categories: Spark
 tags: Spark Utilities Streaming
 author: Ranga Reddy
 date: "2023-04-25 17:00:00 +0530"
+description: >-
+  Work out the maximum number of Kafka messages a Spark Streaming batch will fetch from the partition count, batch duration and max rate per partition.
+kind: tool
+tool_assets: true
 ---
 
 * content
@@ -14,15 +17,7 @@ date: "2023-04-25 17:00:00 +0530"
 
 Used to calculate the Spark Streaming Kafka Batch Size.
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spark Shuffle Partition Generator</title>
-    <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
+<div class="tool-widget">
     <script type="text/javascript">
       $(document).ready(function() {
 
@@ -52,8 +47,6 @@ Used to calculate the Spark Streaming Kafka Batch Size.
         hide_configuration();
       });
     </script>
-  </head>
-  <body>
     <div class="container-fluid">
       <div class="row" id="kafka_batch_size_config" style="margin-top: 10px;">
         <div class="col-md-12">
@@ -137,5 +130,4 @@ Used to calculate the Spark Streaming Kafka Batch Size.
           </div>
       </div> <!-- kafka_batch_size_ouput_config-->
     </div> <!-- container-fluid -->
-  </body>
-</html>
+</div>

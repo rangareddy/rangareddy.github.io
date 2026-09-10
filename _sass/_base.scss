@@ -1,0 +1,140 @@
+/* ==========================================================================
+   Reset & base typography
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(120% 60% at 50% -10%, var(--bg-grad-a) 0%, var(--bg-grad-b) 60%);
+  background-repeat: no-repeat;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16.5px;
+  line-height: 1.7;
+  font-feature-settings: "cv05" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+main { flex: 1 0 auto; }
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 0 0.5em;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(1.95rem, calc(1.3rem + 2.4vw), 2.75rem); font-weight: 800; }
+h2 { font-size: clamp(1.35rem, calc(1.1rem + 1vw), 1.7rem); }
+h3 { font-size: 1.22rem; }
+h4 { font-size: 1.06rem; }
+
+p, ul, ol, dl, blockquote, pre, table, figure { margin: 0 0 1.15em; }
+p:last-child { margin-bottom: 0; }
+
+a {
+  color: var(--brand);
+  text-decoration: none;
+  transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+a:hover { color: var(--brand-ink); }
+
+img, svg, video { max-width: 100%; }
+img { height: auto; }
+
+hr {
+  height: 1px;
+  border: 0;
+  margin: 2.25rem 0;
+  background: var(--border);
+}
+
+ul, ol { padding-left: 1.35em; }
+
+small { font-size: 0.86em; }
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-variant-ligatures: none;
+}
+
+button { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--brand-ring);
+  color: var(--text);
+}
+
+/* the icon set: every icon is a stroked 24x24 glyph */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.14em;
+}
+
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -120%);
+  z-index: 200;
+  padding: 0.6rem 1.1rem;
+  background: var(--brand);
+  color: #fff;
+  border-radius: 0 0 var(--r-sm) var(--r-sm);
+  font-weight: 600;
+
+  &:focus {
+    transform: translate(-50%, 0);
+    color: #fff;
+  }
+}
+
+/* scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }

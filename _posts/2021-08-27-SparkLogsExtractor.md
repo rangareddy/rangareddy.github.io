@@ -1,10 +1,11 @@
 ---
-layout: post
 title:  Spark Logs Extractor tool
 categories: Spark
 tags: Spark Utilities
 author: Ranga Reddy
 date: "2021-08-27 00:00:00 +0530"
+description: >-
+  A shell script that collects a Spark application's YARN logs and event logs and compresses them into a single archive, so a support case needs one attachment instead of a dozen.
 ---
 
 * content

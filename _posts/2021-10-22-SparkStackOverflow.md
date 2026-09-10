@@ -1,10 +1,11 @@
 ---
-layout: post
 title: How to fix java.lang.StackOverflowError in Apache Spark?
 categories: Spark
 tags: Spark Troubleshoot Error
 author: Ranga Reddy
 date: "2021-10-22 00:00:00 +0530"
+description: >-
+  Why java.lang.StackOverflowError turns up in Spark jobs with wide data or deep plans, how to tell whether the driver or the executor blew the stack, and how to size -Xss.
 ---
 
 * content

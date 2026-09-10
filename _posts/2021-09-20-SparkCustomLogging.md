@@ -1,10 +1,11 @@
 ---
-layout: post
 title:  Spark with custom logging
 categories: Spark
 tags: Spark Utilities Logging
 author: Ranga Reddy
 date: "2021-09-20 00:00:00 +0530"
+description: >-
+  Override the cluster-wide log4j.properties for one Spark application, for the driver and the executors, without editing anything under $SPARK_HOME/conf.
 ---
 
 * content

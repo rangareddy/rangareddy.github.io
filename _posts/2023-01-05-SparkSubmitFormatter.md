@@ -1,10 +1,14 @@
 ---
-layout: post
 title: Spark Submit Command Formatter tool
 categories: Spark
 tags: Spark Utilities
 author: Ranga Reddy
 date: "2023-01-05 11:40:00 +0530"
+description: >-
+  Paste a spark-submit command and get it back formatted across lines, or minified onto one line, with every parameter broken out into an editable table.
+kind: tool
+tool_assets: true
+tool_tables: true
 ---
 
 * content
@@ -14,16 +18,7 @@ date: "2023-01-05 11:40:00 +0530"
 
 Used to **format/minify** the **Spark Submit** command and generate it in beautiful/minify format.
 
-<html lang="en">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Spark Configuration Generator</title>
-    <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
-    <link href="{{ site.baseurl }}{% link css/jquery.dataTables.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/jquery.dataTables.js %}"></script>
+<div class="tool-widget">
     <style>
       #spark_submit_config_txt {
         overflow: scroll;
@@ -295,8 +290,6 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
         });
       });
     </script>
-  </head>
-  <body>
     <div class="container-fluid">
       <div class="row" id="spark_submit_cmd_container" style="margin-top: 10px;">
         <div class="col-md-12">
@@ -380,5 +373,4 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
       <!-- row -->
     </div>
     <!-- container-fluid -->
-  </body>
-</html>
+</div>

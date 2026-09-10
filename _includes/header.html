@@ -1,34 +1,51 @@
-<header id="top">
-    <div class="wrapper">
-        <a href="{{ site.baseurl }}/" class="brand">{{ site.title }}</a>
-        <small>{{site.brief-intro}}</small>
-        <button id="headerMenu" class="menu"><i class="fa fa-bars"></i></button>
-        <nav id="headerNav">
-            <ul>
-                <li>
-                    {% if page.url == '/' %}
-                    <a class="active" href="{{site.baseurl}}/">
-                        {% else %}
-                        <a href="{{site.baseurl}}/">
-                            {% endif %}
-                            <i class="fa fa-home"></i>Home
-                        </a>
-                </li>
+<a class="skip-link" href="#main">Skip to content</a>
 
-                {% for my_page in site.pages %}
-                {% if my_page.type == 'page' %}
-                <li>
-                    {% if my_page.url == page.url %}
-                    <a class="active" href="{{ my_page.url | prepend: site.baseurl }}">
-                        {% else %}
-                        <a href="{{ my_page.url | prepend: site.baseurl }}">
-                            {% endif %}
-                            <i class="fa fa-{{my_page.icon}}"></i>{{ my_page.title }}
-                        </a>
-                </li>
-                {% endif %}
-                {% endfor %}
-            </ul>
-        </nav>
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="{{ '/' | relative_url }}" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">{{ site.title }}</span>
+        <span class="brand__role">{{ site.brief-intro }}</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link{% if page.url == '/' %} is-active{% endif %}" href="{{ '/' | relative_url }}">
+            {% include icon.html name="home" %}<span>Home</span>
+          </a>
+        </li>
+        {%- assign nav_pages = site.pages | where: "type", "page" | sort: "path" -%}
+        {%- for my_page in nav_pages %}
+        <li>
+          <a class="site-nav__link{% if my_page.url == page.url %} is-active{% endif %}"
+             href="{{ my_page.url | relative_url }}">
+            {% include icon.html name=my_page.icon %}<span>{{ my_page.title }}</span>
+          </a>
+        </li>
+        {%- endfor %}
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="{{ '/search/' | relative_url }}" title="Search posts" aria-label="Search posts">
+        {% include icon.html name="search" %}
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun">{% include icon.html name="sun" %}</span>
+        <span class="icon-btn__moon">{% include icon.html name="moon" %}</span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open">{% include icon.html name="menu" %}</span>
+        <span class="icon-btn__close">{% include icon.html name="close" %}</span>
+      </button>
     </div>
+  </div>
+  {%- if page.layout == 'post' %}
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+  {%- endif %}
 </header>

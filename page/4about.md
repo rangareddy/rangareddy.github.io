@@ -12,7 +12,7 @@ type: page
 ## About Ranga Reddy
 
 <p align='center'>
-	<img src="{{ site.baseurl }}{% link assets/images/Ranga1.jpeg %}" width='600px' height='500px' />
+	<img src="{{ site.baseurl }}{% link assets/images/Ranga1.jpeg %}" width="320" alt="Ranga Reddy" />
 </p>
 
 **Mr. Ranga Reddy** is a India based, **Senior Software Engineer** working with **Cloudera**. He is expertise is in **Big Data** and **Full Stack Developer**. He has 8+ years of experience in designing, developing and leading large multi-tiered enterprise solutions in various domains - TTH & Manufacturing. He has earlier worked with **Dell R&D**, **Mindtree** and **ITApp**.

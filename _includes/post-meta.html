@@ -1,0 +1,24 @@
+{%- comment -%}
+  Meta row for a post. Pass `post` for a listing item, or nothing on a post page
+  (falls back to `page`). Reading time is skipped for interactive tool posts,
+  where the word count is dominated by embedded widget markup.
+{%- endcomment -%}
+{%- assign p = include.post | default: page -%}
+<div class="meta">
+  <span class="meta__item">
+    {% include icon.html name="calendar" %}
+    <time datetime="{{ p.date | date_to_xmlschema }}">{{ p.date | date: "%b %-d, %Y" }}</time>
+  </span>
+  {%- if p.kind == "tool" %}
+  <span class="meta__item">{% include icon.html name="tool" %}Interactive tool</span>
+  {%- else %}
+  {%- assign words = p.content | strip_html | number_of_words -%}
+  {%- assign minutes = words | divided_by: 200 | plus: 1 -%}
+  <span class="meta__item">{% include icon.html name="clock" %}{{ minutes }} min read</span>
+  {%- endif %}
+  {%- for category in p.categories %}
+  <a class="chip chip--cat" href="{{ site.category_dir | prepend: '/' | relative_url }}#{{ category | slugify }}">
+    {% include icon.html name="folder" %}{{ category }}
+  </a>
+  {%- endfor %}
+</div>

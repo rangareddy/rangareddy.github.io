@@ -1,0 +1,12 @@
+{%- assign p = include.post -%}
+<article class="card post-card">
+  <h2 class="post-card__title">
+    <a href="{{ p.url | relative_url }}">{{ p.title }}</a>
+  </h2>
+  {% include post-meta.html post=p %}
+  <p class="post-card__excerpt">{% include post-summary.html post=p %}</p>
+  {% include tag-list.html post=p %}
+  <a class="read-more" href="{{ p.url | relative_url }}">
+    Read the post {% include icon.html name="arrow-right" %}
+  </a>
+</article>

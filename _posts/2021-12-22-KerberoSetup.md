@@ -1,10 +1,11 @@
 ---
-layout: post
 title: Kerberos Setup in Linux
 categories: Linux
 tags: Linux Kerberos Security
 author: Ranga Reddy
 date: "2021-12-22 00:00:00 +0530"
+description: >-
+  Install and configure a Kerberos KDC and its clients on Linux end to end: kdc.conf, krb5.conf, the KDC database, ACLs, the admin principal, keytabs and a test from both server and client.
 ---
 
 * content

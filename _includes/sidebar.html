@@ -1,0 +1,6 @@
+{%- comment -%} Right-hand rail wrapper. See sidebar-panels.html for the panels. {%- endcomment -%}
+<aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    {% include sidebar-panels.html show=include.show toc=include.toc %}
+  </div>
+</aside>

@@ -1,0 +1,70 @@
+/* ==========================================================================
+   Rouge syntax highlighting, themed from the same tokens as the rest of the
+   site so light and dark both stay readable.
+   ========================================================================== */
+
+:root {
+  --hl-comment: #6b7a90;
+  --hl-keyword: #9333c4;
+  --hl-string:  #0a7d55;
+  --hl-number:  #b7521a;
+  --hl-func:    #2554c7;
+  --hl-name:    #0f766e;
+  --hl-const:   #b3541e;
+  --hl-op:      #5b6472;
+  --hl-error:   #c0392b;
+  --hl-lineno:  #9aa5b5;
+  --hl-hl-bg:   #fff6d6;
+}
+
+@mixin dark-syntax {
+  --hl-comment: #7d8da3;
+  --hl-keyword: #d59bff;
+  --hl-string:  #7fdcaa;
+  --hl-number:  #ffb37a;
+  --hl-func:    #8ab4ff;
+  --hl-name:    #5eead4;
+  --hl-const:   #ffc08a;
+  --hl-op:      #9aa8bd;
+  --hl-error:   #ff8f85;
+  --hl-lineno:  #4d5b70;
+  --hl-hl-bg:   #253048;
+}
+
+:root[data-theme="dark"] { @include dark-syntax; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { @include dark-syntax; }
+}
+
+.highlight {
+  .hll { background-color: var(--hl-hl-bg); }
+  .lineno, .gl { color: var(--hl-lineno); user-select: none; }
+
+  /* comments */
+  .c, .ch, .cd, .cm, .cp, .cpf, .c1, .cs { color: var(--hl-comment); font-style: italic; }
+
+  /* keywords */
+  .k, .kc, .kd, .kn, .kp, .kr, .kt, .kv { color: var(--hl-keyword); font-weight: 600; }
+  .o, .ow, .p, .pi { color: var(--hl-op); }
+
+  /* literals */
+  .s, .sa, .sb, .sc, .dl, .sd, .s2, .se, .sh, .si, .sx, .s1, .ss, .sr { color: var(--hl-string); }
+  .m, .mb, .mf, .mh, .mi, .il, .mo, .mx { color: var(--hl-number); }
+
+  /* names */
+  .n, .nx, .py { color: inherit; }
+  .na, .nl, .nv, .vc, .vg, .vi, .vm { color: var(--hl-name); }
+  .nb, .bp, .ne, .nf, .fm { color: var(--hl-func); font-weight: 500; }
+  .nc, .nn, .no, .nd, .ni, .nt { color: var(--hl-const); }
+
+  /* diffs & errors */
+  .err, .gr { color: var(--hl-error); }
+  .gd { color: var(--hl-error); }
+  .gi { color: var(--hl-string); }
+  .gh, .gu { color: var(--hl-func); font-weight: 700; }
+  .ge { font-style: italic; }
+  .gs { font-weight: 700; }
+  .gt, .gp { color: var(--hl-comment); }
+  .w { color: transparent; }
+}

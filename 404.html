@@ -1,25 +1,17 @@
 ---
 layout: default
+title: Page not found
 permalink: /404.html
+sitemap: false
+description: That page does not exist.
 ---
 
-<style type="text/css" media="screen">
-  .container {
-    margin: 10px auto;
-    max-width: 600px;
-    text-align: center;
-  }
-  h1 {
-    margin: 30px 0;
-    font-size: 4em;
-    line-height: 1;
-    letter-spacing: -1px;
-  }
-</style>
-
-<div class="container">
-  <h1>404</h1>
-
-  <p><strong>Page not found :(</strong></p>
-  <p>The requested page could not be found. <a href="{{ site.url }}">Click here</a> go to home page.</p>
+<div class="shell notfound">
+  <p class="notfound__code">404</p>
+  <h1 class="notfound__title">This page went missing.</h1>
+  <p class="notfound__note">The link may be out of date, or the post may have been renamed.</p>
+  <div class="hero__actions">
+    <a class="btn btn--primary" href="{{ '/' | relative_url }}">Back to home {% include icon.html name="arrow-right" %}</a>
+    <a class="btn btn--ghost" href="{{ '/archive/' | relative_url }}">Browse the archive</a>
+  </div>
 </div>

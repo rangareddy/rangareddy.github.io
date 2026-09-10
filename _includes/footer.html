@@ -1,40 +1,57 @@
 <footer class="site-footer">
-    <div>
-        Copyright &copy;<script>document.write(new Date().getFullYear())</script> Ranga Reddy All rights reserved.
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="{{ '/' | relative_url }}" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">{{ site.title }}</span>
+      </a>
+      <p>{{ site.description }}</p>
     </div>
-    <div class="wrapper">
-        <p class="contact">
-            Contact me at: 
 
-            {% if site.github_username %}
-                <a href="https://github.com/{{site.github_username}}" title="GitHub"><i class="fa fa-github" aria-hidden="true"></i></a> 
-            {% endif %} 
-
-            {% if site.email %}
-                <a href="mailto:{{site.email}}" title="email"><i class="fa fa-envelope-o" aria-hidden="true"></i></a> 
-            {% endif %} 
-
-            {% if site.twitter_username %}
-                <a href="https://twitter.com/{{site.twitter_username}}" title="Twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a> 
-            {% endif %} 
-
-            {% if site.facebook_username %}
-                <a href="https://www.facebook.com/{{site.facebook_username}}" title="Facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a> 
-            {% endif %} 
-
-            {% if site.linkedIn_username%}
-                <a href="https://www.linkedin.com/in/{{site.linkedIn_username}}" title="LinkedIn"><i class="fa fa-linkedin" aria-hidden="true"></i></a> 
-            {% endif %}
-
-            {% if site.footer-links.stackoverflow %}
-                <a href="http://stackoverflow.com/{{ site.footer-links.stackoverflow }}"><i class="svg-icon stackoverflow"></i></a>
-            {% endif %}
-
-            {% if site.footer-links.youtube %}
-                <a href="https://youtube.com/{{ site.footer-links.youtube }}"><i class="svg-icon youtube"></i></a>
-            {% endif %}
-        </p>
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul>
+        <li><a href="{{ '/' | relative_url }}">Home</a></li>
+        {%- assign nav_pages = site.pages | where: "type", "page" | sort: "path" -%}
+        {%- for my_page in nav_pages %}
+        <li><a href="{{ my_page.url | relative_url }}">{{ my_page.title }}</a></li>
+        {%- endfor %}
+        <li><a href="{{ '/search/' | relative_url }}">Search</a></li>
+      </ul>
     </div>
+
+    <div class="site-footer__col">
+      <h2>{{ site.description_footer }}</h2>
+      <ul class="social-row">
+        {%- if site.github_username %}
+        <li><a href="https://github.com/{{ site.github_username }}" title="GitHub" aria-label="GitHub">{% include icon.html name="github" %}</a></li>
+        {%- endif %}
+        {%- if site.linkedIn_username %}
+        <li><a href="https://www.linkedin.com/in/{{ site.linkedIn_username }}" title="LinkedIn" aria-label="LinkedIn">{% include icon.html name="linkedin" %}</a></li>
+        {%- endif %}
+        {%- if site.twitter_username %}
+        <li><a href="https://twitter.com/{{ site.twitter_username }}" title="X / Twitter" aria-label="X / Twitter">{% include icon.html name="twitter" %}</a></li>
+        {%- endif %}
+        {%- if site.stackoverflow %}
+        <li><a href="https://stackoverflow.com/{{ site.stackoverflow }}" title="Stack Overflow" aria-label="Stack Overflow">{% include icon.html name="stackoverflow" %}</a></li>
+        {%- endif %}
+        {%- if site.facebook_username %}
+        <li><a href="https://www.facebook.com/{{ site.facebook_username }}" title="Facebook" aria-label="Facebook">{% include icon.html name="facebook" %}</a></li>
+        {%- endif %}
+        {%- if site.email %}
+        <li><a href="mailto:{{ site.email }}" title="Email" aria-label="Email">{% include icon.html name="mail" %}</a></li>
+        {%- endif %}
+        <li><a href="{{ '/feed.xml' | relative_url }}" title="RSS feed" aria-label="RSS feed">{% include icon.html name="rss" %}</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal">
+    <p>&copy; <span id="footerYear">{{ site.time | date: "%Y" }}</span> {{ site.author }}. All rights reserved.</p>
+    <p>Built with <a href="https://jekyllrb.com/">Jekyll</a> and hosted on GitHub Pages.</p>
+  </div>
 </footer>
 
-<!--<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>-->
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  {% include icon.html name="arrow-up" %}
+</a>

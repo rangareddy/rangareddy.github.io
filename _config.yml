@@ -1,31 +1,45 @@
+# ---------------------------------------------------------------------------
 # Site settings
+# ---------------------------------------------------------------------------
 title: Ranga Reddy
-brief-intro: Software Engineer
+tagline: Data Engineering, Apache Spark and the Lakehouse
+brief-intro: Senior Software Engineer
+description: >-
+  Hands-on notes, troubleshooting guides and interactive tools for Apache Spark,
+  Iceberg, Kafka, Parquet and the Linux stack that runs underneath them.
+
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://rangareddy.github.io" # the base hostname & protocol for your site
-avatar: https://avatars.githubusercontent.com/u/5094273?v=4
-timezone: Asia/Kolkata
 
-#permalink: /:year/:month/:day/:title/
+author: Ranga Reddy
+avatar: https://avatars.githubusercontent.com/u/5094273?v=4
+avatar_local: /assets/images/Ranga1.jpeg
+timezone: Asia/Kolkata
+lang: en
 
 permalink: /:title/
 
-# other links
+# ---------------------------------------------------------------------------
+# Social / contact
+# ---------------------------------------------------------------------------
 twitter_username: avula_ranga
 facebook_username: rangareddy.avula
-github_username:  rangareddy
+github_username: rangareddy
 email: rangareddy.avula@gmail.com
 linkedIn_username: ranga-reddy-big-data-developer/
 stackoverflow: users/1918962/ranga-reddy
 
 description_footer: You can contact me
 
-# comments
-# two ways to comment, only choose one, and use your own short name
-duoshuo_shortname: #rangareddy1988
+# ---------------------------------------------------------------------------
+# Comments (choose one, leave the other blank)
+# ---------------------------------------------------------------------------
+duoshuo_shortname:
 disqus_shortname: rangareddy1988
 
+# ---------------------------------------------------------------------------
 # Build settings
+# ---------------------------------------------------------------------------
 markdown: kramdown
 
 kramdown:
@@ -36,8 +50,10 @@ kramdown:
     guess_lang: true
     default_lang: plaintext
 
-syntax_highlighter_style: colorful
 markdown_ext: markdown,mkdown,mkdn,mkd,md
+
+sass:
+  style: compressed
 
 # url
 category_dir: category/
@@ -47,8 +63,7 @@ tag_dir: tag/
 excerpt_separator: "\n\n\n\n"
 
 # paginate
-gems: [jekyll-paginate]
-paginate: 5
+paginate: 6
 paginate_path: "/blog/page:num/"
 
 plugins:
@@ -59,6 +74,17 @@ plugins:
   - jekyll-feed
   - jemoji
 
+# ---------------------------------------------------------------------------
+# Front matter defaults
+# ---------------------------------------------------------------------------
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      author: Ranga Reddy
+
 include:
   - _data
 
@@ -68,3 +94,4 @@ exclude:
   - LICENSE
   - Gemfile
   - Gemfile.lock
+  - vendor

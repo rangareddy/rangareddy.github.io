@@ -1,0 +1,192 @@
+/* ==========================================================================
+   Long-form article body
+   Table styling is deliberately scoped away from .table / .dataTable so the
+   Bootstrap and DataTables widgets embedded in the tool posts keep their own
+   look.
+   ========================================================================== */
+
+.prose {
+  font-size: 1.03rem;
+  line-height: 1.75;
+  color: var(--text);
+
+  > *:first-child { margin-top: 0; }
+
+  h2, h3, h4, h5, h6 {
+    margin-top: 2.1em;
+    scroll-margin-top: calc(var(--header-h) + 20px);
+  }
+
+  /* some posts open with their own <h1>; step it down so it does not
+     compete with the page title above it */
+  h1 {
+    font-size: clamp(1.5rem, calc(1.2rem + 1.2vw), 1.95rem);
+    margin-top: 1.6em;
+  }
+
+  h2 {
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  p { margin: 0 0 1.15em; }
+
+  strong { font-weight: 700; color: var(--text); }
+
+  a {
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--brand-ring);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 0.18em;
+
+    &:hover { text-decoration-color: var(--brand); }
+  }
+
+  ul, ol { padding-left: 1.4em; }
+
+  li { margin-bottom: 0.35em; }
+
+  li > ul, li > ol { margin: 0.35em 0 0.35em; }
+
+  blockquote {
+    margin: 1.5em 0;
+    padding: 0.9rem 1.2rem;
+    border-left: 3px solid var(--brand);
+    border-radius: 0 var(--r) var(--r) 0;
+    background: var(--brand-soft);
+    color: var(--text-2);
+
+    > *:last-child { margin-bottom: 0; }
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1.6em auto;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* inline code */
+  code {
+    padding: 0.14em 0.4em;
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    background: var(--code-bg);
+    color: var(--brand-ink);
+    font-size: 0.86em;
+    white-space: nowrap;
+  }
+
+  pre code {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    white-space: pre;
+  }
+
+  /* the kramdown {:toc} list is relocated into the sidebar by site.js;
+     hide it inline so it never flashes as a bare bullet list. Without JS it
+     stays where the author put it. */
+  .js & #markdown-toc { display: none; }
+
+  /* tables authored in markdown */
+  table:not(.table):not(.dataTable) {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    display: block;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    font-size: 0.93rem;
+
+    th, td {
+      padding: 0.62rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    thead th {
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: var(--surface-2); }
+  }
+
+}
+
+/* ------------------------------------------------------------ code blocks -- */
+.code-wrap {
+  position: relative;
+  margin: 1.5em 0;
+}
+
+.prose {
+  div.highlight, pre.highlight, > pre {
+    margin: 0;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--code-border);
+    border-radius: var(--r);
+    background: var(--code-bg);
+    color: var(--code-ink);
+    overflow-x: auto;
+    font-size: 0.86rem;
+    line-height: 1.65;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  div.highlight pre {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: visible;
+  }
+
+  .highlighter-rouge { margin: 0; }
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 0.24rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+
+  &:focus-visible { opacity: 1; }
+
+  &.is-done { color: var(--accent); border-color: var(--accent); opacity: 1; }
+  &.is-failed { color: var(--text-2); opacity: 1; }
+}
+
+.code-wrap:hover .copy-btn { opacity: 1; }
+
+.copy-btn:hover { color: var(--brand); border-color: var(--brand-ring); }
+
+@media (hover: none) {
+  .copy-btn { opacity: 1; }
+}

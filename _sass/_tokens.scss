@@ -1,0 +1,102 @@
+/* ==========================================================================
+   Design tokens
+   Light is the default. Dark is applied two ways: by the data-theme attribute
+   (an explicit visitor choice, written before first paint) and by the OS
+   preference when no choice has been made.
+   ========================================================================== */
+
+:root {
+  /* surfaces & ink */
+  --bg:            #f6f8fb;
+  --bg-grad-a:     #eef2ff;
+  --bg-grad-b:     #f6f8fb;
+  --surface:       #ffffff;
+  --surface-2:     #f2f5fa;
+  --surface-sunk:  #f6f8fc;
+  --header-bg:     rgba(255, 255, 255, 0.82);
+  --text:          #111721;
+  --text-2:        #4b5666;
+  --text-3:        #78849a;
+  --border:        #e2e7f0;
+  --border-strong: #ccd4e2;
+
+  /* brand */
+  --brand:         #3a52d8;
+  --brand-ink:     #2a3cae;
+  --brand-soft:    #eaeeff;
+  --brand-ring:    rgba(58, 82, 216, 0.28);
+  --accent:        #0f9070;
+  --accent-soft:   #e4f6f0;
+  /* the primary button needs its own pair: --brand goes light in dark mode,
+     which would leave white label text on a pale fill */
+  --btn-a:         #3a52d8;
+  --btn-b:         #2a3cae;
+  --btn-ink:       #ffffff;
+
+  /* code */
+  --code-bg:       #f5f7fc;
+  --code-border:   #e4e9f3;
+  --code-ink:      #1f2937;
+
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow:    0 4px 16px -6px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --shadow-lg: 0 24px 48px -24px rgba(16, 24, 40, 0.28), 0 2px 6px rgba(16, 24, 40, 0.05);
+
+  /* geometry */
+  --r-sm: 8px;
+  --r:    12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --shell: 1200px;
+  --rail: 300px;
+  --gap: 40px;
+  --header-h: 66px;
+
+  /* type */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  color-scheme: light;
+}
+
+@mixin dark-tokens {
+  --bg:            #0b0f17;
+  --bg-grad-a:     #121a2c;
+  --bg-grad-b:     #0b0f17;
+  --surface:       #121926;
+  --surface-2:     #172131;
+  --surface-sunk:  #0e1522;
+  --header-bg:     rgba(15, 22, 35, 0.84);
+  --text:          #e8eef8;
+  --text-2:        #a3b0c4;
+  --text-3:        #7f8da3;
+  --border:        #1f2a3c;
+  --border-strong: #2e3c53;
+
+  --brand:         #8098ff;
+  --brand-ink:     #a7b7ff;
+  --brand-soft:    #1a2340;
+  --brand-ring:    rgba(128, 152, 255, 0.32);
+  --accent:        #3ddc9c;
+  --accent-soft:   #14302a;
+  --btn-a:         #45599f;
+  --btn-b:         #313f78;
+  --btn-ink:       #f4f7ff;
+
+  --code-bg:       #0d1420;
+  --code-border:   #1e293b;
+  --code-ink:      #d7e2f2;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow:    0 4px 16px -6px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 48px -24px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] { @include dark-tokens; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { @include dark-tokens; }
+}

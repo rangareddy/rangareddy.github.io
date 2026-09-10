@@ -2,54 +2,51 @@
 layout: default
 title: Categories
 permalink: /category/
-icon: th-list
+icon: list
 type: page
+description: Posts grouped by category.
 ---
 
-<div class="page clearfix">
-    <div class="left">
-        <h1>{{page.title}}</h1>
-        <hr>
-        <ul>
-            {% for category in site.categories %}
-            <h2 id="{{category | first}}">{{category | first}}</h2>
-                {% for posts in category  %}
-                    {% for post in posts %}
-                        {% if post.url %}
-                        <li>
-                            <time>
-                            {{ post.date | date:"%F" }} {{ post.date | date: "%a" }}.
-                            </time>
-                            <a class="title" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+{%- assign cats = site.categories | sort -%}
 
-                            {% include category.html %}
-                            {% include tag.html %}
-                        </li>
-                        {% endif %}
-                    {% endfor %}
-                {% endfor %}
-            {% endfor %}
-        </ul>
-    </div>
-    <button class="anchor"><i class="fa fa-anchor"></i></button>
-    <div class="right">
-        <div class="wrap">
-            <!-- Content -->
-            <div class="side content">
-                <div>
-                    Content
-                </div>
-                <ul id="content-side" class="content-ul">
-                    {% for category in site.categories%}
-                        <li>
-                            <a data-scroll href="#{{ category | first }}">
-                                {{ category | first }} ({{ category | last | size }})
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
+<div class="shell layout layout--with-rail">
+  <div class="layout__main">
+    <header class="page-head">
+      <h1 class="page-head__title">{{ page.title }}</h1>
+      <p class="page-head__lede">{{ cats | size }} categories covering {{ site.posts | size }} posts.</p>
+      <div class="chip-row">
+        {%- for category in cats %}
+        <a class="chip chip--cat" href="#{{ category[0] | slugify }}">
+          {{ category[0] }}<span class="chip__count">{{ category[1] | size }}</span>
+        </a>
+        {%- endfor %}
+      </div>
+    </header>
+
+    {%- for category in cats %}
+    <section class="group" id="{{ category[0] | slugify }}">
+      <h2 class="group__title">
+        {% include icon.html name="folder" %}{{ category[0] }}
+        <span class="badge">{{ category[1] | size }}</span>
+      </h2>
+      <ol class="timeline">
+        {%- for post in category[1] %}
+        <li class="timeline__item">
+          <time class="timeline__date" datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%Y-%m-%d" }}</time>
+          <div class="timeline__body">
+            <a class="timeline__title" href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <div class="timeline__meta">
+              {%- for tag in post.tags %}
+              <a class="chip" href="{{ site.tag_dir | prepend: '/' | relative_url }}#{{ tag | slugify }}">#{{ tag }}</a>
+              {%- endfor %}
             </div>
-        </div>
-    </div>
+          </div>
+        </li>
+        {%- endfor %}
+      </ol>
+    </section>
+    {%- endfor %}
+  </div>
+
+  {% include sidebar.html show="recent,tags" %}
 </div>
-<script src="{{ "/js/pageContent.js " | prepend: site.baseurl }}" charset="utf-8"></script>

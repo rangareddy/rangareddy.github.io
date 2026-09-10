@@ -1,10 +1,11 @@
 ---
-layout: post
 title: SparkPi Example
 categories: Spark
 tags: Spark Example
 author: Ranga Reddy
 date: "2021-10-11 00:00:00 +0530"
+description: >-
+  The SparkPi sample submitted in client and cluster deploy mode on a local cluster, CDP with Spark 2 and Spark 3, CDH and HDP: a quick way to prove a new cluster really runs jobs.
 ---
 
 * content

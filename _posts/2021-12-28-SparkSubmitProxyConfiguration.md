@@ -1,10 +1,11 @@
 ---
-layout: post
 title: Spark submit Proxy host/port configuration
 categories: Spark
 tags: Spark Proxy
 author: Ranga Reddy
 date: "2021-12-28 00:00:00 +0530"
+description: >-
+  Point Spark at an HTTP or HTTPS proxy, at application level and cluster-wide, through the proxy system properties on spark.driver.extraJavaOptions and spark.executor.extraJavaOptions.
 ---
 
 * content

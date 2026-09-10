@@ -1,10 +1,11 @@
 ---
-layout: post
 title: Enable Verbose class output for the Spark applications
 categories: Spark
 tags: Spark Troubleshoot
 author: Ranga Reddy
 date: "2021-10-21 00:00:00 +0530"
+description: >-
+  Switch on -verbose:class for the Spark driver and executors to trace class loading and pin down ClassNotFoundException and NoClassDefFoundError.
 ---
 
 * content

@@ -1,0 +1,30 @@
+{%- if paginator.total_pages > 1 %}
+<nav class="pager" aria-label="Post pagination">
+  {%- if paginator.previous_page %}
+    <a class="pager__btn" href="{{ '/' | relative_url }}" aria-label="First page">
+      {% include icon.html name="chevron-first" %}<span>First</span>
+    </a>
+    <a class="pager__btn" href="{{ paginator.previous_page_path | relative_url }}" rel="prev" aria-label="Previous page">
+      {% include icon.html name="arrow-left" %}<span>Previous</span>
+    </a>
+  {%- else %}
+    <span class="pager__btn is-disabled">{% include icon.html name="chevron-first" %}<span>First</span></span>
+    <span class="pager__btn is-disabled">{% include icon.html name="arrow-left" %}<span>Previous</span></span>
+  {%- endif %}
+
+  <span class="pager__count">Page {{ paginator.page }} of {{ paginator.total_pages }}</span>
+
+  {%- if paginator.next_page %}
+    <a class="pager__btn" href="{{ paginator.next_page_path | relative_url }}" rel="next" aria-label="Next page">
+      <span>Next</span>{% include icon.html name="arrow-right" %}
+    </a>
+    {%- assign last_path = site.paginate_path | replace: ':num', paginator.total_pages -%}
+    <a class="pager__btn" href="{{ last_path | relative_url }}" aria-label="Last page">
+      <span>Last</span>{% include icon.html name="chevron-last" %}
+    </a>
+  {%- else %}
+    <span class="pager__btn is-disabled"><span>Next</span>{% include icon.html name="arrow-right" %}</span>
+    <span class="pager__btn is-disabled"><span>Last</span>{% include icon.html name="chevron-last" %}</span>
+  {%- endif %}
+</nav>
+{%- endif %}

@@ -1,10 +1,13 @@
 ---
-layout: post
 title: Epoch & Unix Timestamp Converter Tools
 categories: Tools
 tags: Tools Utilities Linux
 author: Ranga Reddy
-date: "2022-02-28 00:00:00 +0530"
+date: "2023-02-28 00:00:00 +0530"
+description: >-
+  Convert an epoch timestamp into a readable date and back again, in seconds or milliseconds, and read off the current epoch time.
+kind: tool
+tool_assets: true
 ---
 
 * content
@@ -16,15 +19,7 @@ A simple tool to convert an epoch/unix timestamp into a human readable date vice
 
 Epoch also known as Unix timestamps, is the number of seconds that have elapsed since **1970-01-01 00:00:00 GMT**.
 
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-	<title><i class="bi bi-clock"></i>Epoch and Unix Timestamp Converter</title>
-	<link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+<div class="tool-widget">
     <style>
 		.epoch_container {
 		    border-radius: .4rem;
@@ -102,9 +97,7 @@ Epoch also known as Unix timestamps, is the number of seconds that have elapsed 
 			$("#display_date_ephoc_container").hide();
 		});
 	</script>
-</head>
 
-<body>
     <h2>The Current Epoch Unix Timestamp</h2>
     <div id="epoch_clock_container" class='card epoch_container'>
         <input type="text" class="form-control ephoc_time" id="ephoc_time" name="ephoc_time" readonly>
@@ -199,6 +192,5 @@ Epoch also known as Unix timestamps, is the number of seconds that have elapsed 
             </form>
         </div>
     </div>
-</body>
 
-</html>
+</div>

@@ -1,10 +1,13 @@
 ---
-layout: post
 title: Spark Shuffle Partition Generator tool
 categories: Spark
 tags: Spark Utilities
 author: Ranga Reddy
 date: "2023-02-18 06:20:00 +0530"
+description: >-
+  Derive a spark.sql.shuffle.partitions value from the shuffle input size.
+kind: tool
+tool_assets: true
 ---
 
 * content
@@ -14,15 +17,7 @@ date: "2023-02-18 06:20:00 +0530"
 
 Used to generate the spark shuffle partition value based on shuffle input size.
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spark Shuffle Partition Generator</title>
-    <link href="{{ site.baseurl }}{% link css/bootstrap.min.css %}" rel="stylesheet">
-    <script src="{{ site.baseurl }}{% link js/bootstrap.bundle.min.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/jquery-slim.js %}"></script>
-    <script src="{{ site.baseurl }}{% link js/common.js %}"></script>
+<div class="tool-widget">
     <script type="text/javascript">
       $(document).ready(function() {
         function hide_configuration() {
@@ -163,8 +158,6 @@ Used to generate the spark shuffle partition value based on shuffle input size.
         });
       });
     </script>
-  </head>
-  <body>
     <div class="container-fluid">
       <div class="row" id="shuffle_input_config" style="margin-top: 10px;">
         <div class="col-md-12">
@@ -244,5 +237,4 @@ Used to generate the spark shuffle partition value based on shuffle input size.
       <!-- spark_shuffle_configuration_id-->
     </div>
     <!-- container-fluid -->
-  </body>
-</html>
+</div>

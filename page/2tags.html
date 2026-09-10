@@ -4,60 +4,54 @@ title: Tags
 permalink: /tag/
 icon: tags
 type: page
+description: Posts grouped by tag.
 ---
 
-<div class="page clearfix">
-    <div class="left">
-        <h1>{{page.title}}</h1>
-        <hr>
-        {% capture tags %}
-          {% for tag in site.tags %}
-            {{ tag[0] }}
-          {% endfor %}
-        {% endcapture %}
-        {% assign sortedtags = tags | split:' ' | sort %}
+{%- assign tags = site.tags | sort -%}
 
-        <ul>
-        {% for tag in sortedtags %}
-          <h2 id="{{ tag }}">{{ tag }}</h2>
-          {% for post in site.tags[tag] %}
-            <li>
-                <time>
-                {{ post.date | date:"%F" }} {{ post.date | date: "%a" }}.
-                </time>
-                <a class="title" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+<div class="shell layout layout--with-rail">
+  <div class="layout__main">
+    <header class="page-head">
+      <h1 class="page-head__title">{{ page.title }}</h1>
+      <p class="page-head__lede">{{ tags | size }} tags across {{ site.posts | size }} posts.</p>
+      <div class="tag-cloud tag-cloud--page">
+        {%- for tag in tags %}
+        {%- assign count = tag[1] | size -%}
+        {%- if count >= 5 %}{% assign weight = 'is-xl' %}
+        {%- elsif count >= 3 %}{% assign weight = 'is-lg' %}
+        {%- elsif count >= 2 %}{% assign weight = 'is-md' %}
+        {%- else %}{% assign weight = 'is-sm' %}{% endif -%}
+        <a class="chip chip--tag {{ weight }}" href="#{{ tag[0] | slugify }}">
+          {{ tag[0] }}<span class="chip__count">{{ count }}</span>
+        </a>
+        {%- endfor %}
+      </div>
+    </header>
 
-                {% include category.html %}
-                {% include tag.html %}
-            </li>
-          {% endfor %}
-        {% endfor %}
-        </ul>
-
-    </div>
-    <button class="anchor"><i class="fa fa-anchor"></i></button>
-    <div class="right">
-        <div class="wrap">
-
-            <!-- Content -->
-            <div class="side content">
-                <div>
-                    Content
-                </div>
-                <ul id="content-side" class="content-ul">
-                    {% for tag in sortedtags %}
-                    <li>
-                        <a data-scroll href="#{{ tag }}">
-                            {{ tag }} ({{ site.tags[tag].size }})
-                        </a>
-                    </li>
-                    {% endfor %}
-
-                </ul>
+    {%- for tag in tags %}
+    <section class="group" id="{{ tag[0] | slugify }}">
+      <h2 class="group__title">
+        {% include icon.html name="tags" %}{{ tag[0] }}
+        <span class="badge">{{ tag[1] | size }}</span>
+      </h2>
+      <ol class="timeline">
+        {%- for post in tag[1] %}
+        <li class="timeline__item">
+          <time class="timeline__date" datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%Y-%m-%d" }}</time>
+          <div class="timeline__body">
+            <a class="timeline__title" href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <div class="timeline__meta">
+              {%- for category in post.categories %}
+              <a class="chip chip--cat" href="{{ site.category_dir | prepend: '/' | relative_url }}#{{ category | slugify }}">{{ category }}</a>
+              {%- endfor %}
             </div>
-            <!-- 其他div框放到这里 -->
-            <!-- <div class="side">bbbb</div> -->
-        </div>
-    </div>
+          </div>
+        </li>
+        {%- endfor %}
+      </ol>
+    </section>
+    {%- endfor %}
+  </div>
+
+  {% include sidebar.html show="recent,categories" %}
 </div>
-<script src="{{ "/js/pageContent.js " | prepend: site.baseurl }}" charset="utf-8"></script>

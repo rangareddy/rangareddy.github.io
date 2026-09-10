@@ -1,0 +1,12 @@
+{%- comment -%}
+  Plain-text summary for a post. Never renders the post body: tool posts embed
+  their own <style>/<script>/jQuery widgets, and inlining those into a listing
+  duplicated element ids and let a widget's autofocus yank the page down to the
+  last card. Prefer the explicit `description`, fall back to a stripped excerpt.
+{%- endcomment -%}
+{%- assign p = include.post -%}
+{%- if p.description -%}
+{{ p.description }}
+{%- else -%}
+{{ p.excerpt | strip_html | normalize_whitespace | truncate: 200 }}
+{%- endif -%}

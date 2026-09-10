@@ -2,139 +2,87 @@
 layout: default
 ---
 
-<style type="text/css">
-  .highlight {
-    color: #d1d1c9;  
-  }
-</style>
-
-<div class="page clearfix" index>
-  <div class="left">
-    <h1>Welcome to Ranga Reddy Blog!</h1>
-    <small>Data really powers everything that we do</small>
-    <hr>
-    <ul>
-      {% for post in paginator.posts %}
-      <li>
-        <h2>
-          <a class="post-link" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
-        </h2>
-        <div class="label">
-          <div class="label-card">
-            <i class="fa fa-calendar"></i>{{ post.date | date: "%F" }}
-          </div>
-          <div class="label-card">
-            {% if post.author %}<i class="fa fa-user"></i>{{ post.author }}
-            {% endif %}
-          </div>
-          <div class="label-card">
-            {% if page.meta %}<i class="fa fa-key"></i>{{ page.meta }} {% endif %}
-          </div>
-
-          <div class="label-card">
-            {% include category.html %}
-          </div>
-
-          <div class="label-card">
-            {% include tag.html %}
-          </div>
-        </div>
-        <div class="excerpt">
-          {{post.excerpt}}
-        </div>
-        <div class="read-all">
-          <a href="{{ post.url | prepend: site.baseurl }}"><i class="fa fa-newspaper-o"></i>Read All</a>
-        </div>
-        <hr>
-      </li>
-      {% endfor %}
-    </ul>
-
-    <!-- Pagination links -->
-    {% if paginator.total_pages > 1 %}
-      <div class="pagination justify-content-center">
-        {% if paginator.previous_page %}
-        <a href="/index.html" class="previous">First</a>
-        <a href="{{ paginator.previous_page_path | prepend: site.baseurl }}" class="previous">Previous</a>
-        {% else %}
-          <span class="previous disable">First</span>
-          <span class="previous disable">Previous</span>
-        {% endif %}
-        
-        <span class="page_number ">{{ paginator.page }}/{{ paginator.total_pages }}</span>
-
-        {% if paginator.next_page %}
-          <a href="{{ paginator.next_page_path }}" class="next">Next</a>
-          <a href="{{ site.baseurl }}/blog/page{{ paginator.total_pages }}" class="next">Last</a>
-        {% else %}
-          <span class="next disable">Next</span>
-          <span class="next disable">Last</span>
-        {% endif %}
+{%- if paginator.page == 1 %}
+<section class="hero">
+  <div class="shell hero__inner">
+    <div class="hero__text">
+      <p class="hero__eyebrow">{% include icon.html name="sparkles" %}{{ site.tagline }}</p>
+      <h1 class="hero__title">Hi, I&rsquo;m {{ site.author }}.</h1>
+      <p class="hero__lede">{{ site.description }}</p>
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="#latest">
+          Read the latest {% include icon.html name="arrow-right" %}
+        </a>
+        <a class="btn btn--ghost" href="{{ '/about/' | relative_url }}">About me</a>
       </div>
-    {% endif %}
-    
-  </div>
+      <ul class="social-row social-row--hero">
+        <li><a href="https://github.com/{{ site.github_username }}" title="GitHub" aria-label="GitHub">{% include icon.html name="github" %}</a></li>
+        <li><a href="https://www.linkedin.com/in/{{ site.linkedIn_username }}" title="LinkedIn" aria-label="LinkedIn">{% include icon.html name="linkedin" %}</a></li>
+        <li><a href="https://twitter.com/{{ site.twitter_username }}" title="X / Twitter" aria-label="X / Twitter">{% include icon.html name="twitter" %}</a></li>
+        <li><a href="https://stackoverflow.com/{{ site.stackoverflow }}" title="Stack Overflow" aria-label="Stack Overflow">{% include icon.html name="stackoverflow" %}</a></li>
+        <li><a href="{{ '/feed.xml' | relative_url }}" title="RSS feed" aria-label="RSS feed">{% include icon.html name="rss" %}</a></li>
+      </ul>
+    </div>
 
-  <!-- <button class="anchor"><i class="fa fa-anchor"></i></button> -->
-  <div class="right">
-    <div class="wrap">
-      <div class="side">
+    <div class="hero__aside">
+      <img class="hero__avatar" src="{{ site.avatar }}" width="180" height="180"
+           alt="Portrait of {{ site.author }}">
+      <dl class="hero__stats">
         <div>
-          <i class="fa fa-pencil-square-o" aria-hidden="true"></i>
-          Recent Posts
+          <dt>Posts</dt>
+          <dd>{{ site.posts | size }}</dd>
         </div>
-        <ul class="content-ul" recent>
-          {% for post in site.posts offset: 0 limit: 10 %}
-          <li><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <!-- Content -->
-      <div class="side ">
         <div>
-          <i class="fa fa-th-list"></i>
-          Categories
+          <dt>Categories</dt>
+          <dd>{{ site.categories | size }}</dd>
         </div>
-        <ul class="content-ul" cate>
-          {% for category in site.categories %}
-          <li>
-            <a href="{{ root_url }}/{{ site.category_dir }}#{{ category | first }}" class="categories-list-item"
-              cate="{{ category | first }}">
-              <span class="name">
-                {{ category | first }}
-              </span>
-              <span class="badge">{{ category | last | size }}</span>
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <div class="side">
         <div>
-          <i class="fa fa-tags"></i>
-          Tags
+          <dt>Tags</dt>
+          <dd>{{ site.tags | size }}</dd>
         </div>
-        <div class="tags-cloud">
-          {% assign first = site.tags.first %}
-          {% assign max = first[1].size %}
-          {% assign min = max %}
-          {% for tag in site.tags offset:1 %}
-          {% if tag[1].size > max %}
-          {% assign max = tag[1].size %}
-          {% elsif tag[1].size < min %} {% assign min=tag[1].size %} {% endif %} {% endfor %} {% if max==min %} {%
-            assign diff=1 %} {% else %} {% assign diff=max | minus: min %} {% endif %} {% for tag in site.tags %} {%
-            assign temp=tag[1].size | minus: min | times: 36 | divided_by: diff %} {% assign base=temp | divided_by: 4
-            %} {% assign remain=temp | modulo: 4 %} {% if remain==0 %} {% assign size=base | plus: 9 %} {% elsif
-            remain==1 or remain==2 %} {% assign size=base | plus: 9 | append: '.5' %} {% else %} {% assign size=base |
-            plus: 10 %} {% endif %} {% if remain==0 or remain==1 %} {% assign color=9 | minus: base %} {% else %} {%
-            assign color=8 | minus: base %} {% endif %} <a href="{{ root_url }}/{{ site.tag_dir }}#{{ tag[0] }}"
-            style="font-size: {{ size }}pt; color: #{{ color }}{{ color }}{{ color }};">{{ tag[0] }}</a>
-            {% endfor %}
-        </div>
-      </div>
-
+      </dl>
     </div>
   </div>
+</section>
+
+{%- assign tool_posts = site.posts | where: "kind", "tool" -%}
+{%- if tool_posts.size > 0 %}
+<section class="shell tools">
+  <div class="section-head">
+    <h2 class="section-title">{% include icon.html name="tool" %}Interactive tools</h2>
+    <p class="section-note">Run these straight in the browser. Nothing to install.</p>
+  </div>
+  <div class="tools__grid">
+    {%- for post in tool_posts limit: 6 %}
+    <a class="card card--tool" href="{{ post.url | relative_url }}">
+      <span class="card--tool__icon" aria-hidden="true">{% include icon.html name="tool" %}</span>
+      <span class="card--tool__title">{{ post.title }}</span>
+      <span class="card--tool__note">{% include post-summary.html post=post %}</span>
+    </a>
+    {%- endfor %}
+  </div>
+</section>
+{%- endif %}
+{%- endif %}
+
+<div class="shell layout layout--with-rail" id="latest">
+  <div class="layout__main">
+    <div class="section-head">
+      <h2 class="section-title">
+        {% include icon.html name="sparkles" %}
+        {%- if paginator.page == 1 %}Latest posts{% else %}Posts, page {{ paginator.page }}{% endif -%}
+      </h2>
+      <p class="section-note">Newest first. {{ site.posts | size }} posts in total.</p>
+    </div>
+
+    <div class="post-list">
+      {%- for post in paginator.posts %}
+      {% include post-card.html post=post %}
+      {%- endfor %}
+    </div>
+
+    {% include pagination.html %}
+  </div>
+
+  {% include sidebar.html show="profile,categories,tags" %}
 </div>

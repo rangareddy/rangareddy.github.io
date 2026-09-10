@@ -1,0 +1,8 @@
+{%- assign p = include.post | default: page -%}
+{%- if p.tags.size > 0 %}
+<ul class="tag-list">
+  {%- for tag in p.tags %}
+  <li><a class="chip" href="{{ site.tag_dir | prepend: '/' | relative_url }}#{{ tag | slugify }}">#{{ tag }}</a></li>
+  {%- endfor %}
+</ul>
+{%- endif %}

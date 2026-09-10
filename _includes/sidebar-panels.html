@@ -1,0 +1,77 @@
+{%- comment -%}
+  Sidebar panels. `include.show` is a comma separated list of panel names
+  (profile, recent, categories, tags); `include.toc` adds the on-this-page panel.
+{%- endcomment -%}
+{%- assign show = include.show | default: "recent,categories,tags" | split: "," -%}
+{%- if include.toc %}
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title">{% include icon.html name="list" %}On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+{%- endif %}
+
+{%- if show contains "profile" %}
+<section class="panel panel--profile">
+  <img class="panel__avatar" src="{{ site.avatar }}" width="72" height="72"
+       alt="Portrait of {{ site.author }}" loading="lazy">
+  <h2 class="panel__title panel__title--plain">{{ site.author }}</h2>
+  <p class="panel__note">{{ site.brief-intro }}</p>
+  <a class="btn btn--ghost btn--sm" href="{{ '/about/' | relative_url }}">
+    About me {% include icon.html name="arrow-right" %}
+  </a>
+</section>
+{%- endif %}
+
+{%- if show contains "recent" %}
+<section class="panel">
+  <h2 class="panel__title">{% include icon.html name="sparkles" %}Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    {%- for post in site.posts limit: 8 %}
+    <li>
+      <a href="{{ post.url | relative_url }}">
+        {{ post.title }}
+        <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%b %Y" }}</time>
+      </a>
+    </li>
+    {%- endfor %}
+  </ol>
+</section>
+{%- endif %}
+
+{%- if show contains "categories" %}
+<section class="panel">
+  <h2 class="panel__title">{% include icon.html name="list" %}Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    {%- assign cats = site.categories | sort %}
+    {%- for category in cats %}
+    <li>
+      <a href="{{ site.category_dir | prepend: '/' | relative_url }}#{{ category[0] | slugify }}">
+        <span>{{ category[0] }}</span>
+        <span class="badge">{{ category[1] | size }}</span>
+      </a>
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+
+{%- if show contains "tags" %}
+<section class="panel">
+  <h2 class="panel__title">{% include icon.html name="tags" %}Tags</h2>
+  <div class="tag-cloud">
+    {%- assign tags = site.tags | sort %}
+    {%- for tag in tags %}
+    {%- assign count = tag[1] | size -%}
+    {%- if count >= 5 %}{% assign weight = 'is-xl' %}
+    {%- elsif count >= 3 %}{% assign weight = 'is-lg' %}
+    {%- elsif count >= 2 %}{% assign weight = 'is-md' %}
+    {%- else %}{% assign weight = 'is-sm' %}{% endif -%}
+    <a class="chip chip--tag {{ weight }}"
+       href="{{ site.tag_dir | prepend: '/' | relative_url }}#{{ tag[0] | slugify }}">
+      {{ tag[0] }}<span class="chip__count">{{ count }}</span>
+    </a>
+    {%- endfor %}
+  </div>
+</section>
+{%- endif %}
+
