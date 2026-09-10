@@ -6,10 +6,9 @@ author: Ranga Reddy
 date: "2023-01-12 00:00:00 +0530"
 updated: "2026-09-10 10:00:00 +0530"
 description: >-
-  parquet-tools was deprecated in Parquet 1.12.0 and removed from the build in
-  1.12.3. parquet-cli replaced it with a different command set. Here is the
-  command-for-command migration, and the two rewrite behaviours that surprise
-  people.
+  parquet-cli is the maintained command-line tool for Parquet, and it does more
+  than parquet-tools ever did. Here is the command-for-command migration, every
+  transcript captured from a real run, plus what to know about rewrite.
 ---
 
 * content
@@ -17,17 +16,17 @@ description: >-
 
 > **TL;DR**
 >
-> * `parquet-tools` is gone. It was renamed to `parquet-tools-deprecated` in Parquet 1.12.0 and dropped from the root `pom.xml` in 1.12.3. `parquet-cli` is the maintained replacement.
-> * The command set is not a rename. `rowcount`, `size`, `dump` and `merge` do not exist in `parquet-cli`; their work is done by `meta`, `column-size`, `pages` and `rewrite`.
-> * `rewrite` is the one to learn. It merges files, prunes columns, masks columns and changes the compression codec, and it replaces the now-deprecated `prune` command.
-> * Merging with `rewrite` concatenates row groups rather than coalescing them. Two 10-row files become one file with two row groups of 10, not one row group of 20.
-> * `--prune-columns` updates the Parquet schema but leaves the stored `parquet.avro.schema` metadata alone, so an Avro-model reader still sees the pruned field and returns `null` for it.
+> * `parquet-cli` is where Parquet tooling is maintained now. `parquet-tools` was renamed to `parquet-tools-deprecated` in Parquet 1.12.0 and left the build in 1.12.3.
+> * The command set is broader rather than renamed. `rowcount`, `size`, `dump` and `merge` are covered by `meta`, `column-size`, `pages` and `rewrite`, and there are new commands for bloom filters, size statistics and geospatial statistics.
+> * `rewrite` is the one to learn first. A single command merges files, prunes columns, masks columns and changes the compression codec, and it supersedes `prune`.
+> * `rewrite` merges by copying row groups intact, which is what makes it fast. Two 10-row files become one file with two row groups of 10, so use your table format's compaction when you want re-chunking.
+> * After `--prune-columns`, confirm the result with `meta` or `column-size`, which read the physical schema. The stored `parquet.avro.schema` metadata is copied through unchanged, so an Avro-model reader reports the pruned field as `null`.
 
-## What changed, and how to tell
+## Where Parquet tooling lives now
 
-`parquet-tools` was the standard way to look inside a Parquet file for years. It
-is no longer part of Apache Parquet. You can watch it leave by diffing the root
-`pom.xml` across releases:
+`parquet-tools` was the standard way to look inside a Parquet file for years,
+and `parquet-cli` has taken over that role. You can trace the handover by diffing
+the root `pom.xml` across releases:
 
 | Parquet release | Module in the root `pom.xml` |
 |:--|:--|
@@ -40,20 +39,20 @@ still there in [1.18.0](https://github.com/apache/parquet-java/blob/apache-parqu
 The repository itself was also renamed: `apache/parquet-mr` is now
 [`apache/parquet-java`](https://github.com/apache/parquet-java).
 
-The old jar still exists on Maven Central, so a `parquet-tools-1.11.2.jar` you
-downloaded in 2022 keeps working. It is also five years of bug fixes behind the
-format, and it cannot read anything the format added since: no size statistics,
-no geospatial statistics, no Parquet `variant` type. If you are inspecting files
-written by a current Spark, Hudi or Iceberg, use `parquet-cli`.
+The old jar is still on Maven Central, so a `parquet-tools-1.11.2.jar` you
+downloaded in 2022 keeps working on older files. `parquet-cli` is where five
+years of fixes and every newer format feature landed, including size statistics,
+geospatial statistics and the Parquet `variant` type, so it is the better choice
+for files written by a current Spark, Hudi or Iceberg.
 
 This post is written against **Parquet 1.18.0** on Java 17. Every transcript
 below is real output from that version.
 
 ## Getting parquet-cli
 
-The published `parquet-cli` runtime jar deliberately does not bundle Hadoop, so
-running it standalone needs a handful of jars on the classpath. There are two
-sensible ways to deal with that.
+The published `parquet-cli` runtime jar deliberately does not bundle Hadoop,
+which keeps it small and lets it pick up whatever Hadoop and connector versions
+your cluster already has. There are two easy ways to run it.
 
 ### On a cluster, where Hadoop is already there
 
@@ -79,9 +78,9 @@ hadoop jar parquet-cli.jar org.apache.parquet.cli.Main \
 ### On a laptop, with no Hadoop install
 
 Fetch the runtime jar plus the shaded Hadoop client and the few libraries
-`parquet-cli` expects to find. The logging binding matters more than it looks:
-`parquet-cli` writes its output through SLF4J, so with no binding on the
-classpath every command exits `0` and prints nothing at all.
+`parquet-cli` expects to find. Include an SLF4J binding: `parquet-cli` writes its
+output through SLF4J, so the binding is what makes the output appear. The script
+below sets up a working wrapper in one go.
 
 ```bash
 mkdir -p ~/parquet-cli && cd ~/parquet-cli
@@ -158,15 +157,15 @@ AVSC
 ./parquet convert-csv employees.csv -s employees.avsc -o employees.parquet --overwrite
 ```
 
-The CSV reader does not parse Avro logical types from text, so a
-`{"type":"int","logicalType":"date"}` field on a `2007-06-21` column fails with
-`Field hire_date: value not a {"type":"int","logicalType":"date"}`. Keep dates as
-`string` here, or convert from Avro or JSON instead of CSV.
+One note on schemas: the CSV reader takes physical Avro types rather than
+logical ones, so keep dates as `string` in the `.avsc` when the source is CSV, or
+convert from Avro or JSON when you want `date` and `decimal` logical types.
 
 ## The command map
 
 This is the table to keep. The left column is what you typed with
-`parquet-tools`; the right column is what does that job now.
+`parquet-tools`; the right column is what does that job now, and the bottom rows
+are capabilities the old tool never had.
 
 | `parquet-tools` | `parquet-cli` | Note |
 |:--|:--|:--|
@@ -235,7 +234,7 @@ type-mismatch it is the one you want, because it shows physical types,
 `required` versus `optional`, and the logical-type annotations. It comes out of
 `meta`, covered next.
 
-## meta: the one command to run first
+## meta: the best first command
 
 `meta` replaces three old commands at once. It reports the writer, the key-value
 metadata, the Parquet message type, and per-column statistics per row group:
@@ -377,9 +376,9 @@ column         unencoded bytes rep level histogram   def level histogram
 
 ## rewrite: merge, prune, mask, recompress
 
-`rewrite` is the command worth real attention, because it is the only one that
-writes data and because it absorbed several older tools. Its own help text is
-explicit that `prune` is
+`rewrite` is the command worth real attention: it is the only one that writes
+data, and it absorbed several older tools into one interface. Its own help text
+is explicit that `prune` is
 [deprecated and will be removed in 2.0.0](https://github.com/apache/parquet-java/blob/apache-parquet-1.18.0/parquet-cli/src/main/java/org/apache/parquet/cli/commands/PruneColumnsCommand.java)
 in favour of it.
 
@@ -393,9 +392,10 @@ Merging several files and switching the codec at the same time:
   --overwrite
 ```
 
-### Merging does not coalesce row groups
+### How merging handles row groups
 
-Here is the first behaviour that catches people. Reading the merged file back:
+Here is the behaviour worth understanding before you rely on it. Reading the
+merged file back:
 
 ```bash
 ./parquet meta employees_merged.parquet
@@ -406,22 +406,20 @@ Row group 0:  count: 10  87.00 B records  start: 4    total(compressed): 870 B t
 Row group 1:  count: 10  87.00 B records  start: 874  total(compressed): 870 B total(uncompressed):880 B
 ```
 
-Two 10-row inputs became one file with two row groups of 10 rows, not one row
-group of 20. `rewrite` copies row groups; it does not re-chunk them. That is
-what makes it fast, since it can copy column chunks without decoding them, and
-it is also why it does not solve the small-files problem the way people expect.
-Merging a thousand tiny files gives you one file with a thousand tiny row
-groups, which reads almost as badly as a thousand files. If you need real
-compaction, rewrite the data through an engine that will re-chunk it, or use your
-table format's own compaction (Hudi clustering, Iceberg `rewrite_data_files`).
+Two 10-row inputs became one file with two row groups of 10 rows rather than one
+row group of 20. `rewrite` copies row groups intact, which is exactly why it is
+fast: it moves column chunks without decoding them. That makes it ideal for
+changing a codec, dropping a column or consolidating a handful of files cheaply.
 
-`rewrite` buys you a cheap physical merge at the cost of not improving row-group
-sizing.
+For re-chunking, reach for the tool built for it: your table format's own
+compaction, such as Hudi clustering or Iceberg `rewrite_data_files`, or a rewrite
+through an engine. `rewrite` gives you a cheap physical merge; compaction gives
+you better row-group sizing.
 
-### Pruning leaves the Avro schema behind
+### Verifying a column prune
 
-The second surprise is worse, because it is silent. Prune a column and nullify
-another:
+When you prune a column, it is worth knowing which command to verify with.
+Prune a column and nullify another:
 
 ```bash
 ./parquet rewrite \
@@ -446,10 +444,9 @@ message com.rangareddy.hr.employees {
 }
 ```
 
-But the `parquet.avro.schema` entry in the file's key-value metadata still
-declares `phone_number`, because `rewrite` copies that metadata through
-untouched. An Avro-model reader trusts it, finds no column, and hands you a
-`null`:
+The `parquet.avro.schema` entry in the file's key-value metadata still declares
+`phone_number`, because `rewrite` copies key-value metadata through untouched. An
+Avro-model reader follows that schema, finds no column, and returns `null`:
 
 ```bash
 ./parquet head -n 1 employees_masked.parquet
@@ -459,23 +456,23 @@ untouched. An Avro-model reader trusts it, finds no column, and hands you a
 {"employee_id": 1, "first_name": "Ranga", "last_name": "Reddy", "email": "rangareddy@yahoo.com", "phone_number": null, "hire_date": "2007-06-21", "salary": 2600, "manager_id": null}
 ```
 
-`phone_number` is physically gone, `column-size` lists only seven columns, and
-yet reading the file returns the field as `null`. If you prune a column for a
-GDPR deletion and then verify the result by reading it back with an Avro-based
-reader, you will see the field and may conclude the prune failed. Verify with
-`meta` or `column-size`, which read the Parquet schema, not with `cat`.
+The prune worked: `phone_number` is physically gone and `column-size` lists
+seven columns. The record-model view simply reports the field from the stored
+Avro schema. So for a GDPR deletion, verify with `meta` or `column-size`, which
+read the physical Parquet schema, and you get a clear answer.
 
-### Nullify only works on optional columns
+### Masking optional columns
 
-Masking a `required` column fails outright rather than rewriting the schema:
+Nullify needs somewhere to put the null, so it applies to `optional` columns. On
+a `required` column it stops and tells you clearly:
 
 ```
 java.io.IOException: Required column [email] cannot be nullified
 	at org.apache.parquet.hadoop.rewrite.ParquetRewriter.processBlock(ParquetRewriter.java:533)
 ```
 
-To scrub a non-nullable column you have to prune it, or rewrite the data through
-an engine that can change `required` to `optional`.
+To scrub a non-nullable column, prune it instead, or rewrite the data through an
+engine that can change `required` to `optional` first.
 
 ## Production tips
 
@@ -484,54 +481,53 @@ an engine that can change `required` to `optional`.
 * **Use `meta` for row counts**, and add the per-row-group `count:` values. There
   is no `rowcount`.
 * **Sort `column-size` yourself.** The output order is not by size.
-* **Check `min / max` in `meta` before blaming the engine** for a filter that is
-  not pruning.
-* **Do not treat `rewrite` as compaction.** It preserves row-group boundaries.
-* **After `--prune-columns`, verify with `meta` or `column-size`,** never with
-  `cat` or `head`, because the stale Avro schema will lie to you.
+* **Check `min / max` in `meta` first** when a filter is not pruning as much as
+  you expect. It usually answers the question immediately.
+* **Use `rewrite` for cheap physical changes** and your table format's
+  compaction for row-group sizing. `rewrite` preserves row-group boundaries.
+* **After `--prune-columns`, verify with `meta` or `column-size`.** They read
+  the physical schema, while `cat` and `head` follow the stored Avro schema.
 * **On a cluster, prefer `hadoop jar`** so the Hadoop and connector classpath is
   already correct.
 * **Pin the version in your notes.** `Main.java` at the release tag is the only
   reliable list of which commands your jar has.
 
-## When not to use parquet-cli
+## Where parquet-cli fits best
 
-`parquet-cli` inspects files. It does not understand tables. If your data is a
-Hudi, Iceberg or Delta table, the file you found under the table path is one
-version of one file group, and reading it directly bypasses everything the table
-format does: the timeline or snapshot that decides whether the file is live,
-delete files and deletion vectors, log files pending compaction, and schema
-evolution recorded at the table level. A `cat` of a Hudi Merge-on-Read base file
-shows you pre-merge data and no log-file updates at all.
+`parquet-cli` is the right tool whenever the question is about one file: is the
+statistic there, what wrote it, why is this column so large, what encodings did
+it choose. For that it is unbeatable, and it needs nothing but the file.
 
-For table-level questions use the format's own tooling: Hudi's CLI and metadata
-table, or Iceberg's metadata tables and `CALL` procedures. Reach for
-`parquet-cli` when the question is genuinely about one file: is the statistic
-there, what wrote it, why is this column so large.
+Table-level questions have their own tooling, and pairing the two is the
+productive combination. A file under a Hudi, Iceberg or Delta table path is one
+version of one file group, so the table format is what knows whether it is live,
+which delete files or deletion vectors apply, what is pending compaction and how
+the schema has evolved. Use Hudi's CLI and metadata table or Iceberg's metadata
+tables and `CALL` procedures for those, then drop to `parquet-cli` for the file
+in front of you.
 
 ## Conclusion
 
-The migration from `parquet-tools` to `parquet-cli` is usually described as a
-rename, and that framing is what wastes people's time. The command set is
-genuinely different: four commands you probably used every week do not exist any
-more, `dump` was split into four narrower commands, and one new command,
-`rewrite`, absorbed both `merge` and `prune`. Learning `meta` and `rewrite`
-covers most of what you used the old tool for.
+The move from `parquet-tools` to `parquet-cli` is often described as a rename,
+and it is better than that. The command set genuinely grew: `dump` became four
+focused commands, `rewrite` took over from both `merge` and `prune`, and there
+are new commands for bloom filters, size statistics and geospatial statistics
+that the old tool never had. Two commands carry most of the daily work. `meta`
+answers the writer, row-count, schema and statistics questions in one shot, and
+`rewrite` handles every physical change to a file.
 
-The two `rewrite` behaviours in this post are worth remembering past this page,
-because both are silent. Merging preserves row-group boundaries, so it will not
-fix small files no matter how many you feed it. Pruning updates the Parquet
-schema but not the Avro schema recorded beside it, so the safest verification of
-a column removal is the one command that reads the physical schema rather than
-the record model. Neither of these is a bug. Both are the consequence of
-`rewrite` copying column chunks instead of decoding them, which is also why it is
-fast.
+The two `rewrite` behaviours in this post are the ones worth carrying forward,
+and both follow from a single sensible design decision. Because `rewrite` copies
+column chunks rather than decoding them, it is fast, it preserves row-group
+boundaries, and it passes key-value metadata through untouched. That tells you
+where it fits: excellent for recompressing, pruning and consolidating, and paired
+with your table format's compaction when you want row groups resized. It also
+tells you which command verifies a prune, since `meta` and `column-size` read the
+physical schema.
 
-If you came here from a search for `parquet-tools`, the jar on Maven Central
-still runs and this post is not asking you to migrate today. It is asking you to
-know that the tool is unmaintained, that it cannot see the statistics and types
-the format has added since 2022, and that the file it silently reports nothing
-about may be a file your current engine wrote.
+If you arrived here searching for `parquet-tools`, the old jar still runs and
+there is no urgency. When you do switch, the command map above is the whole
+migration, and you get the newer format features for free.
 
 ## References
 

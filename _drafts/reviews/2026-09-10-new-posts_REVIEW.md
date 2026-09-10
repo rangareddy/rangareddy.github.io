@@ -94,3 +94,41 @@ alternative is a performance-tuning post.
    `release-1.2.0` and `0.4.0-incubating`; the code blocks are not transcripts.
 4. **`assets/others/Ranga_Reddy_Data_Engineer.pdf` contains a personal phone
    number** and is served publicly. That is your call, but worth a look.
+
+---
+
+## Tone pass (added after author feedback)
+
+The author asked for a positive tone across all posts and specifically for
+today's. Applied to all four posts written or rewritten today: 68 edits in total.
+
+What changed:
+
+* **Titles now state a goal.** "how to keep your conversions fast" replaced "why
+  your conversion keeps falling back to a full snapshot"; "How to choose the
+  right Apache Hudi index in 1.2.0" replaced "the record-index rename nobody
+  noticed".
+* **"What failure looks like" became a verification section** in all three new
+  posts: "How to confirm your index is doing its job", "Confirming each change
+  took effect", "Confirming you are on the incremental path". The Spark table now
+  lists how to check each change worked rather than how each one fails, and the
+  Hudi table's first row is the healthy signal rather than the broken one.
+* **"When not to use X" became "Where X fits best"** and now presents the
+  alternatives as the right tools for adjacent jobs.
+* **Renames and version boundaries are framed as improvements to adopt**, with
+  the reassurance that the old key or jar still works.
+* **Removed snark and self-deprecation**: "catches people", "wastes people's
+  time", "will lie to you", "cost you an afternoon", "unmaintained", "nothing
+  tells them", "the hard part", and the playbook's "That includes the earlier
+  version of this post."
+
+What deliberately did not change, because the author's own blog rules and the
+`write-tech-blog` skill require it:
+
+* Every "X buys A at the cost of B" trade-off sentence.
+* The verified facts, including the deprecations, the alias behaviour, the
+  1000x file-group default difference, and the two `rewrite` behaviours.
+* The "measure on your own data" caveats and the absence of any laptop timing.
+
+`blog_gates.py` passes on all 10 posts with zero blockers after the pass, which
+also confirms no marketing words crept in while positivising the prose.

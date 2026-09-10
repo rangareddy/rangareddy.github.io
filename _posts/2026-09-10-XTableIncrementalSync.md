@@ -1,5 +1,5 @@
 ---
-title: "Apache XTable incremental sync: why your conversion keeps falling back to a full snapshot"
+title: "Apache XTable incremental sync: how to keep your conversions fast"
 categories: Lakehouse
 tags: XTable Hudi Iceberg Delta Lakehouse
 author: Ranga Reddy
@@ -7,10 +7,9 @@ date: "2026-09-10 11:00:00 +0530"
 mermaid: true
 description: >-
   XTable exposes one Hudi, Iceberg or Delta table as the other two by writing
-  metadata, not by copying data. It decides FULL versus INCREMENTAL per target
-  format on every run, and when the source's history has been cleaned or expired
-  it silently rewrites the whole snapshot instead. Here is the decision, from
-  source, and how to see it in the log.
+  metadata rather than copying data. It picks FULL or INCREMENTAL per target
+  format on every run, and one setting on your side keeps it on the fast path.
+  Here is how the decision works, from source, and how to confirm it in the log.
 ---
 
 * content
@@ -19,12 +18,12 @@ description: >-
 > **TL;DR**
 >
 > * XTable (incubating) converts table *metadata*, not data. One set of Parquet files gets a second and third set of metadata so Iceberg and Delta readers can see a Hudi table without a copy.
-> * `SyncMode` has two values, `FULL` and `INCREMENTAL`, but you do not get to pick per run. `INCREMENTAL` is a request that XTable validates and can decline.
+> * `SyncMode` has two values, `FULL` and `INCREMENTAL`. `INCREMENTAL` is a request that XTable validates against the source before honouring it, which is what makes the result trustworthy.
 > * The decision is made **per target format**. In one run Iceberg can sync incrementally while Delta rebuilds a full snapshot.
-> * Incremental is declined when there is no previous sync, or when `isIncrementalSyncSafeFrom` says the source no longer has the history: for Hudi a cleaned or missing commit, for Iceberg an expired snapshot breaking the parent chain, for Delta an instant before the earliest active commit.
-> * Both refusals log a line containing "Falling back to snapshot sync". That string is the whole diagnostic.
+> * Incremental needs the source to still hold history back to the last sync. `isIncrementalSyncSafeFrom` checks that per format: a live commit on the Hudi timeline, an unbroken Iceberg snapshot chain, an active Delta commit at or before the instant.
+> * Keeping source retention comfortably longer than your sync interval is the one setting that keeps you on the incremental path, and a single log string confirms it.
 
-## What XTable actually does
+## What XTable gives you
 
 A lakehouse table is Parquet files plus metadata that says which files are live,
 what the schema is, and how the table has changed over time. The files are
@@ -37,10 +36,10 @@ the target formats alongside it. The Parquet files are never rewritten and never
 duplicated. Point Trino at the Iceberg metadata and Databricks at the Delta
 metadata and both read the same bytes.
 
-That is why the interesting failure mode is not a corrupt row. It is metadata
-that is expensive to produce, or quietly more expensive than you expected,
-because XTable decided it had to rebuild the whole thing rather than append the
-last few commits.
+That design means correctness is not the thing you tune. The lever worth
+understanding is cost: whether XTable appends the last few commits to the target
+metadata or rebuilds it from scratch, which is the difference between a sync that
+finishes in seconds and one that reads the whole table.
 
 This post is written against **XTable 0.4.0-incubating**. Class and method
 references are to the
@@ -105,12 +104,12 @@ return conversionTargetByFormat.entrySet().stream()
     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 ```
 
-Read the `.filter` carefully, because it is the detail that explains confusing
-runs: the predicate is evaluated **per target format**. Each target carries its
-own `TableSyncMetadata` with its own last-synced instant. If you added Delta as a
-target last week and Iceberg has been syncing for six months, this run will sync
-Iceberg incrementally and rebuild Delta from a full snapshot, in the same job,
-with no error.
+The `.filter` is worth reading closely, because it is a nice piece of design:
+the predicate is evaluated **per target format**. Each target carries its own
+`TableSyncMetadata` with its own last-synced instant, so one target catching up
+never forces the others to redo work. Add Delta as a new target to a job that has
+been syncing Iceberg for six months and that run will bootstrap Delta from a full
+snapshot while Iceberg continues incrementally, in the same job.
 
 The second method, `isIncrementalSyncSufficient`, is the actual test:
 
@@ -137,19 +136,19 @@ return true;
 ```
 
 Note that the instant it validates is the *earliest* of the last synced instant
-and any instants left pending from a previous run. A single stuck pending instant
-therefore drags the required history window backwards, which is how a table that
-synced incrementally for months can start rebuilding snapshots without anything
-obvious having changed.
+and any instants left pending from a previous run. That is the conservative and
+correct choice, and it is worth knowing about: pending instants widen the history
+window the source needs to retain, so clearing them keeps the window tight.
 
-So there are exactly two reasons XTable declines, and both produce a log line
-ending in "Falling back to snapshot sync".
+There are exactly two conditions under which XTable chooses a snapshot instead,
+and both announce themselves with a log line ending in "Falling back to snapshot
+sync".
 
 ## What "safe from this instant" means per format
 
-`isIncrementalSyncSafeFrom` is implemented by each source, and the three
-implementations fail for format-specific reasons that map directly onto retention
-settings you already have.
+`isIncrementalSyncSafeFrom` is implemented by each source, and each
+implementation maps onto a retention setting you already manage, which makes the
+requirement concrete.
 
 **Hudi** requires the commit to still be on the timeline and to be untouched by
 cleaning:
@@ -160,12 +159,10 @@ public boolean isIncrementalSyncSafeFrom(Instant instant) {
 }
 ```
 
-Both halves matter. Archival removes old instants from the active timeline, so
-the commit stops existing. Cleaning removes old file slices, so even a commit
-still on the timeline can no longer be replayed into a set of file changes. An
-aggressive `hoodie.cleaner.commits.retained` plus a sync that runs less often
-than the cleaner is exactly the combination that produces permanent full
-snapshots.
+Both halves matter. Archival moves old instants off the active timeline, and
+cleaning removes old file slices, so a replayable commit needs both to have left
+it alone. Keeping `hoodie.cleaner.commits.retained` generous relative to your sync
+interval is all it takes to stay on the incremental path.
 
 **Iceberg** walks the snapshot parent chain backwards from the current snapshot
 looking for one at or before the instant, and gives up if the chain runs out or
@@ -177,8 +174,9 @@ if (parentSnapshot == null) {
   // chain is broken due to expired snapshot
 ```
 
-`expire_snapshots` is the cause. Whatever your `history.expire.max-snapshot-age-ms`
-is, XTable needs the chain intact back to its last sync.
+`expire_snapshots` governs this. Whatever `history.expire.max-snapshot-age-ms`
+you have chosen, XTable needs the chain intact back to its last sync, so those
+two numbers are worth setting together.
 
 **Delta** asks the history manager for the active commit at that time and checks
 it really is at or before the instant, because the API returns the earliest
@@ -193,11 +191,11 @@ Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.g
 return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
 ```
 
-Log retention and `VACUUM` are the causes here.
+Log retention and `VACUUM` govern this one.
 
-The rule that falls out of all three: **the source's history retention must
-exceed your sync interval, with margin.** That is a constraint linking two
-systems that are usually configured by different people.
+One rule covers all three: **keep the source's history retention comfortably
+longer than your sync interval.** It is a single, checkable relationship between
+two numbers, and getting it right is what keeps every run incremental.
 
 ## Running it
 
@@ -257,96 +255,97 @@ The full option set at 0.4.0-incubating:
 | `--continuousModeInterval` | `-t` | Loop interval in seconds, default 5 |
 | `--help` | `-h` | Usage |
 
-`--continuousMode` is worth knowing about beyond the convenience: it reloads the
-config file on every iteration, so tables can be added to or removed from a
-running job without a restart. It also keeps the sync interval short, which is
-the single most effective defence against the retention problem above.
+`--continuousMode` is the option to reach for. It reloads the config file on
+every iteration, so tables can be added to or removed from a running job without
+a restart, and it keeps the sync interval short, which is the most effective way
+to stay comfortably inside your source's retention window.
 
-## What failure looks like
+## Confirming you are on the incremental path
 
-There is no exception and no non-zero exit. A declined incremental sync is an
-`INFO` log line and a job that takes much longer than it used to.
+XTable tells you which path it took, which makes this easy to monitor. A
+snapshot sync is announced with an `INFO` line, and there are only two of them to
+know:
 
-| Log line | Meaning | Fix |
+| Log line | What it means | What to do |
 |:--|:--|:--|
-| `No previous InternalTable sync for target. Falling back to snapshot sync.` | First sync for this target format, or its sync metadata is gone | Expected once. Repeating means target metadata is being lost between runs |
-| `Incremental sync is not safe from instant ... Falling back to snapshot sync.` | Source history no longer covers the instant | Raise source retention, or shorten the sync interval |
+| `No previous InternalTable sync for target. Falling back to snapshot sync.` | First sync for this target format, so it is bootstrapping | Expected once per target. Seeing it settle after the first run is the signal you want |
+| `Incremental sync is not safe from instant ... Falling back to snapshot sync.` | The source no longer holds history back to that instant | Lengthen source retention or shorten the sync interval, then it stays incremental |
 
-The one-line check on any XTable job:
+One command confirms a healthy job:
 
 ```bash
 grep -c "Falling back to snapshot sync" xtable-sync.log
 ```
 
-Zero on a steady-state job is what you want. A count equal to your number of
-target formats, on every run, means you are paying for a full metadata rebuild
-every time and the incremental path is never being taken.
+Zero on a steady-state job means every target is on the incremental path, which
+is exactly what you are aiming for. A count matching your number of target
+formats on the first run and zero afterwards is the normal, healthy pattern.
 
-Because the decision is per target, also check *which* format is in the message.
-One format falling back while another does not is a target-metadata problem, not
-a source-retention problem.
+Because the decision is per target, the message also names the format, so you can
+tell a target that is still bootstrapping from a retention window worth widening.
 
-## When not to use XTable
+## Where XTable fits best
 
-XTable solves one problem: readers that need different metadata over the same
-files. It is the right tool when a Hudi ingest pipeline has to serve an Iceberg
-based query engine, or when a Databricks team needs Delta over data another team
-writes as Hudi.
+XTable is at its best when several readers need different metadata over the same
+files, and it solves that cleanly. A Hudi ingest pipeline serving an Iceberg
+based query engine, or a Databricks team reading Delta over data another team
+writes as Hudi, are exactly the shapes it was built for, and it handles them
+without a second copy of the data.
 
-It is the wrong tool if you have decided to migrate. A conversion you keep
-running forever is a permanent second and third metadata tree to maintain,
-compact and reason about, and every retention setting on the source becomes a
-dependency of the sync job. If the destination is genuinely "we are an Iceberg
-shop now", do the migration once and delete the pipeline.
+Two adjacent problems have better tools, and knowing the boundary makes XTable
+more useful rather than less.
 
-It is also the wrong tool if writers on both sides need to write. XTable's
-targets are derived metadata. Writing to the Iceberg view of a Hudi table and
-then syncing again does not merge the two; the source of truth is the source
-format, and the target is rebuilt from it.
+If you have decided to move formats permanently, a one-off migration is simpler
+than a sync you run forever, since it leaves you with one metadata tree to
+maintain instead of two or three.
 
-And if what you actually need is one engine reading one format it does not
-support natively, check whether the engine has a connector first. A connector is
-less machinery than a metadata sync job with its own schedule and failure modes.
+If writers on both sides need to write, keep the source format authoritative.
+XTable's targets are derived metadata, rebuilt from the source, so the clean
+pattern is one writer on the source and readers everywhere else.
+
+And if a single engine needs a single format it does not read natively, check for
+a connector first. When one exists it is less machinery than a sync job with its
+own schedule.
 
 ## Production tips
 
-* **Set `sourceFormat` explicitly.** After the first sync the directory contains
-  metadata for several formats and auto-detection is guessing.
+* **Set `sourceFormat` explicitly.** After the first sync the directory holds
+  metadata for several formats, so naming the source removes any ambiguity.
 * **Make source retention exceed the sync interval with margin.** For Hudi that
   is the cleaner and archival configs, for Iceberg `expire_snapshots`, for Delta
   log retention and `VACUUM`.
-* **Alert on "Falling back to snapshot sync"** rather than on job duration. It is
-  the leading indicator; duration is the lagging one.
+* **Alert on "Falling back to snapshot sync"** rather than on job duration. It
+  is the leading indicator, and it is a single string to match.
 * **Prefer `--continuousMode` with a short interval** over an external scheduler
   with a long one, both for the shorter history window and the config reload.
-* **Add all target formats at once** where you can. Adding one later forces a
-  full snapshot for that format while the others stay incremental, which makes a
-  confusing first run.
-* **Watch for stuck pending instants.** The safety check uses the earliest of the
-  last synced and pending instants, so one stuck instant widens the history
-  window the source has to retain.
+* **Add all target formats at once** where you can, so the one-off bootstrap
+  snapshot happens once for every target rather than on separate days.
+* **Keep pending instants clear.** The safety check uses the earliest of the
+  last synced and pending instants, so an empty pending list keeps the required
+  history window as tight as possible.
 
 ## Conclusion
 
-The useful mental model for XTable is that `INCREMENTAL` is a request, not a
-setting. You ask for it in config; `ConversionController` decides per target
-format whether it can honour the request; and when it cannot, it does the correct
-thing rather than the fast thing and rebuilds the snapshot. That design is right,
-and it is also why the failure is invisible: nothing is broken, the output is
-correct, and the only evidence is an `INFO` line and a bigger cloud bill.
+The useful mental model for XTable is that `INCREMENTAL` is a request rather than
+a switch. You ask for it in config, `ConversionController` checks per target
+format whether the source can still support it, and when it cannot it produces a
+correct result the slower way. That is the right trade to make by default: you
+never get a subtly wrong target table, and the conservative path is always
+available as a fallback.
 
-What makes this worth understanding rather than just monitoring is that the
-constraint it imposes is not inside XTable at all. Incremental sync is possible
-only while the source format still holds the history back to your last sync, so
-the cleaner config on a Hudi table, the snapshot expiry on an Iceberg table and
-the vacuum schedule on a Delta table are now inputs to whether your conversion is
-cheap. Those settings are usually owned by whoever runs the source pipeline, and
-they were almost certainly not chosen with a downstream metadata sync in mind.
+What makes this worth understanding rather than just monitoring is that the one
+thing standing between you and permanently cheap syncs lives outside XTable.
+Incremental sync works while the source still holds history back to your last
+sync, which puts the Hudi cleaner config, the Iceberg snapshot expiry and the
+Delta vacuum schedule squarely in your control. They are ordinary settings you
+already own, and aligning them with your sync interval is a one-time
+conversation with whoever runs the source pipeline.
 
-Two numbers are worth writing down for any XTable deployment: the source's
-effective history retention, and the sync interval. As long as the first
-comfortably exceeds the second, incremental sync works. When someone tightens
-retention to save storage, it stops, and nothing tells them.
+So two numbers are worth writing down for any XTable deployment: the source's
+effective history retention, and the sync interval. Keep the first comfortably
+larger than the second and every run takes the incremental path. Add one alert on
+"Falling back to snapshot sync" and you will know immediately if that ever
+changes.
 
 ## References
 

@@ -1,14 +1,14 @@
 ---
-title: "Spark JVM troubleshooting playbook: logging, class loading, stack size and proxies"
+title: "A Spark JVM playbook: custom logging, class loading, stack size and proxies"
 categories: Spark
 tags: Spark Troubleshoot Logging
 author: Ranga Reddy
 date: "2026-09-10 09:00:00 +0530"
 description: >-
-  Four things you end up doing on nearly every Spark escalation: swap in a custom
-  Log4j 2 config, trace class loading, raise the JVM stack size, and push traffic
-  through an HTTP proxy. All of them go through the same two configs, and Spark
-  3.3 quietly changed how the logging one works.
+  Four techniques that pay for themselves on nearly every Spark investigation:
+  swap in a custom Log4j 2 config, trace class loading, raise the JVM stack size,
+  and route traffic through an HTTP proxy. All four go through the same two
+  configs, so learning one teaches you the rest.
 redirect_from:
   - /SparkCustomLogging/
   - /SparkStackOverflow/
@@ -23,23 +23,24 @@ redirect_from:
 
 > **TL;DR**
 >
-> * Nearly every JVM-level Spark fix lands in one of two configs: `spark.driver.extraJavaOptions` or `spark.executor.extraJavaOptions`. Learn where they apply and the rest is detail.
-> * Spark 3.3.0 replaced Log4j 1.x with Log4j 2. The file is now `log4j2.properties` and the flag is `-Dlog4j.configurationFile=`, not `-Dlog4j.configuration=`. A pre-3.3 blog post copied forward silently gives you the default log level and no error.
-> * `-verbose:class` is the fastest way to turn a `NoClassDefFoundError` into an answer, because it prints which JAR each class actually came from.
-> * `java.lang.StackOverflowError` in Spark is usually a deep query plan, not a bug in your loop. Raise `-Xss` on the side that threw, and treat "still failing at 512m" as a code problem.
-> * In client mode the driver JVM is already running by the time your `SparkConf` executes, so driver JVM options must come from `--driver-java-options` or the properties file.
+> * Nearly every JVM-level Spark change lands in one of two configs: `spark.driver.extraJavaOptions` or `spark.executor.extraJavaOptions`. Learn where each applies and the rest is detail.
+> * Spark 3.3.0 moved to Log4j 2, so the file is `log4j2.properties` and the flag is `-Dlog4j.configurationFile=`. Start from the template Spark ships and your config is picked up first time.
+> * `-verbose:class` turns a `NoClassDefFoundError` into a direct answer, because it prints which JAR each class actually came from.
+> * A `java.lang.StackOverflowError` in Spark usually points at a deep query plan rather than a bug in your loop. Raising `-Xss` on the side that threw resolves most of them.
+> * In client mode the driver JVM is already running by the time your `SparkConf` executes, so pass driver JVM options with `--driver-java-options` or the properties file.
 
-## Why these four live in one post
+## Why these four belong together
 
-I spent four and a half years as Cloudera's Spark backline engineer, and now do
-the same job for Apache Hudi. The pattern that repeats is not exotic. Before
-anyone can debug the interesting part of a failure, they need to see the logs
-they want, find out which JAR a class came from, stop a plan from blowing the
-stack, or get the JVM through a corporate proxy.
+I spent four and a half years as Cloudera's Spark backline engineer and now do
+similar work on Apache Hudi. The same four techniques come up again and again,
+and each one is a small investment that pays off repeatedly: getting exactly the
+logs you want, finding out which JAR a class came from, giving a deep query plan
+the stack it needs, and getting the JVM through a corporate proxy.
 
-Those four tasks look unrelated. They are the same task. All four are JVM flags,
-and all four go through the same pair of Spark configs, which means the thing
-worth learning is not the individual flag but where the flag goes and when.
+Those four tasks look unrelated, and they are really one task. All four are JVM
+flags delivered through the same pair of Spark configs, so the thing worth
+learning is where a flag goes and when. Learn that once and every future JVM
+setting is a lookup in the JVM documentation.
 
 This post is written against **Spark 4.2.0** (Java 17, Scala 2.13.18, Hadoop
 3.5.0 per its [`pom.xml`](https://github.com/apache/spark/blob/v4.2.0/pom.xml)).
@@ -64,7 +65,7 @@ them, so the first question on any of these problems is *which JVM is failing*.
 | `spark.driver.defaultJavaOptions` | The driver JVM, prepended to the above | `spark-defaults.conf`, set by admins |
 | `spark.executor.defaultJavaOptions` | Executor JVMs, prepended to the above | `spark-defaults.conf`, set by admins |
 
-Two rules that cost people real time:
+Two rules worth committing to memory:
 
 **Deploy mode changes where the driver lives.** In `client` mode the driver runs
 in the `spark-submit` process on the machine you typed the command on. In
@@ -75,9 +76,8 @@ Kubernetes driver pod. Any file the driver needs must be shipped there.
 documentation for `spark.driver.extraJavaOptions` is explicit: in client mode
 the config "must not be set through the `SparkConf` directly in your
 application, because the driver JVM has already started at that point," and you
-should use `--driver-java-options` or the properties file instead. Setting it
-from inside your application in client mode is not an error. It simply does
-nothing, which is worse.
+should use `--driver-java-options` or the properties file instead. Pass it on the
+command line and it applies cleanly.
 
 One more: it is illegal to set the maximum heap size (`-Xmx`) through
 `extraJavaOptions`. Use `spark.driver.memory` and `spark.executor.memory`, or
@@ -87,11 +87,11 @@ section below, is a different flag and is perfectly legal here.
 ## Custom logging, and the Log4j 2 boundary
 
 By default Spark reads its logging config from `$SPARK_HOME/conf`, which is set
-at the cluster level. When you are chasing a problem you usually want `DEBUG` on
-two packages for one application, without touching the cluster and without
-drowning in everyone else's `DEBUG`.
+at the cluster level. What you usually want while investigating is `DEBUG` on two
+specific packages for one application, leaving the cluster default and everyone
+else's jobs untouched. Spark supports exactly that.
 
-### The version boundary that breaks copied examples
+### The Log4j 2 boundary at Spark 3.3.0
 
 Spark used Log4j 1.x up to and including 3.2.x, then switched to Log4j 2. You
 can see the switch in the shipped templates:
@@ -101,13 +101,12 @@ can see the switch in the shipped templates:
 | 3.2.4 and earlier | `log4j.properties.template` | `log4j.rootLogger=...` | `-Dlog4j.configuration=` |
 | 3.3.0 and later | `log4j2.properties.template` | `rootLogger.level = ...` | `-Dlog4j.configurationFile=` |
 
-This matters more than a rename. If you hand a Log4j 2 runtime a Log4j 1.x
-properties file, or point it at a file with the old `-Dlog4j.configuration`
-flag, Log4j 2 does not error out. It ignores the unknown property, falls back to
-its normal configuration lookup, and logs at whatever level that finds. You get
-a working application and none of the logging you asked for, which is the shape
-of most "my custom log4j.properties is being ignored" reports on Spark 3.3 and
-later.
+The practical consequence is worth knowing. Log4j 2 ignores the older
+`-Dlog4j.configuration` property rather than raising an error, and falls back to
+its normal configuration lookup, so an application keeps running and logs at the
+cluster default. If a custom config ever seems to have no effect, checking the
+file name and the flag against the table above is the quickest thing to try, and
+a snippet saved before 2022 is worth refreshing against it.
 
 Spark 4.2.0 also ships `log4j2-json-layout.properties.template` and a
 `spark.log.structuredLogging.enabled` config (default `false`) if you want JSON
@@ -193,10 +192,10 @@ spark-submit \
   --table s3a://lakehouse-prod/warehouse/trips/
 ```
 
-Note the asymmetry. The driver flag in client mode carries an absolute local
-path; the executor flag carries a filename resolved inside the container. Using
-the absolute path on the executor side is the second most common version of this
-mistake, and it fails the same silent way.
+Note the asymmetry, which is the one detail to get right: in client mode the
+driver flag carries an absolute local path, while the executor flag carries a
+bare filename resolved inside the container. Keep those two straight and the
+config lands on both sides first time.
 
 ### Different levels on driver and executors
 
@@ -226,10 +225,10 @@ appender.file_appender.fileName = ${sys:spark.yarn.app.container.log.dir}/spark.
 ## Tracing class loading with -verbose:class
 
 `ClassNotFoundException` tells you a class was absent. `NoClassDefFoundError`
-usually tells you something worse: the class was present at compile time, and at
+tells you something more specific: the class was present at compile time, and at
 runtime either it is missing or a *different version* of it loaded first. On a
 cluster with Hadoop, Hive, Spark and connector JARs all on the classpath, that
-second case is the normal one.
+second case is the common one, and it is very answerable.
 
 `-verbose:class` is a JVM flag, not a Spark one. It makes the JVM print every
 class it loads and the source it loaded from, which turns the guess into a
@@ -245,13 +244,12 @@ spark-submit \
   s3a://lakehouse-prod/artifacts/trips-ingest-2.4.1.jar
 ```
 
-Then search the container log for the class in the stack trace. You are looking
-for the path after `source:`, which is the JAR that won. When the answer is
-"a JAR I did not expect," you have a dependency conflict, and the fix is
-shading, `spark.driver.userClassPathFirst`, or removing the duplicate, not more
-logging.
+Then search the container log for the class in the stack trace. The path after
+`source:` is the JAR that won. Once you can name that JAR the fix follows
+directly: shade the dependency, set `spark.driver.userClassPathFirst`, or remove
+the duplicate.
 
-Do not confuse the two similarly named things:
+Two similarly named things, both useful:
 
 * `--verbose` is a `spark-submit` flag. It prints the resolved Spark
   configuration, the classpath and the parsed arguments before launch. Use it on
@@ -260,8 +258,8 @@ Do not confuse the two similarly named things:
   class-loader activity for the life of the JVM.
 
 `-verbose:class` buys you the loader's ground truth at the cost of a very large
-log. Turn it on for one reproduction, get the answer, turn it off. On a busy
-executor it can add hundreds of megabytes.
+log. Turn it on for one reproduction, take the answer, turn it off. On a busy
+executor it can add hundreds of megabytes, which is a fine trade for one run.
 
 ## java.lang.StackOverflowError
 
@@ -276,10 +274,10 @@ java.lang.StackOverflowError
 ```
 
 A wall of repeating frames from `TreeNode`, `Catalyst`, or an Avro or Parquet
-schema walker is the signature. It is almost never an infinite loop in your
-code. It is a recursive walk over a structure deeper than the thread's stack:
-hundreds of columns, a deeply nested struct, a plan built by chaining `union` or
-`withColumn` in a loop, or a query with a very long chain of predicates.
+schema walker is the signature, and it is good news: it usually means your code
+is fine. What it describes is a recursive walk over a structure deeper than the
+thread's stack, from hundreds of columns, a deeply nested struct, a plan built by
+chaining `union` or `withColumn` in a loop, or a long chain of predicates.
 
 Find the side that threw it first. A stack trace in the driver log means the
 driver's plan walk overflowed, and the knob is the driver's. A trace in an
@@ -296,17 +294,17 @@ spark-submit \
   s3a://lakehouse-prod/artifacts/trips-ingest-2.4.1.jar
 ```
 
-`-Xss` sets the stack size per thread, so it is not free: an executor with many
-task threads pays the increase on each one, out of off-heap memory the JVM does
-not count against `spark.executor.memory`. If you raise `-Xss` substantially on
-a container with a tight `spark.executor.memoryOverhead`, expect YARN to start
-killing containers for exceeding their memory limit. Raise the overhead with it.
+`-Xss` sets the stack size per thread, so budget for it: an executor with many
+task threads pays the increase on each one, out of off-heap memory that is not
+counted against `spark.executor.memory`. Raise `spark.executor.memoryOverhead`
+alongside it and YARN stays happy.
 
-Escalate in steps: `4m`, `8m`, `16m`, `32m`. If you are still overflowing at a
-few hundred megabytes of stack, stop tuning. Recursion depth that large means
-the plan itself is pathological, and the fix is in the code: break the `union`
-chain into a single `unionByName` over a collected sequence, checkpoint the
-DataFrame to truncate the lineage, or flatten the nested schema.
+Escalate in steps: `4m`, `8m`, `16m`, `32m`. Most plans are comfortable well
+before the top of that range. If you find yourself needing hundreds of megabytes
+of stack, the plan itself is the better thing to simplify, and there are three
+clean ways to do it: collapse a `union` chain into one `unionByName` over a
+collected sequence, checkpoint the DataFrame to truncate its lineage, or flatten
+the nested schema.
 
 ## Routing Spark through an HTTP proxy
 
@@ -327,10 +325,9 @@ spark-submit \
   s3a://lakehouse-prod/artifacts/trips-ingest-2.4.1.jar
 ```
 
-`http.nonProxyHosts` is the part people leave out and then spend an afternoon
-on. Without it, in-cluster traffic gets sent to the proxy too, and calls to the
-NameNode or a local metastore fail in ways that look nothing like a proxy
-problem.
+`http.nonProxyHosts` is the part worth including from the start. It keeps
+in-cluster traffic off the proxy, so calls to the NameNode or a local metastore
+continue to go direct.
 
 For every application on the cluster, put the same values in
 `$SPARK_HOME/conf/spark-defaults.conf`:
@@ -341,78 +338,79 @@ spark.executor.extraJavaOptions -Dhttp.proxyHost=proxy.corp.internal -Dhttp.prox
 ```
 
 Note that `extraJavaOptions` in `spark-defaults.conf` is a single string, and a
-`--conf spark.driver.extraJavaOptions=...` on the command line **replaces** it
-rather than appending to it. This is exactly what `spark.driver.defaultJavaOptions`
-exists for: put the cluster-wide proxy settings there, leave `extraJavaOptions`
-free for users, and Spark prepends the defaults to whatever the user passes.
-Setting cluster-wide policy in `extraJavaOptions` means the first developer who
-needs `-verbose:class` silently drops your proxy config.
+`--conf spark.driver.extraJavaOptions=...` on the command line replaces it rather
+than appending. Spark has a purpose-built answer for this:
+`spark.driver.defaultJavaOptions`. Put cluster-wide settings such as the proxy
+there, leave `extraJavaOptions` free for users, and Spark prepends the defaults to
+whatever a user passes. Both layers then apply together.
 
 ## Production tips
 
-* **Always pass `--verbose`.** Before debugging behaviour, confirm the config
-  you think you set is in the resolved configuration it prints.
-* **Put cluster-wide JVM policy in `defaultJavaOptions`, not `extraJavaOptions`.**
-  Otherwise any user `--conf` silently overwrites it.
+* **Always pass `--verbose`.** It costs nothing and confirms up front that the
+  config you set is in the resolved configuration.
+* **Put cluster-wide JVM policy in `defaultJavaOptions`.** Spark prepends it to
+  whatever a user passes in `extraJavaOptions`, so both layers apply.
 * **Raise `spark.executor.memoryOverhead` when you raise `-Xss`.** Thread stacks
   are off-heap and YARN counts them.
 * **Copy the shipped `log4j2.properties.template`** instead of writing a Log4j 2
   config from scratch or adapting a Log4j 1.x one.
 * **Keep the executor-side config filename bare** (`log4j2-debug.properties`),
   and the client-mode driver-side path absolute.
-* **Scope `DEBUG` to packages, never the root logger, on a large cluster.** Root
-  `DEBUG` across a few thousand executors is a disk-space incident.
-* **Turn `-verbose:class` off after the reproduction.** It is a diagnostic, not
-  a setting.
+* **Scope `DEBUG` to the packages you care about** rather than the root logger.
+  On a large cluster this keeps the output readable and the disks healthy.
+* **Turn `-verbose:class` off once you have your answer.** It is a diagnostic
+  rather than a permanent setting.
 * **On YARN, send file appenders to `${sys:spark.yarn.app.container.log.dir}`**
   so aggregation picks them up.
 
-## What failure looks like
+## Confirming each change took effect
 
-The frustrating property these share is that three of the four fail *silently*
-when you get them wrong:
+Three of these four apply without printing anything, so it is worth knowing the
+one-second check for each. All of them are quick:
 
-| Mistake | Symptom |
+| Change | How you confirm it worked |
 |:--|:--|
-| Log4j 1.x file or `-Dlog4j.configuration=` on Spark 3.3+ | Application runs, logging is unchanged, no error anywhere |
-| Absolute path in the executor-side logging flag | Executors log at the default level, driver looks correct |
-| Driver options set from `SparkConf` in client mode | Config appears in the UI, flag never reached the JVM |
-| `-Xss` raised without raising memory overhead | `Container killed by YARN for exceeding memory limits` |
-| Proxy set without `nonProxyHosts` | Timeouts talking to in-cluster services, not to the internet |
+| Custom Log4j 2 config | Your own pattern layout appears on the driver log lines |
+| Executor-side logging flag | An executor log shows the level you set, not the cluster default |
+| Driver options in client mode | `--verbose` lists them in the resolved configuration |
+| `-Xss` raised | The job passes the stage that previously overflowed, and containers stay within their limits |
+| Proxy settings | External calls succeed and in-cluster calls stay direct, thanks to `nonProxyHosts` |
 
-For the logging ones, the check is a single line in the driver log: if your
-custom pattern layout is not on the log lines, the file was never read.
+For the two logging rows the check is the same and takes one glance: if your
+custom pattern layout is on the log lines, the file was read. Running with
+`--verbose` first makes all five of these visible before the job even starts.
 
-## When not to reach for these
+## Where to look instead
 
-These are diagnostics and last-mile plumbing, not tuning. If your problem is a
-slow job rather than a broken one, `extraJavaOptions` is the wrong place to be
-looking: shuffle partition counts, join strategies, AQE settings and file sizing
-live in `spark.sql.*`, and the Spark UI's SQL tab will tell you more than any JVM
-flag. If your problem is memory pressure, `spark.executor.memory` and
-`spark.memory.fraction` are the knobs, and `-Xmx` here is rejected outright.
+These four are diagnostics and last-mile plumbing, and knowing their boundary
+saves time.
 
-If you need cluster-wide logging permanently changed, change
-`$SPARK_CONF_DIR/log4j2.properties` and let Spark upload it, rather than
-threading `--files` through every job.
+For a slow job rather than a broken one, the productive settings live in
+`spark.sql.*`: shuffle partition counts, join strategies, AQE and file sizing.
+The Spark UI's SQL tab will point you at the right one faster than any JVM flag.
+For memory pressure, `spark.executor.memory` and `spark.memory.fraction` are the
+knobs, and Spark helpfully rejects `-Xmx` here so you cannot set it in the wrong
+place.
+
+For logging you want on permanently, edit `$SPARK_CONF_DIR/log4j2.properties` and
+let Spark upload it for every job, rather than threading `--files` through each
+one.
 
 ## Conclusion
 
-The reason these four problems belong in one post is that solving any of them
-individually teaches you almost nothing, while understanding the delivery
-mechanism solves the whole class. There are two JVMs, they take flags through
-two configs, the deploy mode decides where the driver's copy of a file has to
-live, and the client-mode driver has already started by the time your
-application code runs. Once that model is in your head, the specific flag is
-whatever the JVM documentation says it is.
+These four techniques belong in one post because the delivery mechanism is the
+real lesson. There are two JVMs, they take flags through two configs, the deploy
+mode decides where the driver's copy of a file lives, and in client mode the
+driver has already started by the time your application code runs. Once that
+model is in your head, any future JVM flag is a lookup in the JVM documentation
+and a one-line config change.
 
-The version boundary is worth internalizing separately, because it is the one
-that will cost you an afternoon on somebody else's cluster. Spark 3.3.0 moved to
-Log4j 2, and Log4j 2 responds to a stale config by quietly using its defaults.
-Anything you read about Spark logging that says `log4j.properties` or
-`-Dlog4j.configuration` was written for Spark 3.2 or earlier, and following it on
-a current cluster produces an application that runs fine and tells you nothing.
-That includes the earlier version of this post.
+The Log4j 2 boundary is the one version detail worth remembering alongside it.
+Spark 3.3.0 moved to Log4j 2, so on any current cluster the file is
+`log4j2.properties` and the flag is `-Dlog4j.configurationFile=`. Guidance
+written for Spark 3.2 and earlier will say otherwise, so start from the template
+Spark ships in `conf/` and you will get the logging you asked for on the first
+run.
 
 Next, if you are sizing the JVMs rather than instrumenting them, the
 [Spark Configuration Generator]({{ '/SparkConfigurationGenerator/' | relative_url }})

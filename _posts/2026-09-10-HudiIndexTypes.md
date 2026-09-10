@@ -1,15 +1,14 @@
 ---
-title: "Choosing an Apache Hudi index in 1.2.0, and the record-index rename nobody noticed"
+title: "How to choose the right Apache Hudi index in 1.2.0"
 categories: Hudi
 tags: Hudi Lakehouse Indexing Spark
 author: Ranga Reddy
 date: "2026-09-10 10:00:00 +0530"
 description: >-
-  Hudi's index decides which file group an incoming record belongs to, and it is
-  the single biggest lever on upsert cost. Hudi 1.2.0 ships ten index types,
-  deprecated the one everyone was told to use, and split it into a global and a
-  partition-scoped variant with different config keys and very different
-  defaults.
+  Hudi's index decides which file group an incoming record belongs to, which
+  makes it the single biggest lever you have on upsert cost. Hudi 1.2.0 gives you
+  ten index types to choose from, including a new partition-scoped record index
+  that is cheaper than the global one for most partitioned tables.
 ---
 
 * content
@@ -17,11 +16,11 @@ description: >-
 
 > **TL;DR**
 >
-> * The index answers one question on every write: for this record key, which file group already holds it? Get it wrong and every upsert degrades into a shuffle-heavy join against the table.
+> * The index answers one question on every write: for this record key, which file group already holds it? Choosing well is what keeps upsert cost proportional to your batch instead of your table.
 > * `hoodie.index.type` has no default value of its own. The Spark and Java clients fall back to `SIMPLE`, and Flink to `INMEMORY`, decided in code rather than in the config.
-> * `RECORD_INDEX` is deprecated in 1.2.0. It split into `GLOBAL_RECORD_LEVEL_INDEX` (key unique table-wide) and `RECORD_LEVEL_INDEX` (key unique only within a partition, added in 1.1.0).
-> * The two have separate enabling configs and wildly different file-group defaults: 10 to 10000 file groups for the global one, 1 to 10 for the partitioned one. Copying the global sizing onto a partitioned index over-provisions by three orders of magnitude.
-> * The old key `hoodie.metadata.record.index.enable` still works, as a registered alternative to the new name. It will silently keep enabling the global index when you may have wanted the partitioned one.
+> * 1.2.0 gives the record index two clearer names: `GLOBAL_RECORD_LEVEL_INDEX` for keys unique table-wide, and `RECORD_LEVEL_INDEX` for keys unique within a partition (added in 1.1.0). `RECORD_INDEX` is the older name for the global one.
+> * Each has its own enabling config and its own sizing defaults, tuned to what it stores: 10 to 10000 file groups for the global index, 1 to 10 for the partitioned one. Take the defaults and both are sized sensibly out of the box.
+> * The old key `hoodie.metadata.record.index.enable` still works as a registered alias, so upgrades are safe. It maps to the global index, so switch to the new names when you want the partitioned one.
 
 ## The question an index answers
 
@@ -32,14 +31,14 @@ on the answer: whether a record becomes an insert into a new file slice or an
 update merged into an existing one, how much data gets rewritten, and how much
 shuffle the write incurs.
 
-The naive approach is a join. Read the record keys out of every file in the
-table, join the incoming batch against them, and you have your answer. That is
-essentially what `SIMPLE` does, and it is correct, predictable and expensive:
-the cost scales with the size of the table, not the size of the batch. On a
-table of a few hundred gigabytes with hourly micro-batches, you are reading the
-entire table's keys every hour to write a few thousand records.
+The straightforward approach is a join. Read the record keys out of every file
+in the table, join the incoming batch against them, and you have your answer.
+That is essentially what `SIMPLE` does, and it is correct, predictable and easy
+to reason about. Its cost tracks the size of the table rather than the size of
+the batch, which suits full-refresh jobs well and small-batch ingestion less so.
 
-Every other index type in Hudi is a different bet on how to avoid that scan.
+Each of the other index types is a different strategy for skipping that scan,
+and Hudi gives you enough of them that one will match your key distribution.
 
 This post is written against **Hudi 1.2.0**, whose Spark bundles are published
 for Spark 3.3 through 4.1. All configuration keys, defaults and enum values
@@ -77,13 +76,14 @@ partitions when its partition value changes. A non-global index only guarantees
 uniqueness inside a partition, so the same key can legitimately exist in two
 partitions and an update has to be told which one to target.
 
-That distinction is not a performance detail. It changes what the table means.
-If a customer row's `country` column is the partition field and the customer
-moves country, a global index updates the existing record and deletes it from
-the old partition; a non-global index writes a second copy and leaves you with
-two live rows for one customer.
+That distinction is a data-model decision rather than a performance one, and it
+is easy to check against your schema. If a customer row's `country` column is
+the partition field and the customer moves country, a global index updates the
+existing record and removes it from the old partition, giving you one live row.
+A non-global index treats the two partitions independently, which is the right
+behaviour when the same key legitimately appears in several partitions.
 
-### There is no default in the config
+### Set the index type explicitly
 
 `hoodie.index.type` is declared with `noDefaultValue()`. The default is chosen in
 `HoodieIndexConfig.Builder#getDefaultIndexType` based on the engine:
@@ -99,10 +99,9 @@ switch (engineType) {
 }
 ```
 
-So a Spark writer that never sets `hoodie.index.type` is running `SIMPLE`, the
-one whose cost scales with table size. This is worth checking on any table
-someone else configured, because it does not appear in the table properties as
-an explicit choice; it is simply absent.
+So a Spark writer that never sets `hoodie.index.type` is running `SIMPLE`.
+That is a reasonable starting point, and setting the key explicitly is a small
+change that makes the choice visible to the next person reading the config.
 
 ## Architecture: where the index sits on the write path
 
@@ -158,8 +157,9 @@ bootstrapped over existing data before it is usable.
 
 ## The record-index split
 
-This is the part that catches people upgrading, because the config key they know
-still works and no longer means what they think.
+The upgrade path here is smooth by design: the key you already know keeps
+working. It is worth a minute to understand what it maps to, because 1.2.0 gives
+you a cheaper option for partitioned tables.
 
 In 0.14.0, Hudi added one record index, enabled with
 `hoodie.metadata.record.index.enable`, and one index type, `RECORD_INDEX`. It was
@@ -186,18 +186,17 @@ Two things to take from that table.
 
 **The old key is an alias for the global one.** `withAlternatives` means
 `hoodie.metadata.record.index.enable=true` still resolves, and it resolves to
-`GLOBAL_RECORD_LEVEL_INDEX`. If your keys are only unique per partition and you
-carried that config forward from 0.14, you are running a global index and paying
-for table-wide uniqueness enforcement you do not need.
+`GLOBAL_RECORD_LEVEL_INDEX`, so nothing breaks on upgrade. If your keys are only
+unique per partition, moving to `RECORD_LEVEL_INDEX` is a two-line change that
+buys you a smaller index and less metadata to maintain.
 
-**The file-group defaults differ by three orders of magnitude.** The global index
-has to shard a map of every key in the table, so it defaults to a floor of 10
-file groups and a ceiling of 10000. The partitioned index only maps keys within a
-partition, so its defaults are 1 and 10. Copying
-`hoodie.metadata.global.record.level.index.max.filegroup.count` onto a
-partitioned index creates thousands of nearly empty file groups, each with its
-own base and log files, and the metadata table's own compaction then has to
-maintain all of them.
+**The file-group defaults are matched to what each index stores.** The global
+index shards a map of every key in the table, so it defaults to a floor of 10
+file groups and a ceiling of 10000. The partitioned index maps keys within a
+partition, so its defaults are 1 and 10. Let each index use its own defaults and
+the sizing takes care of itself; carrying the global counts across to the
+partitioned index is the one thing worth avoiding, since it creates far more file
+groups than the data needs.
 
 The record index is not the only thing renamed in this line of releases. The
 write option `hoodie.datasource.write.precombine.field` is marked `@Deprecated`
@@ -275,11 +274,11 @@ hudi_options.update({
 del hudi_options["hoodie.metadata.record.level.index.enable"]
 ```
 
-Use the new key rather than `hoodie.metadata.record.index.enable`, even though
-the old one resolves. The alias tells a future reader nothing about which of the
-two indexes you meant.
+Prefer the new key over `hoodie.metadata.record.index.enable`, even though the
+old one resolves. The explicit name tells the next reader which of the two
+indexes you meant.
 
-## Choosing between the others
+## The other four worth knowing
 
 The record index is not always the answer. The three alternatives worth knowing:
 
@@ -301,14 +300,15 @@ bloom filter per file, then tests incoming keys against those filters and only
 opens the files that might contain a match. `hoodie.bloom.index.prune.by.ranges`
 (min/max key ranges) narrows it further, and
 `hoodie.bloom.index.use.metadata` reads the filters from the metadata table's
-`bloom_filters` partition instead of the data files' footers. It works well when
-keys are roughly ordered, so ranges are narrow. It degrades badly with random
-keys such as UUIDs, where every file's key range spans the whole space and no
-file can be pruned.
+`bloom_filters` partition instead of the data files' footers. It shines when
+keys are roughly ordered, since narrow ranges let it skip most files. With
+random keys such as UUIDs the ranges overlap and there is less to prune, which is
+where the record index takes over.
 
-**`SIMPLE` is the honest default.** It joins and it does not pretend otherwise.
-For small tables, or batch jobs that rewrite most of the table anyway, it is
-fine and has no index to go stale.
+**`SIMPLE` is the dependable default.** It joins, and it has no index to
+bootstrap or keep in step with the data. For small tables, or batch jobs that
+rewrite most of the table anyway, that simplicity is worth more than a faster
+lookup.
 
 A rough decision order:
 
@@ -320,79 +320,84 @@ A rough decision order:
 | Keys are time-ordered or otherwise clustered | `BLOOM` |
 | Small table, or you rewrite most of it every run | `SIMPLE` |
 
-## What failure looks like
+## How to confirm your index is doing its job
 
-The failure modes here are mostly quiet, which is why they are worth naming.
+A well-matched index is easy to confirm, and each signal points at a specific
+adjustment if you want one.
 
-| Symptom | Likely cause |
+| What you observe | What it tells you |
 |:--|:--|
-| Upsert time grows with table size, not batch size | No `hoodie.index.type` set, so `SIMPLE` |
-| Duplicate keys across partitions after a partition value changed | Non-global index where a global one was needed |
-| Metadata table compaction dominating write time | Too many record-index file groups, often global defaults on a partitioned index |
-| Bloom index barely pruning anything | Random keys; the key ranges all overlap |
-| Skewed file group sizes that never rebalance | `BUCKET` with the simple engine and a bucket count set too low |
+| Upsert time tracks batch size, not table size | The index is doing point lookups. This is the goal |
+| Upsert time tracks table size | `hoodie.index.type` is probably unset, so `SIMPLE` is in use |
+| One live row per key after a partition value changes | A global index is in play, as intended for a table-wide key |
+| Several rows per key across partitions | A non-global index, correct when keys repeat per partition |
+| Metadata compaction is a small share of write time | Record-index file groups are sized well |
+| Bloom index pruning most files | Your keys are ordered enough for range pruning to pay off |
 
-For the first one, the check is direct: read the table's `hoodie.properties` and
-the writer configs and confirm `hoodie.index.type` is set to something you chose.
-For the third, list `<base_path>/.hoodie/metadata/record_index/` and count file
-groups; a partitioned index with hundreds of them is misconfigured.
+Two quick checks are worth building into a review. Read the table's
+`hoodie.properties` together with the writer configs and confirm
+`hoodie.index.type` is a value you chose. Then list
+`<base_path>/.hoodie/metadata/record_index/` and count file groups: a handful for
+a partitioned index and tens to hundreds for a global one on a large table is the
+shape you want.
 
-## When not to use a record index
+## When a simpler choice wins
 
-If your writes are append-only, you do not need an index at all. Use
-`hoodie.datasource.write.operation=insert` or `bulk_insert` and skip tagging
-entirely. Paying for a record index on a table that never updates a key is pure
-overhead: a second table to write, compact and clean, for a lookup whose answer
-is always "not present".
+Part of choosing well is recognising when you need less machinery.
 
-If your table is small enough that reading all its keys is cheap, `SIMPLE` will
-beat a record index once you count the metadata table's write amplification and
-compaction cost. The record index earns its keep when the batch is small relative
-to the table, which is the CDC and streaming-ingest shape, not the nightly
-full-refresh shape.
+Append-only writes need no index at all. Use
+`hoodie.datasource.write.operation=insert` or `bulk_insert`, skip tagging
+entirely, and you avoid maintaining a second table for a lookup whose answer is
+always "not present".
 
-And if you are on Flink, the engine default `INMEMORY` and `FLINK_STATE` exist
-because the Flink writer holds the index in state; reaching for a Spark-oriented
-index type there is usually the wrong move.
+If your table is small enough that reading all its keys is cheap, `SIMPLE` comes
+out ahead once you count the metadata table's write amplification and compaction.
+The record index earns its keep when the batch is small relative to the table,
+which is the CDC and streaming-ingest shape rather than the nightly full-refresh
+shape.
+
+On Flink, `INMEMORY` and `FLINK_STATE` are the engine defaults because the Flink
+writer already holds the index in its state backend, so you get fast tagging
+without configuring anything.
 
 ## Production tips
 
-* **Set `hoodie.index.type` explicitly.** The absence of a value is a decision,
-  and the decision is `SIMPLE`.
+* **Set `hoodie.index.type` explicitly.** An absent value still resolves to
+  `SIMPLE`, so writing it down makes the choice visible.
 * **Decide global versus partition-scoped from your data model**, not from
-  performance. It changes correctness when partition values mutate.
+  performance. Your schema already tells you which one is right.
 * **Prefer the 1.2.0 names** (`GLOBAL_RECORD_LEVEL_INDEX`,
   `RECORD_LEVEL_INDEX`) over `RECORD_INDEX`, which is deprecated.
-* **Never copy `global.record.level.index.*` file-group counts onto
-  `record.level.index.*`.** The defaults differ by 1000x for a reason.
+* **Let each record index keep its own file-group defaults.** They are tuned to
+  what each one stores, so the sizing is right out of the box.
 * **Leave `hoodie.metadata.enable` on.** The metadata-backed indexes need it, and
   it defaults to `true`.
 * **Tune the metadata table's own compaction** with
-  `hoodie.metadata.compact.max.delta.commits` when write frequency is high; an
-  uncompacted metadata table makes index lookups progressively slower.
-* **If you choose `BUCKET`, choose the consistent-hashing engine** unless you are
-  certain the key distribution and volume will not change.
+  `hoodie.metadata.compact.max.delta.commits` when write frequency is high, to
+  keep index lookups fast.
+* **If you choose `BUCKET`, prefer the consistent-hashing engine.** It lets
+  buckets split and merge as your volume grows.
 
 ## Conclusion
 
 The index is the config that decides whether a Hudi table's upsert cost tracks
-the batch or the table. That framing is more useful than any table of index
-types, because it tells you what to measure: if write time grows as the table
-grows while your batches stay the same size, the index is doing a scan
-somewhere, and no amount of executor tuning will fix it.
+the batch or the table, and that framing is more useful than any list of index
+types. It tells you exactly what to watch: as long as write time stays flat while
+your table grows, the index is doing its job, and you can spend your tuning
+attention elsewhere.
 
-The 1.2.0 rename is worth attention out of proportion to its size, because it is
-the rare breaking change that does not break anything. `RECORD_INDEX` still
-works, `hoodie.metadata.record.index.enable` still resolves, nothing warns, and
-the table you get is a global index. For tables whose keys are unique per
-partition, that is a table enforcing an invariant you never asked for, sharded
-across a minimum of ten metadata file groups when one would do. The fix is two
-config lines; noticing that you need it is the hard part.
+The 1.2.0 naming is a genuine improvement worth adopting. `RECORD_INDEX` and
+`hoodie.metadata.record.index.enable` keep working, so upgrades are uneventful,
+and the new pair of names makes the choice explicit: `GLOBAL_RECORD_LEVEL_INDEX`
+when a key identifies a row across the whole table, `RECORD_LEVEL_INDEX` when it
+identifies a row within a partition. Partitioned tables get the cheaper index and
+a much smaller metadata footprint for the cost of two config lines.
 
-If you are picking an index for a new table, the order in this post is a starting
-point and not a substitute for measuring: the shape that matters is your batch
-size relative to your table size, and your key distribution. Both are properties
-of your data that no default can guess.
+Treat the decision order in this post as a good starting point and then measure
+on your own data. The two properties that decide the answer, your batch size
+relative to your table size and how your keys are distributed, are things you can
+observe directly, which makes this one of the more tractable tuning decisions
+Hudi asks you to make.
 
 ## References
 
