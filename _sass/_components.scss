@@ -260,6 +260,7 @@
   .icon { color: var(--brand); width: 1.15em; height: 1.15em; }
 
   &--plain {
+    justify-content: center;
     text-transform: none;
     letter-spacing: -0.02em;
     font-size: 1.02rem;
@@ -427,10 +428,9 @@
 .page-head__title, .post-head__title { margin: 0 0 12px; }
 
 .page-head__lede, .post-head__lede {
-  max-width: 62ch;
   margin: 0 0 18px;
   color: var(--text-2);
-  font-size: 1.04rem;
+  font-size: 1.06rem;
 }
 
 .post-head .meta { margin-bottom: 14px; }
@@ -700,35 +700,6 @@
   &:hover { color: var(--brand); border-color: var(--brand-ring); }
 }
 
-/* ------------------------------------------------------------ social row -- */
-.social-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-
-  a {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    background: var(--surface);
-    color: var(--text-2);
-
-    .icon { width: 1.05em; height: 1.05em; }
-
-    &:hover {
-      color: var(--brand);
-      border-color: var(--brand-ring);
-      transform: translateY(-2px);
-    }
-  }
-}
-
 @media (max-width: 640px) {
   .post-card { padding: 20px 20px 18px; }
   .post-nav { grid-template-columns: 1fr; }
@@ -736,4 +707,59 @@
   .post-nav__link--next .post-nav__label { justify-content: flex-start; }
   .timeline__item { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .support { padding: 20px; }
+}
+
+/* ----------------------------------------------------------------- share -- */
+.share {
+  margin: 40px 0 0;
+  padding: 22px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.share__title {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+}
+
+.share__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.share__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+
+  .icon { color: var(--text-3); }
+
+  &:hover {
+    color: var(--brand);
+    border-color: var(--brand-ring);
+    transform: translateY(-1px);
+    .icon { color: var(--brand); }
+  }
+
+  &.is-done {
+    color: var(--accent);
+    border-color: var(--accent);
+    .icon { color: var(--accent); }
+  }
 }

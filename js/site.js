@@ -337,6 +337,30 @@
     input.addEventListener('input', run);
   }());
 
+  /* -------------------------------------------------------- copy post link -- */
+  (function copyLink() {
+    var btn = $('#copyLink');
+    if (!btn) return;
+    var label = btn.querySelector('.copyLink__label');
+    btn.addEventListener('click', function () {
+      var url = btn.getAttribute('data-url');
+      var done = function (text) {
+        btn.classList.add('is-done');
+        label.textContent = text;
+        window.setTimeout(function () {
+          btn.classList.remove('is-done');
+          label.textContent = 'Copy link';
+        }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function () { done('Link copied'); },
+                                               function () { done('Copy failed'); });
+      } else {
+        done('Copy failed');
+      }
+    });
+  }());
+
   /* ------------------------------------------------------------ footer yr -- */
   (function year() {
     var el = $('#footerYear');
