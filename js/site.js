@@ -220,9 +220,24 @@
     window.mermaid.initialize({
       startOnLoad: false,
       theme: dark ? 'dark' : 'default',
-      themeVariables: { fontFamily: 'Inter, system-ui, sans-serif' }
+      themeVariables: {
+        fontFamily: 'Inter, system-ui, sans-serif',
+        // mermaid's default cluster fill is a strong yellow; align it with the
+        // site's surfaces so a diagram does not fight the page.
+        clusterBkg: dark ? '#172131' : '#f2f5fa',
+        clusterBorder: dark ? '#2e3c53' : '#ccd4e2'
+      }
     });
-    window.mermaid.run({ querySelector: 'pre.mermaid' });
+
+    // mermaid sizes each node box by measuring its label in the font that is
+    // active when it runs. Rendering before Inter has loaded measures the
+    // fallback font and clips the last character of longer labels, so wait.
+    var draw = function () { window.mermaid.run({ querySelector: 'pre.mermaid' }); };
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(draw, draw);
+    } else {
+      draw();
+    }
   }());
 
   /* -------------------------------------------------------- external links */
