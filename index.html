@@ -44,24 +44,6 @@ layout: default
   </div>
 </section>
 
-{%- assign tool_posts = site.posts | where: "kind", "tool" -%}
-{%- if tool_posts.size > 0 %}
-<section class="shell tools">
-  <div class="section-head">
-    <h2 class="section-title">{% include icon.html name="tool" %}Interactive tools</h2>
-    <p class="section-note">Run these straight in the browser. Nothing to install.</p>
-  </div>
-  <div class="tools__grid">
-    {%- for post in tool_posts limit: 6 %}
-    <a class="card card--tool" href="{{ post.url | relative_url }}">
-      <span class="card--tool__icon" aria-hidden="true">{% include icon.html name="tool" %}</span>
-      <span class="card--tool__title">{{ post.title }}</span>
-      <span class="card--tool__note">{% include post-summary.html post=post %}</span>
-    </a>
-    {%- endfor %}
-  </div>
-</section>
-{%- endif %}
 {%- endif %}
 
 <div class="shell layout layout--with-rail" id="latest">

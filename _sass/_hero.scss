@@ -115,15 +115,6 @@
   }
 }
 
-/* ----------------------------------------------------------------- tools -- */
-.tools { padding: 48px 24px 8px; }
-
-.tools__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
-
 @media (max-width: 900px) {
   .hero__inner {
     grid-template-columns: minmax(0, 1fr);
@@ -143,5 +134,4 @@
 @media (max-width: 640px) {
   .hero__inner { padding: 32px 16px; }
   .hero__aside { grid-auto-flow: row; justify-items: center; }
-  .tools { padding: 32px 16px 0; }
 }

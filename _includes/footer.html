@@ -10,44 +10,77 @@
 
     <div class="site-footer__col">
       <h2>Explore</h2>
-      <ul>
-        <li><a href="{{ '/' | relative_url }}">Home</a></li>
+      <ul class="footer-links">
+        <li>
+          <a href="{{ '/' | relative_url }}">{% include icon.html name="home" %}<span>Home</span></a>
+        </li>
         {%- assign nav_pages = site.pages | where: "type", "page" | sort: "path" -%}
         {%- for my_page in nav_pages %}
-        <li><a href="{{ my_page.url | relative_url }}">{{ my_page.title }}</a></li>
+        <li>
+          <a href="{{ my_page.url | relative_url }}">
+            {% include icon.html name=my_page.icon %}<span>{{ my_page.title }}</span>
+          </a>
+        </li>
         {%- endfor %}
-        <li><a href="{{ '/search/' | relative_url }}">Search</a></li>
       </ul>
     </div>
 
     <div class="site-footer__col">
       <h2>{{ site.description_footer }}</h2>
-      <ul class="social-row">
+      <ul class="footer-links">
         {%- if site.github_username %}
-        <li><a href="https://github.com/{{ site.github_username }}" title="GitHub" aria-label="GitHub">{% include icon.html name="github" %}</a></li>
+        <li>
+          <a href="https://github.com/{{ site.github_username }}">
+            {% include icon.html name="github" %}<span>GitHub</span>
+          </a>
+        </li>
         {%- endif %}
         {%- if site.linkedIn_username %}
-        <li><a href="https://www.linkedin.com/in/{{ site.linkedIn_username }}" title="LinkedIn" aria-label="LinkedIn">{% include icon.html name="linkedin" %}</a></li>
+        <li>
+          <a href="https://www.linkedin.com/in/{{ site.linkedIn_username }}">
+            {% include icon.html name="linkedin" %}<span>LinkedIn</span>
+          </a>
+        </li>
         {%- endif %}
         {%- if site.twitter_username %}
-        <li><a href="https://twitter.com/{{ site.twitter_username }}" title="X / Twitter" aria-label="X / Twitter">{% include icon.html name="twitter" %}</a></li>
+        <li>
+          <a href="https://twitter.com/{{ site.twitter_username }}">
+            {% include icon.html name="twitter" %}<span>X</span>
+          </a>
+        </li>
         {%- endif %}
         {%- if site.stackoverflow %}
-        <li><a href="https://stackoverflow.com/{{ site.stackoverflow }}" title="Stack Overflow" aria-label="Stack Overflow">{% include icon.html name="stackoverflow" %}</a></li>
+        <li>
+          <a href="https://stackoverflow.com/{{ site.stackoverflow }}">
+            {% include icon.html name="stackoverflow" %}<span>Stack Overflow</span>
+          </a>
+        </li>
         {%- endif %}
         {%- if site.facebook_username %}
-        <li><a href="https://www.facebook.com/{{ site.facebook_username }}" title="Facebook" aria-label="Facebook">{% include icon.html name="facebook" %}</a></li>
+        <li>
+          <a href="https://www.facebook.com/{{ site.facebook_username }}">
+            {% include icon.html name="facebook" %}<span>Facebook</span>
+          </a>
+        </li>
         {%- endif %}
         {%- if site.email %}
-        <li><a href="mailto:{{ site.email }}" title="Email" aria-label="Email">{% include icon.html name="mail" %}</a></li>
+        <li>
+          <a href="mailto:{{ site.email }}">
+            {% include icon.html name="mail" %}<span>{{ site.email }}</span>
+          </a>
+        </li>
         {%- endif %}
       </ul>
     </div>
   </div>
 
   <div class="shell site-footer__legal">
+    {%- comment -%}
+      site.js overwrites #footerYear with the visitor's current year on every
+      load, so this never goes stale. The Liquid value is only the no-script
+      fallback, and it refreshes on each build.
+    {%- endcomment -%}
     <p>&copy; <span id="footerYear">{{ site.time | date: "%Y" }}</span> {{ site.author }}. All rights reserved.</p>
-    <p>Built with <a href="https://jekyllrb.com/">Jekyll</a> and hosted on GitHub Pages.</p>
   </div>
 </footer>
 

@@ -36,25 +36,36 @@
     text-transform: uppercase;
   }
 
-  // .social-row is excluded: it lays its icons out as a flex row, and a bare
-  // `ul` selector here is specific enough to override that and stack them.
-  ul:not(.social-row) {
+  // Both footer columns use .footer-links, so Explore and the contact list
+  // share one icon-plus-label treatment.
+  .footer-links {
     margin: 0;
     padding: 0;
     list-style: none;
     display: grid;
-    gap: 5px;
-  }
+    gap: 2px;
 
-  .social-row {
-    margin-top: 2px;
-  }
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6em;
+      padding: 0.2rem 0;
+      color: var(--text-2);
+      font-size: 0.92rem;
+      line-height: 1.5;
 
-  ul:not(.social-row) a {
-    color: var(--text-2);
-    font-size: 0.92rem;
+      .icon {
+        color: var(--text-3);
+        width: 1.05em;
+        height: 1.05em;
+        transition: color 0.16s ease;
+      }
 
-    &:hover { color: var(--brand); }
+      &:hover {
+        color: var(--brand);
+        .icon { color: var(--brand); }
+      }
+    }
   }
 }
 
