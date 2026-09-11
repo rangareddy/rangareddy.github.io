@@ -1,45 +1,35 @@
-{% if site.duoshuo_shortname %}
+{%- comment -%}
+  Comments are opt-in and off by default, so a post never shows a loading error.
 
-<!-- comment box start -->
-<div class="ds-thread" data-thread-key="{{ site.url }}{{ page.url }}" data-title="{{page.title}}"
-    data-url="{{ site.url }}{{ page.url }}"></div>
-<!-- comment box end -->
+  To turn them on, use giscus, which stores comments in this repository's GitHub
+  Discussions. No third-party account and no tracking:
 
-<!-- JS code start -->
-<script type="text/javascript">
-    var duoshuoQuery = {
-        short_name: "{{site.duoshuo_shortname}}"
-    };
-    
-    (function () {
-        var ds = document.createElement('script');
-        ds.type = 'text/javascript';
-        ds.async = true;
-        ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
-        ds.charset = 'UTF-8';
-        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(ds);
-    })();
-</script>
-<!-- JS code end -->
-{% endif %}
+    1. Enable Discussions: repo Settings -> General -> Features -> Discussions
+    2. Install the giscus app: https://github.com/apps/giscus
+    3. Visit https://giscus.app, enter rangareddy/rangareddy.github.io, and copy
+       the four values it gives you into the `giscus:` block in _config.yml
 
-{% if site.disqus_shortname %}
-<div id="disqus_thread"></div>
-<script>
-    var disqus_config = function () {
-        this.page.url = '{{ site.url }}{{ page.url }}';        // Replace PAGE_URL with your page's canonical URL variable
-        this.page.identifier = '{{ site.url }}{{ page.url }}'; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
-    };
-
-    (function () { // DON'T EDIT BELOW THIS LINE
-        var d = document,
-            s = d.createElement('script');
-
-        s.src = '//{{site.disqus_shortname}}.disqus.com/embed.js';
-
-        s.setAttribute('data-timestamp', +new Date());
-        (d.head || d.body).appendChild(s);
-    })();
-</script>
-
-{% endif %}
+  Until `giscus.repo` is set, this include renders nothing.
+{%- endcomment -%}
+{%- if site.giscus.repo and site.giscus.repo_id %}
+<section class="comments">
+  <h2 class="section-title">{% include icon.html name="sparkles" %}Comments</h2>
+  <script src="https://giscus.app/client.js"
+          data-repo="{{ site.giscus.repo }}"
+          data-repo-id="{{ site.giscus.repo_id }}"
+          data-category="{{ site.giscus.category | default: 'Announcements' }}"
+          data-category-id="{{ site.giscus.category_id }}"
+          data-mapping="pathname"
+          data-strict="1"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="top"
+          data-theme="preferred_color_scheme"
+          data-lang="en"
+          data-loading="lazy"
+          crossorigin="anonymous"
+          async></script>
+  <noscript>Comments need JavaScript. You can also reply on
+    <a href="https://www.linkedin.com/in/{{ site.linkedIn_username }}">LinkedIn</a>.</noscript>
+</section>
+{%- endif %}

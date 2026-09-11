@@ -34,10 +34,19 @@ resume: /assets/others/Ranga_Reddy_Data_Engineer.pdf
 description_footer: You can contact me
 
 # ---------------------------------------------------------------------------
-# Comments (choose one, leave the other blank)
+# Comments (optional, off until configured)
 # ---------------------------------------------------------------------------
-duoshuo_shortname:
-disqus_shortname: rangareddy1988
+# Comments use giscus, which keeps threads in this repo's GitHub Discussions.
+# The previous Disqus shortname was never a registered forum, so every post
+# rendered "We were unable to load Disqus"; it has been removed.
+#
+# To enable: turn on Discussions in repo settings, install
+# https://github.com/apps/giscus, then fill these in from https://giscus.app
+# giscus:
+#   repo: rangareddy/rangareddy.github.io
+#   repo_id: ""
+#   category: Announcements
+#   category_id: ""
 
 # ---------------------------------------------------------------------------
 # Build settings
