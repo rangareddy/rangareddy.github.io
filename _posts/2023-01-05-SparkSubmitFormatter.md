@@ -4,8 +4,11 @@ categories: Spark
 tags: Spark Utilities
 author: Ranga Reddy
 date: "2023-01-05 11:40:00 +0530"
+updated: "2026-09-11 10:00:00 +0530"
 description: >-
-  Paste a spark-submit command and get it back formatted across lines, or minified onto one line, with every parameter broken out into an editable table.
+  Paste a spark-submit command and get it back formatted across lines or minified
+  onto one line, with every Spark option resolved to the configuration property
+  it sets and your application's own arguments kept separate.
 kind: tool
 tool_assets: true
 tool_tables: true
@@ -16,284 +19,324 @@ tool_tables: true
 
 > **TL;DR**
 >
-> * Paste a `spark-submit` command written on one line and get it back split across lines with a trailing backslash per argument, or minified back to one line.
-> * Every `--conf` and flag is also broken out into an editable table, so you can review, change or delete individual settings and regenerate.
-> * Useful when reviewing a command from a ticket or a CI job definition, where a single long line hides duplicated or contradictory `--conf` entries.
+> * Paste a `spark-submit` command written on one line and get it back split across lines with a trailing backslash per option, or minified back to one line.
+> * Each Spark option is resolved to the configuration property it actually sets, so `--num-executors` shows as `spark.executor.instances` and you can compare a command against `spark-defaults.conf` directly.
+> * Your application's own arguments are kept separate from Spark's, so a job that takes `--input` and `--output` no longer has them mistaken for Spark options.
+> * Quoted values survive the round trip intact, including an `extraJavaOptions` string containing spaces.
 
 ## Spark Submit Command Formatter/Minifier
 
-Used to **format/minify** the **Spark Submit** command and generate it in beautiful/minify format.
+Format a `spark-submit` command across lines for review, or minify it back onto
+one line for a scheduler that wants a single string. Both directions preserve the
+command exactly.
+
+The useful part is the breakdown underneath. A long `spark-submit` line hides
+duplicated or contradictory settings, and the same setting can arrive as either a
+flag or a `--conf`, which makes them hard to compare by eye. The parameter table
+resolves every option to its configuration property, so `--executor-memory 18g`
+and `--conf spark.executor.memory=18g` line up as the same row.
+
+The option-to-property mapping follows the `OptionAssigner` list in
+`SparkSubmit.scala` and the flag names in `SparkSubmitOptionParser.java` at the
+Spark `v4.2.0` tag, so `--principal` and `--keytab` resolve to
+`spark.kerberos.principal` and `spark.kerberos.keytab` rather than the pre-Spark-3
+`spark.yarn.*` names.
 
 <div class="tool-widget">
     <style>
       #spark_submit_config_txt {
-        overflow: scroll;
         resize: vertical;
         width: 100%;
-        background-color: #F9E98B;
+        font-family: var(--font-mono, monospace);
+        font-size: 0.86rem;
+      }
+      #spark_submit_cmd_text {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        font-family: var(--font-mono, monospace);
+        font-size: 0.86rem;
+        line-height: 1.6;
       }
     </style>
     <script type="text/javascript">
-      $(document).ready(function() {
-        var spark_submit_cmd_line_parameter_table;
-        var spark_submit_cmd_parameter_table;
+      $(document).ready(function () {
+        'use strict';
 
-        function validateAndHide() {
-          var spark_submit_cmd_val = $("#spark_submit_config_txt").val();
-          if (!spark_submit_cmd_val) {
-            $("#spark_submit_cmd_format_container").hide();
-            $("#spark_submit_cmd_parameter_container").hide();
-            $("#spark_submit_cmd_add_parameter_container").hide();
-            $("#spark_submit_config_txt").focus();
-          }
-        }
+        // --------------------------------------------------------------------
+        // spark-submit option table.
+        // Flag -> equivalent configuration property, taken from the
+        // OptionAssigner list in SparkSubmit.scala and the flag names in
+        // SparkSubmitOptionParser.java at the v4.2.0 tag. Only flags
+        // spark-submit actually accepts appear here; anything else is emitted
+        // as --conf, which is what spark-submit expects.
+        // --------------------------------------------------------------------
+        var SPARK_OPTIONS = {
+          'master': 'spark.master',
+          'remote': 'spark.remote',
+          'deploy-mode': 'spark.submit.deployMode',
+          'name': 'spark.app.name',
+          'jars': 'spark.jars',
+          'packages': 'spark.jars.packages',
+          'exclude-packages': 'spark.jars.excludes',
+          'repositories': 'spark.jars.repositories',
+          'py-files': 'spark.submit.pyFiles',
+          'files': 'spark.files',
+          'archives': 'spark.archives',
+          'driver-memory': 'spark.driver.memory',
+          'driver-cores': 'spark.driver.cores',
+          'driver-java-options': 'spark.driver.extraJavaOptions',
+          'driver-class-path': 'spark.driver.extraClassPath',
+          'driver-library-path': 'spark.driver.extraLibraryPath',
+          'executor-memory': 'spark.executor.memory',
+          'executor-cores': 'spark.executor.cores',
+          'num-executors': 'spark.executor.instances',
+          'total-executor-cores': 'spark.cores.max',
+          'principal': 'spark.kerberos.principal',
+          'keytab': 'spark.kerberos.keytab',
+          'queue': 'spark.yarn.queue',
+          // Accepted by spark-submit but with no configuration equivalent.
+          'proxy-user': null,
+          'properties-file': null
+        };
 
-        function hide_table_containers() {
-          $("#spark_submit_cmd_parameter_container").hide();
-          $("#spark_submit_cmd_add_parameter_container").hide();
-        }
+        // Flags that take no value.
+        var SPARK_SWITCHES = ['verbose', 'supervise', 'version', 'help', 'load-spark-defaults'];
 
-        function show_table_containers() {
-          $("#spark_submit_cmd_parameter_container").show();
-          $("#spark_submit_cmd_add_parameter_container").show();
-        }
+        var INDENT = ' '.repeat(2);
+        var lastCommand = '';
+        var parameterTable = null;
+        var appArgsTable = null;
 
-        function validateAndShow(build_type) {
-          var spark_submit_cmd_val = $("#spark_submit_config_txt").val().trim();
-          if (spark_submit_cmd_val) {
-            $("#spark_submit_cmd_format_container").show();
-          }
-
-          if ('minify' == build_type) {
-            hide_table_containers();
-          } else {
-            show_table_containers();
-          }
-        }
-        validateAndHide();
-        var br_delimeter = " \\ <br> "
-        var space_delimeter = "&nbsp;&nbsp;&nbsp;&nbsp;";
-        var delimeter = br_delimeter + space_delimeter
-        var sparkSubmitCommand = ""
-        let sparkConfigMapObj = {
-          "master": "spark.master",
-          "deploy-mode": "spark.submit.deployMode",
-          "driver-cores": "spark.driver.cores",
-          "executor-cores": "spark.executor.cores",
-          "driver-memory": "spark.driver.memory",
-          "executor-memory": "spark.executor.memory",
-          "num-executors": "spark.executor.instances",
-          "principal": "spark.yarn.principal",
-          "keytab": "spark.yarn.keytab",
-          "queue": "spark.yarn.queue",
-          "jars": "spark.jars",
-          "name": "spark.app.name",
-          "class": "class",
-          "files": "spark.yarn.dist.files",
-          "driver-java-options": "spark.driver.extraJavaOptions",
-          "driver-class-path": "spark.driver.extraClassPath",
-          "driver-library-path": "spark.driver.extraLibraryPath",
-          "executor-java-options": "spark.executor.extraJavaOptions",
-          "executor-class-path": "spark.executor.extraClassPath",
-          "executor-library-path": "spark.executor.extraLibraryPath",
-          "py-files": "spark.yarn.dist.pyFiles",
-          "archives": "spark.yarn.dist.archives",
-          "packages": "packages",
-          "repositories": "repositories"
-        }
-
-        $("#sample_spark_submit_config").click(function() {
-          var sample_spark_submit_cmd = "spark-submit --class org.apache.spark.examples.SparkPi --master yarn --deploy-mode cluster --num-executors 1";
-          sample_spark_submit_cmd += " --driver-memory 512m --executor-memory 512m --driver-cores 1 --executor-cores 2 $SPARK_HOME/examples/jars/spark-examples_*.jar 1000";
-          $("#spark_submit_config_txt").val(sample_spark_submit_cmd);
-          hide_table_containers();
-          $("#spark_submit_cmd_format_container").hide();
-        });
-
-        function build_spark_submit(build_type) {
-
-          if(spark_submit_cmd_parameter_table) {
-            spark_submit_cmd_parameter_table.destroy()
-          }
-
-          if(spark_submit_cmd_line_parameter_table) {
-            spark_submit_cmd_line_parameter_table.destroy()
-          }
-
-          var jarFileName = ""
-          var className = ""
-          var base_spark_class = ""
-          var spark_submit_config_txt = $("#spark_submit_config_txt").val();
-          if (spark_submit_config_txt) {
-            sparkSubmitCommand = ""
-            spark_submit_config_txt = spark_submit_config_txt.replace("org.apache.spark.deploy.SparkSubmit", "spark-submit").trim()
-            var sparkSparkArgs = []
-            var commandLineArgs = []
-            let sparkConfigArray = Object.entries(sparkConfigMapObj)
-            let sparkConfigMap = new Map(sparkConfigArray);
-            const sparkSubmitArray = spark_submit_config_txt.replaceAll("\\\n", "").split("--");
-            for (let i = 0; i < sparkSubmitArray.length; i++) {
-              let sparkSubmitParameterArray = sparkSubmitArray[i].replace(/\s\s+/g, ' ').replaceAll('\"', '').trim().split(" ");
-              let spark_submit_param_arr_len = sparkSubmitParameterArray.length;
-              if (spark_submit_param_arr_len > 1) {
-                let parameterName = sparkSubmitParameterArray[0];
-                let parameterValue = sparkSubmitParameterArray[1];
-                let is_config_param = parameterName == 'conf';
-                let is_spark_param = parameterName.startsWith('spark.')
-                if (is_config_param) {
-                  let index = parameterValue.indexOf("=")
-                  parameterName = parameterValue.substring(0, index)
-                  if (spark_submit_param_arr_len > 2) {
-                    let strArray = new Array()
-                    for (let j = 2; j < spark_submit_param_arr_len; j++) {
-                      strArray[j - 2] = sparkSubmitParameterArray[j]
-                    }
-                    parameterValue = '\"' + strArray.join(" ") + '\"'
-                  } else {
-                    parameterValue = parameterValue.substring(index + 1)
-                  }
-                }
-                var is_valid_spark_builtin_param = sparkConfigMap.has(parameterName)
-                var is_valid_spark_param = is_config_param || is_spark_param || is_valid_spark_builtin_param;
-                if (is_valid_spark_param) {
-                  if (parameterName == 'class') {
-                    className = parameterValue;
-                  } else {
-                    sparkSparkArgs.push({
-                      "name": parameterName,
-                      "value": parameterValue
-                    })
-                  }
-                } else if (parameterName != 'spark-submit' && parameterName != 'packages' && parameterName != 'repositories') {
-                  commandLineArgs.push({
-                    "name": parameterName,
-                    "value": parameterValue
-                  })
-                }
-                if (sparkSubmitParameterArray.length > 2) {
-                  if (sparkSubmitParameterArray[2].endsWith(".jar") || sparkSubmitParameterArray[2].endsWith(".py")) {
-                    jarFileName = sparkSubmitParameterArray[2]
-                    if (sparkSubmitParameterArray.length > 3) {
-                      for (j = 3; j < sparkSubmitParameterArray.length; j++) {
-                        commandLineArgs.push({
-                          "name": sparkSubmitParameterArray[j],
-                          "value": ""
-                        })
-                      }
-                    }
-                  }
-                }
-              } else if (sparkSubmitParameterArray[0].indexOf("spark") != -1 && base_spark_class == "") {
-                base_spark_class = sparkSubmitParameterArray[0]
-              }
+        // --------------------------------------------------------------------
+        // Tokenizer: splits on whitespace but keeps quoted values intact, so a
+        // value like "-XX:+UseG1GC -Dfoo=bar" survives as one token. Also joins
+        // backslash-continued lines first, which is how these commands are
+        // usually pasted.
+        // --------------------------------------------------------------------
+        function tokenize(text) {
+          var src = String(text).replace(/\\[ \t]*\r?\n/g, ' ');
+          var tokens = [];
+          var current = '';
+          var quote = null;
+          var started = false;
+          for (var i = 0; i < src.length; i++) {
+            var ch = src.charAt(i);
+            if (quote !== null) {
+              if (ch === quote) { quote = null; } else { current += ch; }
+              continue;
             }
-
-            spark_submit_cmd_parameter_table = $('#spark_submit_cmd_parameter_table').DataTable( {
-              data: sparkSparkArgs,
-              columns: [
-                { "data": "name",
-                  render: function (data, type, row, meta) {
-                    var is_valid_spark_builtin_param = sparkConfigMap.has(data)
-                    if (is_valid_spark_builtin_param) {
-                      data = sparkConfigMap.get(data);
-                    }
-                    return type === 'display' ? ('<span>'+ data + '</span>') : data;
-                  }
-                },
-                { "data": "value"}
-              ],
-              responsive: true,
-              paging: true,
-              searching: true,
-              ordering: true,
-              info: false
-            });
-
-            if (commandLineArgs.length > 0) {
-              spark_submit_cmd_line_parameter_table = $('#spark_submit_cmd_line_parameter_table').DataTable( {
-              data: commandLineArgs,
-              columns: [
-                { "data": "name" },
-                { "data": "value" }
-              ],
-              responsive: true,
-              paging: true,
-              searching: true,
-              ordering: true,
-              info: false
-            });
-
+            if (ch === '"' || ch === "'") { quote = ch; started = true; continue; }
+            if (/\s/.test(ch)) {
+              if (started) { tokens.push(current); current = ''; started = false; }
+              continue;
             }
-            $("#spark_submit_cmd_parameter_container").show();
-            if (base_spark_class) {
-              sparkSubmitCommand += base_spark_class + delimeter;
+            current += ch;
+            started = true;
+          }
+          if (started) { tokens.push(current); }
+          return tokens;
+        }
+
+        // --------------------------------------------------------------------
+        // Parser. spark-submit's grammar is: launcher, options, primary
+        // resource, then application arguments. Everything after the resource
+        // belongs to the application and is passed through untouched, which is
+        // what keeps an app's own --input/--output flags out of the Spark
+        // parameter table.
+        // --------------------------------------------------------------------
+        function parseCommand(tokens) {
+          var parsed = {
+            launcher: 'spark-submit',
+            options: [],
+            className: null,
+            resource: null,
+            appArgs: []
+          };
+          var i = 0;
+
+          if (tokens.length > 0 && tokens[0].charAt(0) !== '-') {
+            parsed.launcher = tokens[0] === 'org.apache.spark.deploy.SparkSubmit' ? 'spark-submit' : tokens[0];
+            i = 1;
+          }
+
+          for (; i < tokens.length; i++) {
+            var token = tokens[i];
+
+            if (parsed.resource !== null) { parsed.appArgs.push(token); continue; }
+            if (token.charAt(0) !== '-') { parsed.resource = token; continue; }
+
+            var name = token.replace(/^--?/, '');
+
+            if (name === 'conf') {
+              var pair = tokens[++i] || '';
+              var eq = pair.indexOf('=');
+              parsed.options.push({
+                flag: null,
+                name: eq === -1 ? pair : pair.substring(0, eq),
+                value: eq === -1 ? '' : pair.substring(eq + 1)
+              });
+            } else if (SPARK_SWITCHES.indexOf(name) !== -1) {
+              parsed.options.push({ flag: name, name: name, value: null });
+            } else if (name === 'class') {
+              parsed.className = tokens[++i] || '';
             } else {
-              sparkSubmitCommand += "spark-submit" + delimeter;
+              // Known flag, or one we do not recognise. Either way it keeps its
+              // value and its position rather than being dropped.
+              parsed.options.push({ flag: name, name: name, value: tokens[++i] || '' });
             }
-            var sparkSubmitArgsLen = sparkSparkArgs.length;
-            for (i = 0; i < sparkSubmitArgsLen; i++) {
-              var data = sparkSparkArgs[i];
-              var name = data["name"];
-              var value = data["value"];
-              if (sparkConfigMap.has(name)) {
-                sparkSubmitCommand += "--" + name + " " + value;
-              } else {
-                sparkSubmitCommand += "--conf " + name + "=" + value;
-              }
-              if (i != sparkSubmitArgsLen - 1) {
-                sparkSubmitCommand += delimeter;
-              }
-            }
-            if (className) {
-              sparkSubmitCommand += delimeter + "--class " + className;
-            }
-            if (jarFileName) {
-              sparkSubmitCommand += delimeter + jarFileName;
-            }
-            commandLineArgsLen = commandLineArgs.length;
-            for (i = 0; i < commandLineArgsLen; i++) {
-              var data = commandLineArgs[i];
-              var name = data["name"];
-              var value = data["value"];
-              if (value == "") {
-                sparkSubmitCommand += " " + name;
-              } else {
-                sparkSubmitCommand += " --" + name + " " + value;
-              }
-            }
-            if ('minify' == build_type) {
-              $("#spark_submit_cmd_text").html(sparkSubmitCommand.replaceAll(delimeter, " "));
-              $("#spark_submit_hide_id").html(sparkSubmitCommand.replaceAll(delimeter, " "));
+          }
+          return parsed;
+        }
+
+        // Re-quote only values that need it, so the output can be pasted back.
+        function quoteIfNeeded(value) {
+          if (value === null || value === '') { return value === '' ? '""' : ''; }
+          return /[\s"'$*?&|<>()]/.test(value) ? '"' + value.replace(/"/g, '\\"') + '"' : value;
+        }
+
+        function renderCommand(parsed, mode) {
+          var parts = [parsed.launcher];
+          parsed.options.forEach(function (option) {
+            if (option.flag === null) {
+              parts.push('--conf ' + option.name + '=' + quoteIfNeeded(option.value));
+            } else if (option.value === null) {
+              parts.push('--' + option.flag);
             } else {
-              $("#spark_submit_cmd_text").html(sparkSubmitCommand);
-              $("#spark_submit_hide_id").html(sparkSubmitCommand.replaceAll(delimeter, " "));
+              parts.push('--' + option.flag + ' ' + quoteIfNeeded(option.value));
             }
-            validateAndShow(build_type);
-            if (commandLineArgsLen < 1) {
-              $("#spark_submit_cmd_add_parameter_container").hide();
+          });
+          if (parsed.className) { parts.push('--class ' + parsed.className); }
+
+          // The application resource and its arguments belong to the program,
+          // not to Spark, so they stay together on the final line.
+          var tail = [];
+          if (parsed.resource) { tail.push(parsed.resource); }
+          parsed.appArgs.forEach(function (arg) { tail.push(quoteIfNeeded(arg)); });
+          if (tail.length > 0) { parts.push(tail.join(' ')); }
+
+          return mode === 'minify' ? parts.join(' ') : parts.join(' \\\n' + INDENT);
+        }
+
+        // Rows for the parameter table: show the configuration property for a
+        // flag that has one, so a reader can compare a command against
+        // spark-defaults.conf.
+        function toParameterRows(parsed) {
+          return parsed.options.map(function (option) {
+            var key = option.name;
+            var source = 'conf';
+            if (option.flag !== null) {
+              source = '--' + option.flag;
+              if (Object.prototype.hasOwnProperty.call(SPARK_OPTIONS, option.flag) && SPARK_OPTIONS[option.flag]) {
+                key = SPARK_OPTIONS[option.flag];
+              }
             }
+            return { name: key, value: option.value === null ? '(flag)' : option.value, source: source };
+          });
+        }
+
+        function destroyTables() {
+          if (parameterTable) { parameterTable.destroy(); parameterTable = null; }
+          if (appArgsTable) { appArgsTable.destroy(); appArgsTable = null; }
+          $('#spark_submit_cmd_parameter_table tbody').empty();
+          $('#spark_submit_cmd_line_parameter_table tbody').empty();
+        }
+
+        var TABLE_OPTIONS = {
+          responsive: true, paging: true, searching: true, ordering: true, info: false
+        };
+
+        function showResult(parsed, mode) {
+          $('#spark_submit_cmd_format_container').show();
+          $('#spark_submit_cmd_parameter_container').toggle(parsed.options.length > 0);
+          $('#spark_submit_cmd_add_parameter_container').toggle(parsed.appArgs.length > 0);
+        }
+
+        function hideResult() {
+          $('#spark_submit_cmd_format_container').hide();
+          $('#spark_submit_cmd_parameter_container').hide();
+          $('#spark_submit_cmd_add_parameter_container').hide();
+        }
+
+        function build(mode) {
+          var raw = $('#spark_submit_config_txt').val();
+          if (!raw || !raw.trim()) {
+            hideResult();
+            $('#spark_submit_config_txt').trigger('focus');
+            return;
+          }
+
+          destroyTables();
+
+          var parsed = parseCommand(tokenize(raw));
+          lastCommand = renderCommand(parsed, mode);
+
+          // textContent, not html(): a pasted command is untrusted input and
+          // must never be interpreted as markup.
+          document.getElementById('spark_submit_cmd_text').textContent = lastCommand;
+
+          parameterTable = $('#spark_submit_cmd_parameter_table').DataTable($.extend({
+            data: toParameterRows(parsed),
+            columns: [{ data: 'name' }, { data: 'value' }, { data: 'source' }]
+          }, TABLE_OPTIONS));
+
+          if (parsed.appArgs.length > 0) {
+            // Order matters for application arguments, so this table keeps the
+            // sequence the command used rather than sorting it.
+            appArgsTable = $('#spark_submit_cmd_line_parameter_table').DataTable($.extend({}, TABLE_OPTIONS, {
+              data: parsed.appArgs.map(function (arg, index) { return { position: index + 1, value: arg }; }),
+              columns: [{ data: 'position' }, { data: 'value' }],
+              ordering: false
+            }));
+          }
+
+          showResult(parsed, mode);
+        }
+
+        function copyCommand() {
+          if (!lastCommand) { return; }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(lastCommand).then(function () {
+              window.alert('spark-submit command copied!');
+            }, function () {
+              window.alert('Select the command and press Ctrl+C to copy.');
+            });
           } else {
-            alert('Please enter spark-submit command to ' + build_type);
-            validateAndHide();
+            window.alert('Select the command and press Ctrl+C to copy.');
           }
         }
-        $("#format_spark_submit_config").click(function(e) {
-          e.preventDefault();
-          build_spark_submit('format')
+
+        var SAMPLE = [
+          'spark-submit',
+          '--class com.rangareddy.pipeline.TripsIngest',
+          '--master yarn',
+          '--deploy-mode cluster',
+          '--num-executors 12',
+          '--executor-cores 5',
+          '--executor-memory 18g',
+          '--driver-memory 4g',
+          '--conf spark.sql.shuffle.partitions=480',
+          '--conf spark.executor.extraJavaOptions="-XX:+UseG1GC -Dlog4j.configurationFile=log4j2.properties"',
+          's3a://lakehouse-prod/artifacts/trips-ingest-2.4.1.jar',
+          '--input s3a://lakehouse-prod/raw/trips/',
+          '--table s3a://lakehouse-prod/warehouse/trips/'
+        ].join(' \\\n' + INDENT);
+
+        $('#sample_spark_submit_config').on('click', function () {
+          $('#spark_submit_config_txt').val(SAMPLE);
+          hideResult();
         });
-        $("#minify_spark_submit_config").click(function(e) {
+        $('#format_spark_submit_config').on('click', function (e) { e.preventDefault(); build('format'); });
+        $('#minify_spark_submit_config').on('click', function (e) { e.preventDefault(); build('minify'); });
+        $('#reset_spark_submit_config').on('click', function (e) {
           e.preventDefault();
-          build_spark_submit('minify')
+          $('#spark_submit_config_txt').val('');
+          destroyTables();
+          hideResult();
         });
-        $("#reset_spark_submit_config").click(function(e) {
-          e.preventDefault();
-          $("#spark_submit_config_txt").val("");
-          validateAndHide();
-        });
-        $("#copy-spark-submit").click(function(e) {
-          e.preventDefault();
-          copy_text_to_clipboard('spark_submit_cmd_text', 'spark-submit command copied!');
-        });
+        $('#copy-spark-submit').on('click', function (e) { e.preventDefault(); copyCommand(); });
+
+        hideResult();
       });
     </script>
     <div class="container-fluid">
@@ -302,7 +345,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
           <div class="card">
             <div class="card-header">
               <span style='float: left;'>
-                <h4 style="color: sienna;">Spark Submit Command</h4>
+                <h4>Spark Submit Command</h4>
               </span>
               <span style='float: right;'>
                 <button type="button" id='sample_spark_submit_config' class="btn btn-success">Load Sample Command</button>
@@ -329,13 +372,12 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
       <div class="row" id='spark_submit_cmd_format_container' style="margin-top: 10px;">
         <div class="col-md-12">
           <div class="card">
-            <h4 class="card-header" style="color: blue;">Formatted Spark Submit Command</h4>
+            <h4 class="card-header">Formatted Spark Submit Command</h4>
             <div class="card-body">
-              <p class="card-text" id='spark_submit_cmd_text' style="background: lightgreen;"></p>
+              <pre class="card-text" id='spark_submit_cmd_text'></pre>
             </div>
             <div class="card-footer">
-              <p class="card-text" id='spark_submit_hide_id' style="display:none;"></p>
-              <button type="button" id='copy-spark-submit' class="btn btn-danger">Copy Spark Submit Command</button>
+              <button type="button" id='copy-spark-submit' class="btn btn-primary">Copy Spark Submit Command</button>
             </div>
           </div>
         </div>
@@ -344,13 +386,14 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
       <div class="row" id="spark_submit_cmd_parameter_container" style="margin-top: 10px;">
         <div class="col-md-12">
           <div class="card">
-            <h4 class="card-header" style="color: corol;">Spark Submit Command Parameters</h4>
+            <h4 class="card-header">Spark Configuration Parameters</h4>
             <div class="card-body">
               <table id="spark_submit_cmd_parameter_table" class="table table-striped table-responsive" style="width:100%">
                 <thead>
                     <tr>
-                        <th>Parameter Name</th>
-                        <th>Parameter Value</th>
+                        <th>Configuration property</th>
+                        <th>Value</th>
+                        <th>Set by</th>
                     </tr>
                 </thead>
               </table>
@@ -362,13 +405,13 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
       <div class="row" id="spark_submit_cmd_add_parameter_container" style="margin-top: 10px;">
         <div class="col-md-12">
           <div class="card">
-            <h4 class="card-header" style="color: fuchsia;">Spark Submit Additional (Command Line) Parameters</h4>
+            <h4 class="card-header">Application Arguments</h4>
             <div class="card-body">
               <table id="spark_submit_cmd_line_parameter_table" class="table table-striped table-responsive" style="width:100%">
                 <thead>
                     <tr>
-                        <th>Parameter Name</th>
-                        <th>Parameter Value</th>
+                        <th>#</th>
+                        <th>Argument passed to your application</th>
                     </tr>
                 </thead>
               </table>
@@ -384,6 +427,7 @@ Used to **format/minify** the **Spark Submit** command and generate it in beauti
 ## References
 
 * [Submitting applications](https://spark.apache.org/docs/latest/submitting-applications.html) for the `spark-submit` argument reference
+* [`SparkSubmit.scala` at v4.2.0](https://github.com/apache/spark/blob/v4.2.0/core/src/main/scala/org/apache/spark/deploy/SparkSubmit.scala), the `OptionAssigner` list this tool's flag-to-property mapping follows
 * [Spark configuration reference](https://spark.apache.org/docs/latest/configuration.html) for what each `--conf` key means and its precedence
 * [Spark Configuration Generator]({% post_url 2021-12-29-SparkConfigurationGenerator %}) to work out the executor sizes before formatting the command
 * [Spark JVM troubleshooting playbook]({% post_url 2026-09-10-SparkTroubleshootingPlaybook %}) for the `extraJavaOptions` gotchas a long command tends to hide

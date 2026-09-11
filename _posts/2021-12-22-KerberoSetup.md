@@ -4,6 +4,7 @@ categories: Linux
 tags: Linux Kerberos Security
 author: Ranga Reddy
 date: "2021-12-22 00:00:00 +0530"
+updated: "2026-09-11 10:00:00 +0530"
 description: >-
   Install and configure a Kerberos KDC and its clients on Linux end to end: kdc.conf, krb5.conf, the KDC database, ACLs, the admin principal, keytabs and a test from both server and client.
 ---
@@ -14,7 +15,7 @@ description: >-
 > **TL;DR**
 >
 > * Kerberos is the authentication standard across the Hadoop ecosystem, so setting up a KDC is a prerequisite for securing HDFS, YARN, Hive and Spark.
-> * You install `krb5-workstation` on every node and `krb5-server` on one, then configure `kdc.conf` (KDC behaviour) and `krb5.conf` (client behaviour) to agree on the realm.
+> * Install `krb5-workstation` on every node and `krb5-server` on one, then configure `kdc.conf` (KDC behaviour) and `krb5.conf` (client behaviour) to agree on the realm.
 > * `kdb5_util create -s` builds the principal database; the ACL file decides who may administer it; `kadmin.local` creates the first admin.
 > * Services authenticate with keytabs rather than passwords, which is why the last step is exporting one and testing `kinit -kt` from a client machine.
 
@@ -32,19 +33,31 @@ We will install Kerberos Server in one machine and Kerberos client in rest of th
 
 ### Step 1: Install Kerberos Client
 
-We need to install Kerberos Client On all the Nodes or machines in the Cluster
+We need to install the Kerberos client on every node in the cluster.
 
-`$ yum install krb5-workstation krb5-libs krb5-auth-dialog`
+```sh
+sudo dnf install krb5-workstation krb5-libs
+```
+
+On RHEL 7 and older, `yum` replaces `dnf`. On Debian and Ubuntu the client
+package is `krb5-user` instead.
 
 ### Step2: Install Kerberos Server
 
-Kerberos Server can be installed in Master Node . But that is not a strict rule. Alternatively it can be installed in any server within the Cluster.
+The Kerberos server usually goes on the master node, though that is a
+convention rather than a rule; any server in the cluster will do.
 
-`$ yum install krb5-server`
+```sh
+sudo dnf install krb5-server
+```
+
+On Debian and Ubuntu the equivalents are `krb5-kdc` and `krb5-admin-server`, and
+their configuration lives in a different directory, so follow the Ubuntu server
+guide linked at the end for those paths.
 
 ### Step 3: Configure Kerberos
 
-As part of the configuration , we will need to make changes to two files --
+The configuration lives in two files, one for the KDC and one for clients.
 
 #### 3.1 `kdc.conf` changes
 
@@ -138,13 +151,18 @@ To see list of all principals created --
 
 Note these steps MUST be done in KDC Server machine.
 
-Restart KDC Server
+Start both services and enable them so the KDC comes back after a reboot:
 
-`$ service krb5kdc start`
+```sh
+sudo systemctl enable --now krb5kdc
+sudo systemctl enable --now kadmin
+```
 
-Restart KADMIN Server
+Confirm both came up before moving on:
 
-`$ service kadmin start`
+```sh
+systemctl status krb5kdc kadmin
+```
 
 We are done with the Setup. We will test it from Kerberos as well Client servers.
 
@@ -224,3 +242,4 @@ Check if ticket created
 * [Kerberos V5 System Administrator's Guide](https://web.mit.edu/kerberos/krb5-latest/doc/admin/index.html) for realm and database administration
 * [Hadoop in secure mode](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SecureMode.html) for how Hadoop services consume the keytabs created here
 * [Spark security](https://spark.apache.org/docs/latest/security.html) for delegation tokens and `--principal` / `--keytab` on a Kerberized cluster
+* [Ubuntu server Kerberos guide](https://documentation.ubuntu.com/server/how-to/kerberos/) for the Debian and Ubuntu package names and configuration paths
