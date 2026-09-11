@@ -189,6 +189,17 @@
     });
   }());
 
+  /* ------------------------------------------------------- table wrapper -- */
+  (function tableWrap() {
+    $$('.prose table').forEach(function (table) {
+      if (table.closest('.table-wrap') || table.classList.contains('dataTable')) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      table.parentNode.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    });
+  }());
+
   /* ------------------------------------------------------------ mermaid -- */
   (function mermaidDiagrams() {
     if (typeof window.mermaid === 'undefined') return;
@@ -290,9 +301,14 @@
       var query = input.value.trim();
       var terms = query.toLowerCase().split(/\s+/).filter(Boolean);
       if (!terms.length) return render([], '');
+      // Matching decides which posts appear; publication date decides the order,
+      // newest first, so the freshest answer is always at the top.
       var hits = docs.map(function (d) { return { doc: d, s: score(d, terms) }; })
         .filter(function (h) { return h.s > 0; })
-        .sort(function (a, b) { return b.s - a.s || (a.doc.date < b.doc.date ? 1 : -1); })
+        .sort(function (a, b) {
+          if (a.doc.date !== b.doc.date) { return a.doc.date < b.doc.date ? 1 : -1; }
+          return b.s - a.s;
+        })
         .map(function (h) { return h.doc; });
       render(hits, query);
     };

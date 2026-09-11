@@ -353,4 +353,4 @@ changes.
 * [`ConversionController.java` at 0.4.0-incubating](https://github.com/apache/incubator-xtable/blob/0.4.0-incubating/xtable-core/src/main/java/org/apache/xtable/conversion/ConversionController.java), where the per-target FULL versus INCREMENTAL decision is made
 * [`SyncMode.java` at 0.4.0-incubating](https://github.com/apache/incubator-xtable/blob/0.4.0-incubating/xtable-api/src/main/java/org/apache/xtable/model/sync/SyncMode.java), the two modes and their definitions
 * [`RunSync.java` at 0.4.0-incubating](https://github.com/apache/incubator-xtable/blob/0.4.0-incubating/xtable-utilities/src/main/java/org/apache/xtable/utilities/RunSync.java) for the CLI options and the dataset config schema
-* [Choosing a Hudi index]({% post_url 2026-09-10-HudiIndexTypes %}), if the source side of your sync is a Hudi table you are still tuning
+* [Hudi indexing documentation](https://hudi.apache.org/docs/indexes), if the source side of your sync is a Hudi table you are still tuning

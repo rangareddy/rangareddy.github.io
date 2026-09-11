@@ -100,8 +100,6 @@
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    display: block;
-    overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: var(--r);
     font-size: 0.93rem;
@@ -206,4 +204,16 @@
   &:not([data-processed]) { color: transparent; }
 
   svg { max-width: 100%; height: auto; }
+}
+
+/* --------------------------------------------------------------- tables -- */
+/* site.js wraps every prose table so a wide one scrolls inside its own box
+   rather than widening the page. A `display: block` table would size to its
+   content and leave a short header, hence the wrapper. */
+.table-wrap {
+  margin: 0 0 1.15em;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  > table { margin: 0; }
 }

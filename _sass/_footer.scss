@@ -36,7 +36,9 @@
     text-transform: uppercase;
   }
 
-  ul {
+  // .social-row is excluded: it lays its icons out as a flex row, and a bare
+  // `ul` selector here is specific enough to override that and stack them.
+  ul:not(.social-row) {
     margin: 0;
     padding: 0;
     list-style: none;
@@ -44,7 +46,11 @@
     gap: 5px;
   }
 
-  a {
+  .social-row {
+    margin-top: 2px;
+  }
+
+  ul:not(.social-row) a {
     color: var(--text-2);
     font-size: 0.92rem;
 

@@ -3,7 +3,10 @@ layout: default
 title: Tags
 permalink: /tag/
 icon: tags
-type: page
+# Not `type: page`, so it stays out of the header nav and the footer list.
+# Categories covers top-level navigation; this page is reached by clicking any
+# tag chip on a post.
+type: secondary
 description: Posts grouped by tag.
 ---
 

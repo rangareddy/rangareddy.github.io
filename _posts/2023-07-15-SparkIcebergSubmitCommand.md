@@ -380,6 +380,6 @@ This tool is used to generate or build the Spark Submit Command using Iceberg Ca
 ## References
 
 * [Iceberg Spark getting started](https://iceberg.apache.org/docs/latest/spark-getting-started/) for the runtime coordinate and session extensions
-* [Iceberg Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration.html) for catalog properties and the `SparkCatalog` versus `SparkSessionCatalog` choice
+* [Iceberg Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration/) for catalog properties and the `SparkCatalog` versus `SparkSessionCatalog` choice
 * [`CatalogUtil.java` at apache-iceberg-1.11.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/core/src/main/java/org/apache/iceberg/CatalogUtil.java), the accepted `type` values
 * [Iceberg `gradle.properties` at apache-iceberg-1.11.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/gradle.properties), the Spark and Scala support matrix this tool encodes

@@ -47,7 +47,7 @@ below were read from the
 writing, because several of them changed in 1.1.0 and 1.2.0.
 
 Prerequisites: Hudi's [indexing
-documentation](https://hudi.apache.org/docs/indexing/) and the [metadata table
+documentation](https://hudi.apache.org/docs/indexes) and the [metadata table
 overview](https://hudi.apache.org/docs/metadata/). Two terms used throughout:
 a **file group** is the unit of record locality in a Hudi table, identified by a
 file ID, and a **file slice** is one version of a file group, a base file plus
@@ -401,7 +401,7 @@ Hudi asks you to make.
 
 ## References
 
-* [Hudi indexing documentation](https://hudi.apache.org/docs/indexing/) for the conceptual overview and engine support
+* [Hudi indexing documentation](https://hudi.apache.org/docs/indexes) for the conceptual overview and engine support
 * [`HoodieIndex.java` at release-1.2.0](https://github.com/apache/hudi/blob/release-1.2.0/hudi-client/hudi-client-common/src/main/java/org/apache/hudi/index/HoodieIndex.java), the authoritative `IndexType` list and the deprecation note
 * [`HoodieMetadataConfig.java` at release-1.2.0](https://github.com/apache/hudi/blob/release-1.2.0/hudi-common/src/main/java/org/apache/hudi/common/config/HoodieMetadataConfig.java) for the record-index keys, aliases and file-group defaults
 * [`HoodieIndexConfig.java` at release-1.2.0](https://github.com/apache/hudi/blob/release-1.2.0/hudi-client/hudi-client-common/src/main/java/org/apache/hudi/config/HoodieIndexConfig.java) for `hoodie.index.type` and the per-engine default
