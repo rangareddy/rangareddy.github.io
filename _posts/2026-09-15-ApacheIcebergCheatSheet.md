@@ -36,7 +36,33 @@ Software Foundation, used under the
 my own. Where a claim is specific to a
 version, the version is named.
 
-## 1. Core architecture
+## 1. History and major releases
+
+| Date | Milestone |
+|:--|:--|
+| 2018-11-16 | Entered the Apache incubator as a table format for large, slow-moving tabular data |
+| 2018-12-10 | Software grant agreement filed |
+| 2019-06-23 | The specification moved to git and the ASF site, making the format itself the deliverable |
+| 2020-05-20 | Graduated to a Top-Level Project, the same day as Apache Hudi |
+| 2021-01-26 | **0.11.0**, the line where Spark 3 support and row-level operations matured |
+| 2022-10-17 | **1.0.0**, the format declared stable |
+| 2023-10-04 | **1.4.0** |
+| 2025-02-13 | **1.8.0** |
+| 2026-05-19 | **1.11.0**, the current release |
+
+| Line | What it brought |
+|:--|:--|
+| 0.x | The snapshot tree, hidden partitioning, partition and schema evolution, format version 2 with position and equality deletes, the first Spark and Flink integrations |
+| 1.0 to 1.3 | API stability, `rewrite_data_files` and the maintenance procedure surface, branches and tags, Puffin statistics files |
+| 1.4 to 1.7 | The REST catalog spec maturing, view support, changelog scans, broader engine adoption |
+| 1.8 to 1.11 | Format version 3 with deletion vectors and row lineage, format version 4, `compute_table_stats` and `compute_partition_stats`, `rewrite_table_path` |
+
+The pattern to notice is that the *specification* is the project, and the engine
+integrations follow it. That is why an Iceberg table written by Spark is readable
+by Trino or Snowflake without a translation step, and why "which format version"
+is a more useful question than "which library version".
+
+## 2. Core architecture
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -102,7 +128,7 @@ flowchart LR
   C --> D["the files<br/>actually scanned"]
 ```
 
-## 2. Getting started
+## 3. Getting started
 
 ```bash
 spark-sql \
@@ -149,7 +175,7 @@ WHEN NOT MATCHED THEN INSERT *;
 Note there is no record key to declare. Iceberg has no notion of row identity, so
 `MERGE` states the matching condition itself and plans a join to find the files.
 
-## 3. Hidden partitioning and transforms
+## 4. Hidden partitioning and transforms
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -176,7 +202,7 @@ the reader filters on `started_at`. There is no `dt` column to add to the schema
 no risk of a query forgetting to filter on it, and no correlation for the user to
 remember. This is the capability that is hardest to retrofit in another format.
 
-## 4. Row-level operations
+## 5. Row-level operations
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -221,7 +247,7 @@ ALTER TABLE prod.db.trips SET TBLPROPERTIES (
 > counter-intuitive default in the format: a table you have not configured
 > rewrites files on every `DELETE`.
 
-## 5. Format versions
+## 6. Format versions
 
 | Version | Example | Description |
 |:--|:--|:--|
@@ -237,7 +263,7 @@ ALTER TABLE prod.db.trips SET TBLPROPERTIES ('format-version' = '3');
 Format version only moves forward. Check that every engine reading the table
 supports the version before raising it.
 
-## 6. Metadata tables
+## 7. Metadata tables
 
 `MetadataTableType` lists sixteen, and querying them is the fastest way to
 understand a table you did not create.
@@ -269,7 +295,7 @@ FROM prod.db.trips.partitions ORDER BY file_count DESC LIMIT 20;
 SELECT count(*) AS delete_files FROM prod.db.trips.delete_files;
 ```
 
-## 7. Time travel, branches and tags
+## 8. Time travel, branches and tags
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -296,7 +322,7 @@ Branches are the audit-and-backfill mechanism: stage a risky rewrite on a branch
 validate it with ordinary queries, then fast-forward `main`. Nothing readers see
 changes until the fast-forward.
 
-## 8. Schema evolution
+## 9. Schema evolution
 
 | Change | Example | Description |
 |:--|:--|:--|
@@ -313,7 +339,7 @@ column IDs are in the format itself rather than bolted on. That is the practical
 difference from formats where rename and drop need a compatibility mode switched
 on first.
 
-## 9. Procedures
+## 10. Procedures
 
 `SparkProcedures` registers exactly twenty at 1.11.0. Call them as
 `CALL <catalog>.system.<name>(...)`.
@@ -367,7 +393,7 @@ CALL prod.system.create_changelog_view(
 SELECT trip_id, _change_type, _change_ordinal FROM trips_changes ORDER BY _change_ordinal;
 ```
 
-## 10. Maintenance
+## 11. Maintenance
 
 | Job | Example | Description |
 |:--|:--|:--|
@@ -382,7 +408,7 @@ SELECT trip_id, _change_type, _change_ordinal FROM trips_changes ORDER BY _chang
 > `expire_snapshots` removes the snapshots containing it. For a right-to-erasure
 > obligation, expiry is part of the compliance story rather than housekeeping.
 
-## 11. Key table properties
+## 12. Key table properties
 
 | Property | Default | Description |
 |:--|:--|:--|
@@ -397,7 +423,7 @@ SELECT trip_id, _change_type, _change_ordinal FROM trips_changes ORDER BY _chang
 | `write.metadata.previous-versions-max` | 100 | How many old `metadata.json` files to keep |
 | `history.expire.max-snapshot-age-ms` | 5 days | Default age `expire_snapshots` works from |
 
-## 12. Sorting, clustering and file sizing
+## 13. Sorting, clustering and file sizing
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -428,7 +454,7 @@ Sorting is what makes Iceberg's column bounds worth having. Unsorted data gives
 every file a wide min and max, so bounds prune nothing and every query is a full
 scan regardless of how much metadata you have.
 
-## 13. Diagnosing a table
+## 14. Diagnosing a table
 
 | Symptom | Where to look | Likely cause |
 |:--|:--|:--|
@@ -448,7 +474,73 @@ SELECT count(*) AS snapshots, min(committed_at) AS oldest FROM prod.db.trips.sna
 SELECT count(*) AS delete_files FROM prod.db.trips.delete_files;
 ```
 
-## 14. Concurrency
+## 15. Migrating a Hive table to Iceberg
+
+Three procedures, and the difference between them is what happens to the source
+table. All three reuse the existing data files rather than rewriting them.
+
+| Procedure | Source table after | Use it when |
+|:--|:--|:--|
+| `snapshot` | Untouched, still queryable | You want to test Iceberg against real data with a safe rollback: drop the new table and nothing is lost |
+| `migrate` | Replaced in place, retained as `<table>_BACKUP_` | You have validated the format and want the original name to become the Iceberg table |
+| `add_files` | Untouched | You already have an Iceberg table and want to pull existing files into it, for example a backfill |
+
+| Procedure | Arguments |
+|:--|:--|
+| `snapshot` | `source_table` (required), `table` (required), `location`, `properties`, `parallelism` (default 1) |
+| `migrate` | `table` (required), `properties`, `drop_backup` (default `false`), `backup_table_name` (default `<table>_BACKUP_`), `parallelism` |
+| `add_files` | `table` (required), `source_table` (required), `partition_filter`, `check_duplicate_files` (default `true`), `parallelism` |
+
+```sql
+-- 1. Rehearse: an Iceberg table over the same files, source untouched
+CALL prod.system.snapshot('hive_db.trips', 'prod.db.trips_iceberg');
+
+-- Validate against the original before going further
+SELECT count(*) FROM hive_db.trips;
+SELECT count(*) FROM prod.db.trips_iceberg;
+
+-- 2. Commit: replace the Hive table in place, keeping a backup
+CALL prod.system.migrate(table => 'hive_db.trips');
+
+-- The original is now hive_db.trips_BACKUP_. To skip keeping it:
+-- CALL prod.system.migrate(table => 'hive_db.trips', drop_backup => true);
+
+-- 3. Or pull existing files into a table you already created
+CALL prod.system.add_files(
+  table => 'prod.db.trips',
+  source_table => 'hive_db.trips_2025',
+  partition_filter => map('city_id', 'sf')
+);
+
+-- add_files also accepts a raw path in `format`.`path` form
+CALL prod.system.add_files(
+  table => 'prod.db.trips',
+  source_table => '`parquet`.`s3a://lakehouse-prod/raw/trips_2024`'
+);
+```
+
+Four things worth knowing before running `migrate` on anything that matters.
+
+**The data is not rewritten, so the layout you had is the layout you get.** A
+Hive table of many small files becomes an Iceberg table of many small files. Plan
+a `rewrite_data_files` pass afterwards, with a sort order if the table is queried
+with predicates.
+
+**Partitioning carries across as identity transforms**, because that is what a
+Hive directory layout means. Hidden partitioning does not arrive for free: to
+move to `days(started_at)` you add the partition field afterwards, and files
+written before it keep their original spec.
+
+**`check_duplicate_files` guards files, not rows.** It defaults to `true` and
+stops the same file being added twice, but it will not stop you adding files
+whose rows already exist in the table under different filenames. Use
+`partition_filter` to be explicit about scope.
+
+**Stop the writers first.** These procedures capture the current file list, so a
+job still writing to the Hive table during `migrate` can leave files that no
+Iceberg snapshot references.
+
+## 16. Concurrency
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -481,3 +573,7 @@ most between releases.
 * [Spark configuration](https://iceberg.apache.org/docs/latest/spark-configuration/) for catalog wiring and read and write options
 * [`TableProperties.java` at apache-iceberg-1.11.0](https://github.com/apache/iceberg/blob/apache-iceberg-1.11.0/core/src/main/java/org/apache/iceberg/TableProperties.java) for every property and its default
 * [Apache Hudi on Spark: the complete cheat sheet]({% post_url 2026-09-15-ApacheHudiCheatSheet %}) for the same reference treatment of Hudi
+
+## Trademarks
+
+Apache Iceberg, Apache Spark, Apache Flink, Apache Hive, Apache Parquet, Apache Avro, Apache Hudi, Apache Polaris (incubating) and Apache are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries. Delta Lake is a trademark of the Linux Foundation.

@@ -42,7 +42,33 @@ below was read from the `release-1.2.0` tag rather than recalled, and source
 links point at that tag so what you click matches what you read. Where a claim is
 specific to a version, the version is named.
 
-## 1. Introduction, key features and architecture
+## 1. History and major releases
+
+| Date | Milestone |
+|:--|:--|
+| 2016 | The project dates from late 2016, built around applying a continuous stream of changes to a data lake efficiently |
+| 2019-01-17 | Entered the Apache incubator |
+| 2020-05-20 | Graduated to a Top-Level Project, the same day as Apache Iceberg |
+| 2021-08-24 | **0.9.0** |
+| 2022-08-16 | **0.12.0** |
+| 2023-09-27 | **0.14.0**, table version 6, and the first record index |
+| 2024-12-10 | **1.0.0**, table version 8 and the v2 timeline layout |
+| 2026-05-23 | **1.2.0**, table version 9, the current release |
+
+| Line | What it brought |
+|:--|:--|
+| 0.x, early | The timeline, file groups and file slices, Copy-on-Write and Merge-on-Read, incremental queries, the bloom and simple indexes |
+| 0.7 to 0.11 | The metadata table (on by default from 0.7.0), multi-modal indexing, clustering, the bucket index, schema-on-read evolution |
+| 0.12 to 0.15 | The record index (0.14.0), non-blocking concurrency work, CDC queries, partition TTL, table version 6 |
+| 1.0 | Table version 8, the timeline moved to `.hoodie/timeline/` with an LSM-tree archive, record merge modes replacing payload classes, non-blocking concurrency control |
+| 1.1 to 1.2 | Table version 9, the partition-scoped record index (1.1.0), secondary and expression indexes, the `VECTOR`, `BLOB` and `VARIANT` types and a Lance base file format (1.2.0) |
+
+The line to notice is the 1.0 boundary. It changed the on-disk timeline layout,
+so a 0.x reader cannot understand a 1.x timeline directory. Everything else in
+the 1.x line is additive, and the config renames all kept their old spellings as
+registered alternatives.
+
+## 2. Introduction, key features and architecture
 
 Apache Hudi (Hadoop Upserts Deletes and Incrementals) is a transactional data
 lakehouse platform that brings ACID semantics, record-level mutations and
@@ -77,7 +103,7 @@ the data serve batch ETL, streaming ingestion and interactive SQL.
 
 ![Spark, Flink, Kafka Connect and PySpark write Hudi tables; Spark, Trino, Presto, Athena, BigQuery and Hive query them; S3, Glue, Hive Metastore, DataHub and BigQuery store and catalog them; the files themselves are Parquet and Avro, with Iceberg and Delta metadata available through Apache XTable](/assets/images/hudi-cheat-sheet/ecosystem.png)
 
-## 2. Getting started: shell and CRUD
+## 3. Getting started: shell and CRUD
 
 Each of the three write operations below lands exactly one completed instant on
 the timeline, and the snapshot read that follows returns the state that instant
@@ -101,7 +127,7 @@ pyspark --master "local[2]" \
 Swap `pyspark` for `spark-sql` and the same four `--conf` flags give you the SQL
 shell used throughout this page.
 
-```py
+```python
 base_path = 'file:///tmp/hudi_crud_demo'
 table_name = 'hudi_crud_table'
 
@@ -164,7 +190,7 @@ DELETE FROM hudi_crud_table WHERE id = 2;
 > table property is now `hoodie.table.ordering.fields`, spelled `orderingFields`
 > in SQL, with `hoodie.table.precombine.field` kept as an alias.
 
-## 3. Table types: Copy-on-Write and Merge-on-Read
+## 4. Table types: Copy-on-Write and Merge-on-Read
 
 The table type is set once at create time and fixes the write-cost against
 read-cost trade-off.
@@ -210,7 +236,7 @@ Dimension by dimension:
 | Best for | BI dashboards, dimension tables, SCD | Kafka CDC, streaming, corrections |
 | File format on disk | Parquet or ORC only | Parquet base plus Avro log files |
 
-```py
+```python
 hudi_options = {
     'hoodie.datasource.write.table.type': 'COPY_ON_WRITE',   # or MERGE_ON_READ
 }
@@ -218,7 +244,7 @@ hudi_options = {
 
 In SQL the same choice is `type = 'cow'` or `type = 'mor'` in `TBLPROPERTIES`.
 
-## 4. File layout and internal columns
+## 5. File layout and internal columns
 
 A table splits into partitions, each partition holds file groups (the unit of
 update), and each file group holds file slices: successive versions of the same
@@ -258,7 +284,7 @@ slice:
 | `_hoodie_file_name` | Base file the record lives in |
 | `_hoodie_commit_seqno` | Ordering sequence number within a commit |
 
-## 5. Critical writer properties
+## 6. Critical writer properties
 
 Record key, partition path and key generator are fixed at table creation and
 persisted in `.hoodie/hoodie.properties`. Changing them later means rewriting the
@@ -277,7 +303,7 @@ free to change.
 | Key generator | `hoodie.datasource.write.keygenerator.class` | `SimpleKeyGenerator` | Derives record key and partition path from columns |
 | Write operation | `hoodie.datasource.write.operation` | `upsert` | `upsert`, `insert`, `bulk_insert`, `delete`, `insert_overwrite` and more |
 
-```py
+```python
 hudi_options = {
     'hoodie.table.name': 'orders',
     'hoodie.datasource.write.table.type': 'MERGE_ON_READ',      # fixed at creation
@@ -318,7 +344,7 @@ wins:
 
 *Source: Apache Hudi documentation.*
 
-## 6. The timeline
+## 7. The timeline
 
 The timeline under `.hoodie/timeline/` (table version 8 and later; directly under
 `.hoodie/` on 0.x) is the ordered log of every action on a table. An instant is
@@ -357,7 +383,7 @@ stays queryable without keeping every instant in the active set:
 | `restore` | `...restore` | Both | Return the table to a savepoint. Reverted table state |
 | `schemacommit` | `...schemacommit` | Both | Record a schema change. Entry under `.hoodie/.schema/` |
 
-## 7. Supported data types
+## 8. Supported data types
 
 ![Widening promotions from int to long to float to double and decimal to larger precision, alongside the primitive, complex and 1.2.0 type categories](/assets/images/hudi-cheat-sheet/type_promotion.png)
 
@@ -393,7 +419,7 @@ Type promotion is widening and lossless: `int -> long -> float -> double`, and
 `decimal(p,s)` to larger precision or scale. Narrowing is rejected. Not
 supported: `CHAR`, `VARCHAR`, `NUMERIC`, `NULL`, `OBJECT`.
 
-## 8. Write operations
+## 9. Write operations
 
 The write operation controls index involvement, deduplication and file sizing,
 and the lane it falls into decides whether the write pays for an index lookup at
@@ -420,7 +446,7 @@ file groups holding the keys in the batch:
 | `delete_partition` | No | No | Drop entire partitions by partition path |
 | `bootstrap` | No | Yes | Import an external Parquet dataset |
 
-```py
+```python
 # Bulk insert: immutable, for initial large loads
 hudi_options_bulk = {
     'hoodie.datasource.write.operation': 'bulk_insert',
@@ -430,12 +456,27 @@ hudi_options_bulk = {
 ```
 
 ```sql
-INSERT INTO orders VALUES (...);                          -- insert, see the note
-INSERT OVERWRITE orders PARTITION (order_date) ...;       -- insert_overwrite
-INSERT OVERWRITE TABLE orders ...;                        -- insert_overwrite_table
-UPDATE orders SET status = 'shipped' WHERE order_id = 1;  -- upsert
-MERGE INTO orders USING updates ON ...;                   -- upsert
-DELETE FROM orders WHERE order_id = 2;                    -- delete
+-- insert (see the note below on which operation INSERT INTO actually uses)
+INSERT INTO orders (order_id, status, amount, order_date)
+VALUES ('ord-1', 'placed', 42.00, '2024-01-15');
+
+-- insert_overwrite: replaces only the partitions this SELECT produces
+INSERT OVERWRITE orders PARTITION (order_date = '2024-01-15')
+SELECT order_id, status, amount FROM orders_staging WHERE order_date = '2024-01-15';
+
+-- insert_overwrite_table: replaces every partition
+INSERT OVERWRITE TABLE orders SELECT * FROM orders_staging;
+
+-- upsert
+UPDATE orders SET status = 'shipped' WHERE order_id = 'ord-1';
+
+-- upsert
+MERGE INTO orders t USING orders_staging s ON t.order_id = s.order_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+
+-- delete
+DELETE FROM orders WHERE order_id = 'ord-2';
 ```
 
 > **Note:** Spark SQL `INSERT INTO` does not honour
@@ -444,7 +485,7 @@ DELETE FROM orders WHERE order_id = 2;                    -- delete
 > or `bulk_insert` or `upsert`), with duplicate handling through
 > `hoodie.datasource.insert.dup.policy`.
 
-## 9. Key generators
+## 10. Key generators
 
 A key generator derives the record key and partition path from named columns
 through `hoodie.datasource.write.keygenerator.class`.
@@ -472,7 +513,7 @@ specs (`SIMPLE` or `TIMESTAMP`) on the partition path only and delegates the
 record key to `SimpleKeyGenerator` or `ComplexKeyGenerator`, so the row above uses
 `recordkey.field=id` with `partitionpath.field=city:SIMPLE,dept:SIMPLE`.
 
-```py
+```python
 hudi_options = {
     'hoodie.datasource.write.recordkey.field': 'user_id,event_type',
     'hoodie.datasource.write.partitionpath.field': 'country,date',
@@ -483,7 +524,7 @@ hudi_options = {
 #   partition  -> "US/2024-01-15"
 ```
 
-## 10. Query types
+## 11. Query types
 
 The same table reads five ways. All five are projections over one timeline,
 differing only in which instants and file slices they resolve.
@@ -500,7 +541,7 @@ differing only in which instants and file slices they resolve.
 | CDC | Yes | Yes | `incremental` plus `incremental.format=cdc` | Row change log: operation, before, after |
 | Time travel | Yes | Yes | `as.of.instant` | Full table at a past instant |
 
-```py
+```python
 base_path = 'file:///tmp/hudi_table'
 
 df_snapshot = spark.read.format('hudi').load(base_path)
@@ -540,7 +581,7 @@ SELECT * FROM hudi_table TIMESTAMP AS OF '20240101000000000';
 SELECT * FROM hudi_table TIMESTAMP AS OF '2024-01-01 00:00:00';
 ```
 
-## 11. Indexes
+## 12. Indexes
 
 Hudi's writer-side index maps a record key (plus, for non-global indexes, its
 partition path) to a file group. That mapping is what lets a Copy-on-Write upsert
@@ -589,7 +630,7 @@ lookup that grows with the table.
 `HBASE` was an eleventh in the 0.x line and is gone in 1.x, so a 0.x config
 carrying it needs changing before you upgrade.
 
-```py
+```python
 # Bucket index: deterministic hashing, no lookup
 hudi_options_bucket = {
     'hoodie.index.type': 'BUCKET',
@@ -626,7 +667,7 @@ hudi_options_record = {
 > what each stores: 10 to 10000 file groups for the global index, 1 to 10 for the
 > partition-scoped one. Let each use its own and the sizing looks after itself.
 
-## 12. The metadata table
+## 13. The metadata table
 
 The metadata table is a single internal Merge-on-Read Hudi table under
 `.hoodie/metadata/`, one partition per index, that replaces object-store `LIST`
@@ -646,7 +687,7 @@ calls and powers data skipping and point lookups.
 | `secondary_index` | Indexes on non-key columns | `hoodie.metadata.index.secondary.enable` | `true` since 1.0.0 |
 | `expression_index` | Indexes on a function of a column | `hoodie.metadata.index.expression.enable` | `false` |
 
-```py
+```python
 hudi_options = {
     'hoodie.metadata.enable': 'true',                            # core, file listings
     'hoodie.metadata.index.column.stats.enable': 'true',         # data skipping
@@ -663,6 +704,9 @@ CREATE INDEX idx_day ON hudi_table USING column_stats(ts)
   OPTIONS(expr='from_unixtime', format='yyyy-MM-dd');
 DROP INDEX idx_email ON hudi_table;
 
+-- What indexes does this table have?
+SHOW INDEXES FROM hudi_table;
+
 -- Inspect what the metadata table holds
 SELECT type, key FROM hudi_metadata('hudi_table') LIMIT 20;
 CALL show_metadata_table_partitions(table => 'hudi_table');
@@ -673,7 +717,7 @@ CALL show_metadata_table_partitions(table => 'hudi_table');
 > uneventful. Use the new name when you want the partition-scoped index, since
 > the alias resolves to the global one.
 
-## 13. Concurrency control
+## 14. Concurrency control
 
 Hudi separates three kinds of process acting on a table, writers, table services
 and readers, and layers four concurrency controls across them.
@@ -703,9 +747,9 @@ choice you make, through `hoodie.write.concurrency.mode` plus a lock provider.
 | ZooKeeper | [`ZookeeperBasedLockProvider`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-client/hudi-client-common/src/main/java/org/apache/hudi/client/transaction/lock/ZookeeperBasedLockProvider.java) | Multi-node clusters |
 | Hive Metastore | [`HiveMetastoreBasedLockProvider`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-sync/hudi-hive-sync/src/main/java/org/apache/hudi/hive/transaction/lock/HiveMetastoreBasedLockProvider.java) | Hive-integrated stacks |
 | DynamoDB | [`DynamoDBBasedLockProvider`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-aws/src/main/java/org/apache/hudi/aws/transaction/lock/DynamoDBBasedLockProvider.java) | AWS deployments |
-| In-process | [`InProcessLockProvider`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-client/hudi-client-common/src/main/java/org/apache/hudi/client/transaction/lock/InProcessLockProvider.java) | A single JVM doing both writing and table services |
+| In-process | [`InProcessLockProvider`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-common/src/main/java/org/apache/hudi/client/transaction/lock/InProcessLockProvider.java) | A single JVM doing both writing and table services |
 
-```py
+```python
 # Optimistic concurrency with a DynamoDB lock
 hudi_options = {
     'hoodie.write.concurrency.mode': 'optimistic_concurrency_control',
@@ -730,7 +774,7 @@ hudi_options_nbcc = {
 > using the simple or partition-level bucket index, and not to clustering against
 > an ingestion writer, where you still use the optimistic mode.
 
-## 14. Schema evolution
+## 15. Schema evolution
 
 Backwards-compatible changes work at write time out of the box. The full DDL
 surface needs the experimental schema-on-read mode.
@@ -770,7 +814,7 @@ ALTER TABLE trips DROP COLUMN driver;
 > accepted changes that depend on it. Turn it on when you need rename, drop or
 > reorder, and not before.
 
-## 15. Table services
+## 16. Table services
 
 Self-managing background jobs keep file sizes, storage and the timeline healthy.
 Each runs inline or asynchronously, and they chain: compaction and clustering
@@ -795,7 +839,7 @@ content: small files are rewritten into larger, sorted ones.
 
 *Source: Apache Hudi documentation.*
 
-```py
+```python
 compaction_opts = {
     'hoodie.compact.inline': 'true',                  # default false
     'hoodie.compact.inline.max.delta.commits': '5',   # the default
@@ -829,10 +873,20 @@ maintenance_opts = {
 > is multi-writer territory: configure a lock provider and
 > `hoodie.write.concurrency.mode` first.
 
-## 16. Bootstrapping an existing dataset
+## 17. Migrating a Hive table to Hudi
 
-Convert a large existing Parquet dataset into a Hudi table, with or without
-rewriting the underlying data.
+Convert an existing Hive or Parquet dataset into a Hudi table, with or without
+rewriting the underlying data. Unlike Iceberg, which offers an in-place
+`migrate`, Hudi always writes a new table: bootstrap produces a Hudi table at a
+new base path and leaves the source where it is.
+
+| Step | What it does |
+|:--|:--|
+| Pick a mode | `METADATA_ONLY` for cold history, `FULL_RECORD` for data you will upsert, or a selector that mixes them per partition |
+| Declare the keys | The record key, partition path and key generator are frozen at this point, so get them right before you start |
+| Run the bootstrap | Writes a new Hudi table at `base_path`, leaving the source dataset untouched |
+| Sync the catalog | Hive sync registers the new table; a Merge-on-Read table registers as both `_ro` and `_rt` |
+| Cut writers over | The source is still live until you point ingestion at the Hudi table |
 
 ![METADATA_ONLY writes a skeleton that points back at the original Parquet files, while FULL_RECORD copies the records into Hudi base files](/assets/images/hudi-cheat-sheet/bootstrap_modes.png)
 
@@ -853,7 +907,7 @@ CALL run_bootstrap(
 );
 ```
 
-```py
+```python
 bootstrap_options = {
     'hoodie.table.name': 'bootstrapped_table',
     'hoodie.bootstrap.base.path': 's3a://lakehouse-prod/raw/orders_parquet',
@@ -872,10 +926,43 @@ spark.range(1).write.format('hudi').options(**bootstrap_options) \
     .mode('append').save('s3a://lakehouse-prod/warehouse/orders')
 ```
 
-## 17. SQL procedures
+Four things worth knowing before bootstrapping something that matters.
+
+**`METADATA_ONLY` leaves you depending on the source files.** The skeleton points
+at the original Parquet, so those files must stay where they are and stay
+readable. If the plan is to decommission the Hive table's storage, that mode is
+the wrong choice and `FULL_RECORD` is what you want.
+
+**The record key decision is permanent.** Record key, partition path and key
+generator go into `.hoodie/hoodie.properties`, and changing them later means
+rewriting the table. Decide global against partition-scoped uniqueness from your
+data model before running the bootstrap, not after.
+
+**Partitioning carries across as it is on disk.** A Hive layout of
+`order_date=2024-01-15/` becomes a Hudi partition path of the same shape. Hudi
+has no hidden partitioning, so the partition column stays explicit and queries
+still have to filter on it.
+
+**Set the index at bootstrap time.** A table bootstrapped for upserts wants a
+record-level or bucket index chosen deliberately. The Spark default of `SIMPLE`
+will make the first large upsert scan the table you just created.
+
+Catalog registration is writer configuration rather than a procedure: set
+`hoodie.datasource.hive_sync.enable` on the bootstrap write, or run the
+`HiveSyncTool` afterwards. A Merge-on-Read table registers under two names,
+`_ro` and `_rt`.
+
+```sql
+-- Confirm what the table actually recorded, since these values are now frozen
+SELECT type, key FROM hudi_metadata('bootstrapped_table') LIMIT 10;
+CALL show_commits(table => 'bootstrapped_table', limit => 5);
+```
+
+## 18. SQL procedures
 
 Day-two administration from Spark SQL with `CALL <procedure>(named => args)`,
-returned as a result set.
+returned as a result set. `HoodieProcedures` registers 71 of them in 1.2.0; these
+are the ones worth remembering.
 
 ![A CALL statement is parsed by the Hudi session extension, resolved through the procedures registry, and executed against the timeline and data files](/assets/images/hudi-cheat-sheet/procedures_flow.png)
 
@@ -903,7 +990,7 @@ CALL run_clustering(
 CALL show_metadata_table_partitions(table => 'hudi_table');
 ```
 
-## 18. Savepoints and restore
+## 19. Savepoints and restore
 
 A savepoint pins the file versions of a commit so cleaning and archival cannot
 remove them; restore rewinds the table to that instant. Together they are Hudi's
@@ -940,7 +1027,7 @@ CALL delete_savepoint(table => 'hudi_table', instant_time => '20260713100000000'
 > cleaning, so long-lived savepoints grow storage; delete them once the risk has
 > passed.
 
-## 19. Catalog integration
+## 20. Catalog integration
 
 Publish table metadata to external catalogs so engines can discover and query the
 tables.
@@ -960,7 +1047,7 @@ spells the suffixes out: `_rt` serves snapshot reads and `_ro` serves
 read-optimized reads. When an engine looks a commit behind, check which of the
 two the catalog handed it.
 
-```py
+```python
 hudi_options_hive = {
     'hoodie.datasource.hive_sync.enable': 'true',
     'hoodie.datasource.hive_sync.mode': 'hms',        # or 'jdbc', 'hiveql'
@@ -985,7 +1072,7 @@ hudi_options_glue = {
 > Delta metadata alongside Hudi, rather than a catalog. Pair it with whatever
 > catalog the target engine reads.
 
-## 20. Writer interfaces
+## 21. Writer interfaces
 
 The same table accepts writes through four Spark entry points, sharing the
 writer configs above and differing only in how the pipeline is driven.
@@ -999,7 +1086,7 @@ writer configs above and differing only in how the pipeline is driven.
 | Structured Streaming | `df.writeStream.format('hudi')` | Continuous ingestion from a streaming DataFrame |
 | Hudi Streamer | `spark-submit` with `HoodieStreamer` | Turnkey ingestion: sources, transforms, checkpoints |
 
-```py
+```python
 stream_df.writeStream.format('hudi') \
     .options(**hudi_options) \
     .option('checkpointLocation', 's3a://lakehouse-prod/checkpoints/orders') \
@@ -1007,7 +1094,7 @@ stream_df.writeStream.format('hudi') \
     .start('s3a://lakehouse-prod/warehouse/orders')
 ```
 
-## 21. Hudi Streamer
+## 22. Hudi Streamer
 
 [`HoodieStreamer`](https://github.com/apache/hudi/blob/release-1.2.0/hudi-utilities/src/main/java/org/apache/hudi/utilities/streamer/HoodieStreamer.java),
 formerly DeltaStreamer, is a self-contained Spark job for one-shot or
@@ -1067,7 +1154,7 @@ hoodie.datasource.hive_sync.partition_fields=event_date
 
 ![The Hudi platform: pluggable ingestion feeds the lake-storage table format, self-managing table services and indexes maintain it, and many engines query it](/assets/images/hudi-cheat-sheet/platform2.png)
 
-## 22. Tuning
+## 23. Tuning
 
 The knobs that most affect write and read performance. They fall into three
 stages, and the middle one is where a write-side decision becomes a read-side
@@ -1093,7 +1180,7 @@ Treat every number above as a starting point and measure on your own data. File
 sizing and parallelism in particular depend on your record width and cluster
 shape, which no default can know.
 
-## 23. Diagnosing a table
+## 24. Diagnosing a table
 
 | Symptom | Where to look | Likely cause |
 |:--|:--|:--|
@@ -1121,7 +1208,7 @@ The failure worth planning for is the quiet one. Nothing raises an error when
 compaction stops; snapshot reads simply merge a little more every hour, which is
 why the query above belongs on a schedule rather than in an incident.
 
-## 24. Best practices
+## 25. Best practices
 
 * **Use a record-level index on large tables.** Exact key-to-file lookups avoid bloom false-positive scans at billion-row scale.
 * **Resist over-partitioning.** Thousands of tiny partitions mean small files and metadata pressure. Prefer coarse time buckets.
@@ -1157,3 +1244,7 @@ Everything else here is a knob you can turn later.
 * [Hudi concurrency control](https://hudi.apache.org/docs/concurrency_control/) for the four controls, the lock providers and the multi-writer setup
 * [`HoodieIndex.java` at release-1.2.0](https://github.com/apache/hudi/blob/release-1.2.0/hudi-client/hudi-client-common/src/main/java/org/apache/hudi/index/HoodieIndex.java) for the authoritative `IndexType` list
 * [Apache Hudi: architecture, features and what makes it different]({% post_url 2026-09-15-ApacheHudiGuide %}) for the guide this page is the reference companion to
+
+## Trademarks
+
+Apache Hudi, Apache Spark, Apache Flink, Apache Hive, Apache Kafka, Apache Parquet, Apache Avro, Apache Iceberg, Apache XTable (incubating), Apache Hadoop and Apache are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries. Delta Lake is a trademark of the Linux Foundation.

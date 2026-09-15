@@ -45,7 +45,7 @@ the ones that break a job on upgrade.
 | 2009 | Started as a research project in the UC Berkeley AMPLab, built around the RDD paper's idea of reusing data across iterations |
 | 2010 | Open sourced under a BSD licence |
 | 2013 | Donated to the Apache Software Foundation and entered the incubator |
-| 2014 | Became an ASF Top-Level Project, and **1.0.0** released in May |
+| 2014 | Became an ASF Top-Level Project in February, and **1.0.0** released in May |
 | 2016 | **2.0.0** in July: the Dataset API, SparkSession, and Structured Streaming |
 | 2020 | **3.0.0** in June: adaptive query execution and dynamic partition pruning |
 | 2025 | **4.0.0** in May: ANSI mode on by default, the `VARIANT` type, and Spark Connect |
@@ -200,7 +200,6 @@ spark-submit \
   --executor-memory 16g \
   --driver-memory 8g \
   --conf spark.sql.shuffle.partitions=400 \
-  --conf spark.dynamicAllocation.enabled=true \
   --jars /opt/jars/postgresql-42.7.3.jar \
   --files /etc/app/log4j2.properties \
   /opt/apps/trips-rollup-2.4.1.jar --run-date 2026-09-15
@@ -218,6 +217,12 @@ spark-submit \
 | `--packages` | `org.apache.hudi:hudi-spark3.5-bundle_2.12:1.2.0` | Maven coordinates, resolved at submit time |
 | `--files` | `/etc/app/log4j2.properties` | Files shipped to every working directory |
 | `--conf` | `spark.sql.shuffle.partitions=400` | Any Spark property. Repeatable |
+
+Dynamic allocation is deliberately absent above, because it and `--num-executors`
+are mutually exclusive: turning on `spark.dynamicAllocation.enabled` makes the
+fixed count irrelevant. If you want it, drop `--num-executors`, set
+`spark.dynamicAllocation.minExecutors` and `maxExecutors`, and give it either an
+external shuffle service or `spark.dynamicAllocation.shuffleTracking.enabled`.
 
 On Kubernetes the same roles map onto pods, with the driver pod creating and
 owning the executor pods:
@@ -285,7 +290,8 @@ trips = (spark.read.format("jdbc")
     .option("url", "jdbc:postgresql://db.internal:5432/rides")
     .option("dbtable", "public.trips")
     .option("user", "etl")
-    .option("partitionColumn", "trip_id")
+    # partitionColumn must be numeric, date or timestamp. A string key will not do.
+    .option("partitionColumn", "trip_seq")
     .option("lowerBound", "1")
     .option("upperBound", "40000000")
     .option("numPartitions", "16")
@@ -519,21 +525,52 @@ trigger, and the output mode decides which of its rows get written out:
 | Arbitrary sink logic | `.foreachBatch(fn)` | Gives you a batch DataFrame per micro-batch. How you write to a sink with no native connector |
 
 ```python
-(spark.readStream.format("kafka")
+from pyspark.sql.functions import col, from_json, window, count
+from pyspark.sql.types import StructType, StringType, TimestampType, DoubleType
+
+schema = (StructType()
+    .add("trip_id", StringType())
+    .add("city_id", StringType())
+    .add("fare_amount", DoubleType())
+    .add("started_at", TimestampType()))
+
+events = (spark.readStream.format("kafka")
     .option("kafka.bootstrap.servers", "kafka-broker1:9092")
     .option("subscribe", "trips")
     .option("startingOffsets", "latest")
     .load()
-    .selectExpr("CAST(value AS STRING) AS payload", "timestamp AS event_time")
-    .withWatermark("event_time", "10 minutes")
-    .writeStream
+    # Kafka's own `timestamp` is broker ingest time. Event time comes from the
+    # payload, which is what a watermark should be based on.
+    .select(from_json(col("value").cast("string"), schema).alias("t"))
+    .select("t.*"))
+
+# A plain pass-through sink: no state, so no watermark is needed.
+(events.writeStream
     .format("parquet")
-    .option("checkpointLocation", "s3a://lakehouse-prod/checkpoints/trips")
+    .option("checkpointLocation", "s3a://lakehouse-prod/checkpoints/trips_raw")
     .option("path", "s3a://lakehouse-prod/warehouse/trips_raw")
     .trigger(processingTime="1 minute")
     .outputMode("append")
     .start())
+
+# A stateful aggregation, which is where the watermark actually does work:
+# it finalises windows and lets Spark drop their state.
+(events
+    .withWatermark("started_at", "10 minutes")
+    .groupBy(window(col("started_at"), "5 minutes"), col("city_id"))
+    .agg(count("*").alias("trips"))
+    .writeStream
+    .format("parquet")
+    .option("checkpointLocation", "s3a://lakehouse-prod/checkpoints/trips_by_window")
+    .option("path", "s3a://lakehouse-prod/warehouse/trips_by_window")
+    .outputMode("append")
+    .start())
 ```
+
+The two queries above are deliberately different. A watermark on the first would
+be inert: it only has an effect on stateful operations, which a pass-through sink
+is not. Each query also gets its own checkpoint location, which is a hard
+requirement rather than a convention.
 
 Event-time windows come in three shapes, and the choice changes how many windows
 a single record lands in:
@@ -665,3 +702,7 @@ dedicated test pass rather than meeting it during an upgrade.
 * [Structured Streaming programming guide](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html) for triggers, watermarks and output modes
 * [ANSI compliance](https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html) for the full list of behaviours the Spark 4 default changes
 * [Apache Hudi on Spark: the complete cheat sheet]({% post_url 2026-09-15-ApacheHudiCheatSheet %}) for the lakehouse layer on top of this
+
+## Trademarks
+
+Apache Spark, Apache Hudi, Apache Iceberg, Apache Kafka, Apache Parquet, Apache Hadoop, Apache Hive and Apache are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.
