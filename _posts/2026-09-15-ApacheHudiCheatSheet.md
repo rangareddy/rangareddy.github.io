@@ -34,7 +34,10 @@ Spark SQL forms side by side where both exist. The table of contents above is th
 fastest way in.
 
 Written against the **latest Hudi release, 1.2.0 as of now**, with Spark bundles
-for Spark 3.3 through 4.1. Every config key, default, enum value and class name
+for Spark 3.3 through 4.1. Diagrams captioned *Source: Apache Hudi
+documentation* are taken from the project's own docs, &copy; The Apache Software
+Foundation, and are used under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0);
+the rest are my own. Every config key, default, enum value and class name
 below was read from the `release-1.2.0` tag rather than recalled, and source
 links point at that tag so what you click matches what you read. Where a claim is
 specific to a version, the version is named.
@@ -181,7 +184,13 @@ keep snapshot isolation.
 Updates append to Avro log files, merged with the base files during snapshot
 reads or at compaction.
 
-![Copy-on-Write rewrites the base file on every update; Merge-on-Read appends log files and compacts them into a new base file](/assets/images/hudi-cheat-sheet/cow_vs_mor_write_path.png)
+![Copy-on-Write: each update rewrites the affected base Parquet file into a new file slice](/assets/images/hudi-cheat-sheet/apache/cow.png)
+
+*Source: Apache Hudi documentation.*
+
+![Merge-on-Read: updates append to delta log files beside the base file, compacted into a new base file later](/assets/images/hudi-cheat-sheet/apache/mor.png)
+
+*Source: Apache Hudi documentation.*
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -226,6 +235,20 @@ records, each a base Parquet file plus the delta logs written against it.
 | Delta log | `.8f3a1c92-...-0_20260915090000123.log.1_0-31-2104` | Append-only Avro file of inserts, updates and deletes on MoR. Leading dot hides it from a plain listing. Merged at read time |
 | Instant | `20260915090000123` | A point on the timeline, `yyyyMMddHHmmssSSS`, identifying one action. The handle used by incremental reads and time travel |
 | Metadata table | `.hoodie/metadata/` | An internal Hudi MoR table holding file listings and indexes. Removes the object-store `LIST` from planning |
+
+A Merge-on-Read file group accumulates log files against one base file, and
+compaction folds them into the next slice. Before:
+
+![A Merge-on-Read file group: one base Parquet file with delta log files appended beside it](/assets/images/hudi-cheat-sheet/apache/mor-file-layout.jpg)
+
+*Source: Apache Hudi documentation.*
+
+And after compaction, where the merged result becomes the base file of a new
+slice:
+
+![The same file group after compaction, with the log files merged into a new base file](/assets/images/hudi-cheat-sheet/apache/mor-post-compaction.jpg)
+
+*Source: Apache Hudi documentation.*
 
 | Internal column | Meaning |
 |:--|:--|
@@ -280,6 +303,21 @@ or `CUSTOM`. Neither carries a static default: the documented behaviour is
 when it is not. This replaces the legacy payload classes such as
 `OverwriteWithLatestAvroPayload`.
 
+The two built-in modes differ only in which column decides the winner. Event-time
+ordering compares the ordering field, so a late-arriving record with an older
+value loses:
+
+![Event-time ordering: the record with the larger ordering-field value wins regardless of arrival order](/assets/images/hudi-cheat-sheet/apache/event-time-merge.png)
+
+*Source: Apache Hudi documentation.*
+
+Commit-time ordering compares the instant instead, so the newest write always
+wins:
+
+![Commit-time ordering: the record from the later commit wins regardless of its ordering-field value](/assets/images/hudi-cheat-sheet/apache/commit-time-merge.png)
+
+*Source: Apache Hudi documentation.*
+
 ## 6. The timeline
 
 The timeline under `.hoodie/timeline/` (table version 8 and later; directly under
@@ -292,7 +330,17 @@ actions. It is the handle incremental reads and time-travel queries use.
 Every action moves through `requested`, then `inflight`, then completed. Only
 completed instants are visible to queries, which is what makes a commit atomic.
 
-![Every timeline action moves through requested, inflight and completed states](/assets/images/hudi-cheat-sheet/timeline_states.png)
+![Hudi timeline actions and the requested, inflight and completed states each one moves through](/assets/images/hudi-cheat-sheet/apache/timeline-actions.png)
+
+*Source: Apache Hudi documentation.*
+
+Once instants age out of the active timeline they are archived rather than
+deleted. Hudi 1.x stores that history as an LSM tree, so the archived timeline
+stays queryable without keeping every instant in the active set:
+
+![The archived timeline is an LSM tree, with instants merged into progressively larger levels](/assets/images/hudi-cheat-sheet/apache/lsm-timeline.png)
+
+*Source: Apache Hudi documentation.*
 
 | Action | Example filename | Table | Description |
 |:--|:--|:--|:--|
@@ -352,6 +400,14 @@ and the lane it falls into decides whether the write pays for an index lookup at
 all.
 
 ![Immutable ingest skips the index, mutable merge looks up the record key to find its file group, and replacement operations swap whole file groups with a replacecommit](/assets/images/hudi-cheat-sheet/write_operations.png)
+
+The reason the mutable lane exists at all is the shape of the write. A batch
+overwrite rewrites partitions wholesale; an incremental upsert touches only the
+file groups holding the keys in the batch:
+
+![Batch writes rewrite whole partitions while incremental writes touch only the affected file groups](/assets/images/hudi-cheat-sheet/apache/incr-vs-batch.png)
+
+*Source: Apache Hudi documentation.*
 
 | Operation | Index involvement | Ordering applied | Use case |
 |:--|:--|:--|:--|
@@ -432,7 +488,9 @@ hudi_options = {
 The same table reads five ways. All five are projections over one timeline,
 differing only in which instants and file slices they resolve.
 
-![Over one Merge-on-Read timeline, snapshot merges base and logs, read-optimized reads the compacted base only, incremental and CDC read a window of instants, and time travel reads as of a past instant](/assets/images/hudi-cheat-sheet/query_types.png)
+![Snapshot, read-optimized and incremental queries resolving against the same Merge-on-Read timeline](/assets/images/hudi-cheat-sheet/apache/query-types.png)
+
+*Source: Apache Hudi documentation.*
 
 | Query type | CoW | MoR | How to ask for it | Returns |
 |:--|:--|:--|:--|:--|
@@ -507,6 +565,10 @@ same partition path for a key. A global index enforces uniqueness across the
 table and can find or move a key in any partition, at the cost of a table-wide
 lookup that grows with the table.
 
+![An upsert without an index scans to find matching files; with an index it looks the key up and goes straight to the file group](/assets/images/hudi-cheat-sheet/apache/with-without-index.png)
+
+*Source: Apache Hudi documentation.*
+
 ![A local index probes only the partition the writer supplies; a global index probes every partition and can move a record between them](/assets/images/hudi-cheat-sheet/index_scope.png)
 
 `HoodieIndex.IndexType` has exactly ten values in 1.2.0:
@@ -570,7 +632,9 @@ The metadata table is a single internal Merge-on-Read Hudi table under
 `.hoodie/metadata/`, one partition per index, that replaces object-store `LIST`
 calls and powers data skipping and point lookups.
 
-![The multi-modal index stack inside the Hudi metadata table](/assets/images/hudi-cheat-sheet/stack_indexes.png)
+![The multi-modal index stack inside the Hudi metadata table](/assets/images/hudi-cheat-sheet/apache/stack-indexes.png)
+
+*Source: Apache Hudi documentation.*
 
 | Sub-index | Purpose | Enabling config | Default |
 |:--|:--|:--|:--|
@@ -723,6 +787,13 @@ trims the timeline entries left behind.
 | [Indexing](https://hudi.apache.org/docs/metadata_indexing) | Build metadata-table indexes asynchronously | Async protocol | `hoodie.metadata.index.*` |
 | [Archival](https://hudi.apache.org/docs/timeline) | Move old timeline entries to `timeline/history/` | After cleaning | `hoodie.archive.*`, `hoodie.keep.*` |
 | Partition TTL | Expire partitions past their retention | Inline with writes | `hoodie.partition.ttl.*` |
+
+Clustering is the one worth seeing, because it changes layout without changing
+content: small files are rewritten into larger, sorted ones.
+
+![Clustering rewrites small files into larger sorted file groups without changing the records](/assets/images/hudi-cheat-sheet/apache/clustering.png)
+
+*Source: Apache Hudi documentation.*
 
 ```py
 compaction_opts = {
@@ -1022,7 +1093,35 @@ Treat every number above as a starting point and measure on your own data. File
 sizing and parallelism in particular depend on your record width and cluster
 shape, which no default can know.
 
-## 23. Best practices
+## 23. Diagnosing a table
+
+| Symptom | Where to look | Likely cause |
+|:--|:--|:--|
+| Reads get slower every day, nothing errors | `hudi_filesystem_view`, `Log_File_Unscheduled` | Compaction is not running on a Merge-on-Read table, so log files accumulate per file slice |
+| Upsert time grows with the table, not the batch | `hoodie.properties`, the `hoodie.index.type` line | The index is unset, so `SIMPLE` is scanning. Move to a record-level or bucket index |
+| Storage grows far faster than data | `CALL show_commits`, and the cleaner config | Cleaning is not keeping up, or a long-lived savepoint is pinning file slices |
+| Duplicate keys after a partition value changed | The index scope | A non-global index, where the same key now lives in two partitions |
+| A config you set looks ignored | `.hoodie/hoodie.properties` | It is one of the properties frozen at table creation, so the writer option cannot change it |
+| Writes fail with a commit conflict | The concurrency mode and lock provider | Two writers with optimistic concurrency. Expected behaviour; consider non-blocking mode for Merge-on-Read |
+| An engine reads a commit behind | Which synced table name it was given | `_ro` serves read-optimized reads; `_rt` serves snapshot reads |
+| Planning slower than the scan | `hoodie.metadata.enable` | The metadata table is off, so planning is listing object storage |
+
+```sql
+-- The one-query health check: unscheduled log bytes per file group
+SELECT File_ID, Partition_Path, Log_File_Count, Log_File_Unscheduled
+FROM hudi_filesystem_view('hudi_table')
+ORDER BY Log_File_Unscheduled DESC
+LIMIT 20;
+
+-- Is compaction actually completing?
+CALL show_compaction(table => 'hudi_table', limit => 10);
+```
+
+The failure worth planning for is the quiet one. Nothing raises an error when
+compaction stops; snapshot reads simply merge a little more every hour, which is
+why the query above belongs on a schedule rather than in an incident.
+
+## 24. Best practices
 
 * **Use a record-level index on large tables.** Exact key-to-file lookups avoid bloom false-positive scans at billion-row scale.
 * **Resist over-partitioning.** Thousands of tiny partitions mean small files and metadata pressure. Prefer coarse time buckets.

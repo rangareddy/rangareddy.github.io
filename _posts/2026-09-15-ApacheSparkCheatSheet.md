@@ -4,6 +4,7 @@ categories: Spark
 tags: Spark SQL Tuning Streaming Reference
 author: Ranga Reddy
 date: "2026-09-15 14:00:00 +0530"
+mermaid: true
 description: >-
   One page to keep open while you work: the execution model, spark-submit, the
   memory split, join strategies, shuffle and partitioning, adaptive query
@@ -45,6 +46,38 @@ the ones that break a job on upgrade.
 | Partition | `df.rdd.getNumPartitions()` | The unit of parallelism. Too few starves the cluster, too many drowns it in scheduling |
 | Shuffle | `groupBy`, `join`, `repartition` | Redistributes data across executors over the network. The expensive thing you are usually tuning around |
 | Slot | `spark.executor.cores` per executor | How many tasks one executor runs at once. Total parallelism is executors times cores |
+
+```mermaid
+flowchart LR
+  D["driver<br/>SparkSession, DAG, scheduler"] --> CM["cluster manager<br/>YARN, Kubernetes, standalone"]
+  CM --> E1["executor 1<br/>slots + block manager"]
+  CM --> E2["executor 2"]
+  CM --> E3["executor 3"]
+  E1 -.->|"shuffle blocks"| E2
+  E2 -.->|"shuffle blocks"| E3
+  E1 --> D
+  E2 --> D
+  E3 --> D
+```
+
+```mermaid
+flowchart LR
+  subgraph ST1["stage 1: narrow, no shuffle"]
+    direction LR
+    R1["read trips"] --> F["filter, select"]
+  end
+
+  subgraph ST2["stage 2: after the shuffle"]
+    direction LR
+    AG["aggregate"] --> W["write, the action"]
+  end
+
+  F -->|"shuffle<br/>groupBy city_id"| AG
+```
+
+Everything between two shuffles is one stage, and a stage runs one task per
+partition. That is the whole scheduling model, and it is why "how many
+partitions" is the question behind most tuning.
 
 Transformations are lazy and actions are eager. `filter`, `select`, `join` and
 `withColumn` add to a plan; `count`, `collect`, `show` and `write` execute it.
@@ -98,6 +131,19 @@ spark-submit \
 | Unified pool | `spark.memory.fraction` | `0.6` | Share of (heap minus 300 MB reserved) available for execution plus storage |
 | Storage floor | `spark.memory.storageFraction` | `0.5` | The part of the unified pool that caching can hold against eviction |
 | Cores per executor | `spark.executor.cores` | `1` | Concurrent tasks per executor. Each task shares the same heap |
+
+```mermaid
+flowchart TB
+  C["container the cluster manager allocates"] --> H["spark.executor.memory<br/>JVM heap"]
+  C --> O["spark.executor.memoryOverhead<br/>off-heap, 384m or 10 percent"]
+  H --> RES["reserved<br/>300 MB"]
+  H --> UP["unified pool<br/>memory.fraction 0.6"]
+  H --> USR["user memory<br/>the remaining 0.4"]
+  UP --> EX["execution<br/>shuffles, joins, sorts"]
+  UP --> ST["storage<br/>cached blocks<br/>floor at storageFraction 0.5"]
+  %% execution can evict storage down to the floor; storage can never evict execution
+  EX -.->|"evicts"| ST
+```
 
 The container your cluster manager sees is `spark.executor.memory` **plus**
 overhead, so a `16g` executor with the default factor asks for about 17.6g. When
@@ -186,6 +232,19 @@ work runs with one task. Use `repartition(1)` when you genuinely want the shuffl
 
 AQE re-optimises the plan mid-flight using statistics from completed stages,
 which is why it beats anything you can set by hand ahead of time.
+
+```mermaid
+flowchart LR
+  P["logical plan"] --> ST1["run stage 1"]
+  ST1 --> STATS["real statistics<br/>partition sizes, row counts"]
+  STATS --> RE["re-optimise"]
+  RE --> C1["coalesce small<br/>partitions"]
+  RE --> C2["split skewed<br/>partitions"]
+  RE --> C3["switch sort merge<br/>to broadcast"]
+  C1 --> ST2["run stage 2"]
+  C2 --> ST2
+  C3 --> ST2
+```
 
 | Feature | Config | Default | Description |
 |:--|:--|:--|:--|
@@ -281,7 +340,34 @@ Without a watermark, a streaming aggregation keeps state forever and the job
 degrades over days rather than failing outright. The watermark is what lets Spark
 drop state it will never need again.
 
-## 11. Diagnosing a slow job
+## 11. Useful functions and patterns
+
+| Pattern | Example | Description |
+|:--|:--|:--|
+| Window ranking | `row_number().over(Window.partitionBy("city_id").orderBy(desc("fare")))` | Deduplicate or top-N per group. One shuffle, unlike a self-join |
+| Deduplicate by key | `dropDuplicates(["trip_id"])` | Keeps an arbitrary row. Use a window with an explicit order when which row wins matters |
+| Explode arrays | `select(explode("items").alias("item"))` | One output row per element |
+| Pivot | `groupBy("city_id").pivot("status").count()` | Supply the value list to avoid a pass that discovers it |
+| Conditional | `when(col("fare") > 50, "high").otherwise("low")` | The SQL `CASE` equivalent |
+| Null-safe equality | `col("a").eqNullSafe(col("b"))` | `<=>` in SQL. Treats null equal to null, unlike `=` |
+| Coalesce nulls | `coalesce(col("a"), col("b"), lit(0))` | First non-null. Unrelated to `DataFrame.coalesce` |
+| Salting a skewed key | `concat(col("k"), lit("_"), (rand()*16).cast("int"))` | Spreads a hot key across partitions when AQE skew handling does not fire |
+| Broadcast a small side | `join(broadcast(dim), "city_id")` | Forces the strategy when statistics are unreliable |
+| Inspect the plan | `df.explain("formatted")` | `formatted`, `extended` or `cost`. The fastest way to check a pushdown |
+
+```python
+from pyspark.sql import Window
+from pyspark.sql.functions import row_number, desc, col
+
+# Latest row per trip, which is the shape most CDC dedup takes
+latest = (trips
+    .withColumn("rn", row_number().over(
+        Window.partitionBy("trip_id").orderBy(desc("updated_at"))))
+    .where(col("rn") == 1)
+    .drop("rn"))
+```
+
+## 12. Diagnosing a slow job
 
 | Symptom | Where to look | Likely cause |
 |:--|:--|:--|
@@ -298,7 +384,7 @@ The Spark UI SQL tab is the most useful page and the least used. It shows the
 physical plan with row counts per node, which answers "did my filter push down"
 and "which side got broadcast" directly, rather than by inference.
 
-## 12. What changed in Spark 4
+## 13. What changed in Spark 4
 
 | Change | Description |
 |:--|:--|

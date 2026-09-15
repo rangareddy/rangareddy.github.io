@@ -4,6 +4,7 @@ categories: Iceberg
 tags: Iceberg Lakehouse Spark SQL Reference
 author: Ranga Reddy
 date: "2026-09-15 13:00:00 +0530"
+mermaid: true
 description: >-
   One page to keep open while you work: the snapshot tree, metadata tables,
   hidden partitioning, row-level operation modes, branches and tags, the twenty
@@ -43,6 +44,22 @@ version, the version is named.
 | Data file | `data/city_id=sf/00000-0-a1c2f3b4-....parquet` | The rows. The directory layout is human convenience only; partition values come from the manifest |
 | Delete file | position or equality deletes, or a Puffin deletion vector | How a row is removed without rewriting its data file, under merge-on-read |
 
+```mermaid
+flowchart LR
+  CAT["catalog<br/>one pointer"] --> MD["v2.metadata.json<br/>schema, specs, snapshots"]
+  MD --> SNAP["current snapshot<br/>7241925443479918015"]
+  SNAP --> ML["manifest list<br/>snap-...avro"]
+  ML --> M1["manifest m0<br/>partition ranges"]
+  ML --> M2["manifest m1<br/>partition ranges"]
+  M1 --> D1["data files"]
+  M1 --> DEL["delete files"]
+  M2 --> D2["data files"]
+```
+
+A commit writes a new `metadata.json` and swaps the catalog pointer. Nothing
+already written is mutated, which is what makes an old snapshot readable for as
+long as retention keeps it.
+
 ```
 s3a://lakehouse-prod/warehouse/trips/
 ├── metadata/
@@ -58,6 +75,17 @@ s3a://lakehouse-prod/warehouse/trips/
 
 `FileContent` enumerates what a manifest entry can describe: `DATA`,
 `POSITION_DELETES`, `EQUALITY_DELETES`, `DATA_MANIFEST` and `DELETE_MANIFEST`.
+
+Planning is a sequence of prunes rather than a directory listing, and each step
+reads metadata rather than data:
+
+```mermaid
+flowchart LR
+  Q["query with<br/>a filter"] --> A["manifest list<br/>skip whole manifests<br/>by partition range"]
+  A --> B["manifests<br/>skip files by<br/>partition value"]
+  B --> C["column bounds<br/>skip files by<br/>min and max"]
+  C --> D["the files<br/>actually scanned"]
+```
 
 ## 2. Getting started
 
@@ -143,6 +171,26 @@ remember. This is the capability that is hardest to retrofit in another format.
 | Equality deletes | column values, for example `trip_id = 'trip-1001'` | Avoids needing positions, but the reader applies the predicate more widely |
 | Deletion vectors | Puffin blobs, format version 3 | A bitmap of deleted rows per data file. Implemented in `DeletionVector.java` and the `puffin` package |
 
+```mermaid
+flowchart TB
+  subgraph CW["copy-on-write: the default for delete, update and merge"]
+    direction LR
+    C1["DELETE one row"] --> C2["read the data file"]
+    C2 --> C3["write a new file<br/>without that row"]
+    C3 --> C4["read = plain Parquet"]
+  end
+
+  subgraph MR["merge-on-read: opt in per operation"]
+    direction LR
+    M1["DELETE one row"] --> M2["write a delete file<br/>or deletion vector"]
+    M2 --> M3["data file untouched"]
+    M3 --> M4["read = data merged<br/>with deletes"]
+    M3 --> M5["rewrite_position_delete_files<br/>later"]
+  end
+
+  CW ~~~ MR
+```
+
 ```sql
 -- All three default to copy-on-write; set them together or not at all
 ALTER TABLE prod.db.trips SET TBLPROPERTIES (
@@ -218,6 +266,16 @@ SELECT count(*) AS delete_files FROM prod.db.trips.delete_files;
 | Write to a branch | `INSERT INTO prod.db.trips.branch_etl_wip SELECT ...` | Stage work without touching the main line |
 | Fast-forward | `CALL prod.system.fast_forward('prod.db.trips', 'main', 'etl-wip')` | Move `main` up to the branch once the work is validated |
 | Retention on a ref | `CREATE TAG 'x' RETAIN 90 DAYS` | Stops snapshot expiry from removing the snapshot the ref points at |
+
+```mermaid
+flowchart LR
+  S1["snapshot 1"] --> S2["snapshot 2"]
+  S2 --> S3["snapshot 3<br/>main"]
+  S2 --> B1["snapshot 4<br/>etl-wip branch"]
+  B1 --> B2["snapshot 5<br/>etl-wip"]
+  S2 --> T1["tag<br/>audit-2026-q3"]
+  B2 -.->|"fast_forward"| S3
+```
 
 Branches are the audit-and-backfill mechanism: stage a risky rewrite on a branch,
 validate it with ordinary queries, then fast-forward `main`. Nothing readers see
@@ -324,7 +382,58 @@ SELECT trip_id, _change_type, _change_ordinal FROM trips_changes ORDER BY _chang
 | `write.metadata.previous-versions-max` | 100 | How many old `metadata.json` files to keep |
 | `history.expire.max-snapshot-age-ms` | 5 days | Default age `expire_snapshots` works from |
 
-## 12. Concurrency
+## 12. Sorting, clustering and file sizing
+
+| Concept | Example | Description |
+|:--|:--|:--|
+| Write sort order | `ALTER TABLE t WRITE ORDERED BY city_id, started_at` | Declares the order writers should produce. Makes column bounds tight, so more files prune |
+| Locally ordered | `WRITE LOCALLY ORDERED BY started_at` | Sorts within each task rather than globally. Cheaper, still helps bounds |
+| Distribution mode | `'write.distribution-mode' = 'hash'` | `none`, `hash` or `range`. Controls the shuffle before a write, which decides file count and skew |
+| Compact | `CALL prod.system.rewrite_data_files(table => 'db.trips')` | Bin-packs small files toward the target size |
+| Compact and sort | `rewrite_data_files` with `strategy => 'sort'` | Re-clusters as it compacts, which is what makes later scans prune |
+| Z-order | `sort_order => 'zorder(city_id, rider_id)'` | Multi-dimensional clustering, for filters on several columns |
+| Target size | `'write.target-file-size-bytes' = '536870912'` | 512 MB default. What both writes and compaction aim for |
+| Partial progress | `'partial-progress.enabled' = 'true'` | Commits compaction in batches, so a long rewrite is not all-or-nothing |
+
+```sql
+-- Declare the order once, and every writer honours it
+ALTER TABLE prod.db.trips WRITE ORDERED BY city_id, started_at;
+
+-- Compact and z-order the last week only, committing progressively
+CALL prod.system.rewrite_data_files(
+  table => 'db.trips',
+  strategy => 'sort',
+  sort_order => 'zorder(city_id, rider_id)',
+  where => 'started_at >= TIMESTAMP \'2026-09-08 00:00:00\'',
+  options => map('partial-progress.enabled', 'true', 'max-concurrent-file-group-rewrites', '4')
+);
+```
+
+Sorting is what makes Iceberg's column bounds worth having. Unsorted data gives
+every file a wide min and max, so bounds prune nothing and every query is a full
+scan regardless of how much metadata you have.
+
+## 13. Diagnosing a table
+
+| Symptom | Where to look | Likely cause |
+|:--|:--|:--|
+| Planning slower than the scan | `SELECT count(*) FROM t.files` | Too many small files, or manifests never rewritten |
+| Storage grows far faster than data | `SELECT count(*) FROM t.snapshots` | Snapshots never expired, so no file is ever reclaimable |
+| Reads get slower on a merge-on-read table | `SELECT count(*) FROM t.delete_files` | Delete files accumulating. Run `rewrite_position_delete_files` |
+| Filters do not prune | `t.files` column bounds, and the query plan | Data is unsorted, so bounds overlap. Declare a write order and compact with sort |
+| One partition dominates runtime | `SELECT * FROM t.partitions ORDER BY file_count DESC` | Skew, or a partition transform whose granularity is wrong |
+| `Cannot commit: stale table metadata` | The catalog type | Writer contention. Expected under optimistic concurrency; check the catalog gives atomic swaps |
+| A deleted row is still visible | `t.snapshots` and retention | Time travel still reaches the snapshot holding it. Expiry has not run |
+| Orphan files after failed jobs | `remove_orphan_files` with a conservative `older_than` | Failed writes leave data behind that no metadata references |
+
+```sql
+-- The three-query triage
+SELECT count(*) AS files, sum(file_size_in_bytes)/1024/1024 AS mb FROM prod.db.trips.files;
+SELECT count(*) AS snapshots, min(committed_at) AS oldest FROM prod.db.trips.snapshots;
+SELECT count(*) AS delete_files FROM prod.db.trips.delete_files;
+```
+
+## 14. Concurrency
 
 | Concept | Example | Description |
 |:--|:--|:--|
