@@ -55,6 +55,40 @@ The 3.5, 4.0 and 4.1 lines are still receiving maintenance releases alongside
 4.2, so "latest" and "the version you should be on" are not always the same
 question. Check which line your platform and connectors support first.
 
+**Why it displaced MapReduce.** MapReduce gave you exactly two steps, map then
+reduce, and wrote to disk between every one of them. A multi-step pipeline became
+a chain of jobs, each paying a full write and read, and an iterative algorithm
+paid that on every pass.
+
+```mermaid
+flowchart TB
+  subgraph MR["MapReduce: disk between every step"]
+    direction LR
+    M1["read HDFS"] --> M2["map"]
+    M2 --> M3["write disk"]
+    M3 --> M4["shuffle + sort"]
+    M4 --> M5["reduce"]
+    M5 --> M6["write HDFS"]
+    M6 --> M7["next job reads<br/>it all back"]
+  end
+
+  subgraph SP["Spark: one DAG, memory between steps"]
+    direction LR
+    S1["read once"] --> S2["map, filter, join<br/>chained in memory"]
+    S2 --> S3["shuffle only where<br/>the DAG needs one"]
+    S3 --> S4["more in-memory steps"]
+    S4 --> S5["write once"]
+  end
+
+  MR ~~~ SP
+```
+
+Two changes did it. Spark keeps intermediate results in memory instead of on
+disk, and it models the whole pipeline as one DAG rather than a fixed pair of
+steps, so it can see across the chain and shuffle only where the data genuinely
+has to move. The DAG is the more durable idea of the two: it is what lets
+Catalyst and adaptive execution reason about the query at all.
+
 The through-line is that each major version moved work from the user to the
 engine. 1.x asked you to write RDD code and tune it by hand. 2.x gave the
 optimizer a schema to work with. 3.x let it re-plan from runtime statistics.
@@ -110,14 +144,95 @@ partitions" is the question behind most tuning.
 
 Transformations are lazy and actions are eager. `filter`, `select`, `join` and
 `withColumn` add to a plan; `count`, `collect`, `show` and `write` execute it.
+
+**Narrow against wide is the distinction that predicts everything else.** A
+narrow transformation needs only the partition in front of it, so it runs in
+place. A wide one needs rows from other partitions, so it forces a shuffle, and a
+shuffle is what ends a stage.
+
+```mermaid
+flowchart TB
+  subgraph NW["narrow: each output partition reads one input partition"]
+    direction LR
+    N1["p1"] --> N1b["p1'"]
+    N2["p2"] --> N2b["p2'"]
+    N3["p3"] --> N3b["p3'"]
+  end
+
+  subgraph WD["wide: each output partition reads many input partitions"]
+    direction LR
+    W1["p1"] --> X1["p1'"]
+    W1 --> X2["p2'"]
+    W2["p2"] --> X1
+    W2 --> X2
+    W3["p3"] --> X1
+    W3 --> X2
+  end
+
+  NW ~~~ WD
+```
+
+| Kind | Operations | What it costs |
+|:--|:--|:--|
+| Narrow | `map`, `filter`, `select`, `withColumn`, `union`, `mapPartitions`, `coalesce` | Nothing beyond the work itself. No network, no stage boundary |
+| Wide | `groupBy`, `reduceByKey`, `join`, `distinct`, `repartition`, `sortBy`, window functions | A shuffle: write to disk, transfer over the network, read back. Ends the stage |
+
+Two consequences worth holding on to. **Counting the wide transformations in your
+job tells you how many stages it will have**, which is the fastest way to predict
+a plan before running it. And a broadcast join is valuable precisely because it
+turns a wide transformation into a narrow one: the small side goes to every
+executor, so no rows have to move.
+
+`coalesce` sits on the narrow side, which is exactly why it can starve upstream
+parallelism: avoiding the shuffle means the reduced partition count propagates
+backwards up the DAG.
 That is why a typo in a `filter` often surfaces at the `write`, several lines
 later.
+
+### Worked example: counting jobs, stages and tasks
+
+Reading the counts off a piece of code is the skill this all builds to. Take
+this, on a table that reads as 8 input partitions:
+
+```python
+from pyspark.sql.functions import col, when
+
+trips = spark.read.parquet("s3a://lakehouse-prod/warehouse/trips")   # 8 partitions
+
+by_city = (trips
+    .filter(col("fare_amount") > 50)                                 # narrow
+    .withColumn("fare_band",
+                when(col("fare_amount") > 100, "high").otherwise("mid"))  # narrow
+    .groupBy("city_id").count())                                     # WIDE: shuffle
+
+by_city.write.parquet("s3a://lakehouse-prod/warehouse/trips_by_city")  # action
+```
+
+| Level | Count | Why |
+|:--|--:|:--|
+| Jobs | 1 | One action, `write`. Actions are what trigger jobs |
+| Stages | 2 | One wide transformation, `groupBy`, so one shuffle boundary |
+| Tasks in stage 1 | 8 | One per input partition. The filter and `withColumn` fuse into the same tasks |
+| Tasks in stage 2 | 200 | One per post-shuffle partition, from `spark.sql.shuffle.partitions`, unless AQE coalesces them |
+
+The rules underneath are short enough to memorise. **Jobs equal actions.**
+**Stages equal wide transformations plus one.** **Tasks equal partitions, per
+stage.** Narrow transformations never add a stage; they fuse into the tasks of
+the stage they sit in, which is also what whole-stage code generation collapses
+into a single generated method.
+
+Watch for two things that break the arithmetic. Some operations hide an extra
+job: `show()` may run one job to peek and another to finish, and any operation
+that needs to sample or infer, such as reading JSON without a schema or a
+`sortBy` computing range boundaries, runs its own job first. And with adaptive
+execution on, the 200 in stage 2 is an upper bound rather than the number you
+will see, because coalescing runs after the shuffle statistics arrive.
 
 ## 3. RDD, DataFrame and Dataset
 
 | API | Example | Description |
 |:--|:--|:--|
-| RDD | `sc.textFile("s3a://.../trips/").map(lambda l: l.split(","))` | A distributed collection of objects with no schema. You control the partitioning and the functions; Catalyst cannot see inside them |
+| RDD | `sc.textFile("s3a://lakehouse-prod/raw/trips/").map(lambda l: l.split(","))` | A distributed collection of objects with no schema. You control the partitioning and the functions; Catalyst cannot see inside them |
 | DataFrame | `spark.read.parquet(path).filter("fare_amount > 50")` | A `Dataset[Row]`: rows with a known schema. The optimizer can reorder, prune and push down. The default choice |
 | Dataset | `ds.filter(t => t.fare > 50)` (Scala, Java) | Typed rows of a case class. Compile-time type safety plus the optimizer, at the cost of some serialisation overhead |
 
@@ -224,6 +339,42 @@ fixed count irrelevant. If you want it, drop `--num-executors`, set
 `spark.dynamicAllocation.minExecutors` and `maxExecutors`, and give it either an
 external shuffle service or `spark.dynamicAllocation.shuffleTracking.enabled`.
 
+**Cluster mode against client mode** decides where the driver runs, and that
+decides more than it sounds like.
+
+```mermaid
+flowchart TB
+  subgraph CL["cluster mode: driver runs inside the cluster"]
+    direction LR
+    C1["spark-submit<br/>from a gateway"] --> C2["cluster manager"]
+    C2 --> C3["driver<br/>in a container"]
+    C3 --> C4["executors"]
+    C1 -.->|"can disconnect"| C3
+  end
+
+  subgraph CI["client mode: driver runs where you submitted"]
+    direction LR
+    I1["spark-submit<br/>driver lives here"] --> I2["cluster manager"]
+    I2 --> I3["executors"]
+    I1 -->|"driver traffic"| I3
+    I1 -.->|"kill this and<br/>the job dies"| I3
+  end
+
+  CL ~~~ CI
+```
+
+| | Cluster mode | Client mode |
+|:--|:--|:--|
+| Driver runs | In a container the cluster manager allocates | In the `spark-submit` process |
+| Submitting machine | Can disconnect once the job is accepted | Must stay up for the whole job |
+| Driver logs | Through the cluster manager or history server | Straight to your terminal |
+| Network | Driver and executors are both inside the cluster | Executors call back out to your machine |
+| Use it for | Production and scheduled jobs | Interactive work, notebooks, `spark-shell` |
+
+The one that bites: an interactive session is client mode, so the driver is on
+the machine you are sitting at. A `collect()` that works in production can
+exhaust the driver heap on your laptop, and closing the laptop kills the job.
+
 On Kubernetes the same roles map onto pods, with the driver pod creating and
 owning the executor pods:
 
@@ -264,6 +415,32 @@ The container your cluster manager sees is `spark.executor.memory` **plus**
 overhead, so a `16g` executor with the default factor asks for about 17.6g. When
 a job is killed for exceeding its container limit and the heap looked fine, the
 overhead is the first thing to check.
+
+**Worked example, `--executor-memory 16g` on the defaults.** The formula is in
+`UnifiedMemoryManager`: subtract the reserved 300 MB, then take
+`spark.memory.fraction` of what is left.
+
+| Step | Arithmetic | Result |
+|:--|:--|--:|
+| Executor heap | `--executor-memory 16g` | 16384 MB |
+| Less reserved system memory | 16384 − 300 | 16084 MB usable |
+| Unified pool | 16084 × 0.6 | **9650 MB** |
+| Storage floor, protected from eviction | 9650 × 0.5 | 4825 MB |
+| User memory, for your own objects | 16084 × 0.4 | 6434 MB |
+| Off-heap overhead | max(384 MB, 16384 × 0.10) | 1638 MB |
+| **What the cluster manager must allocate** | 16384 + 1638 | **18022 MB, about 17.6 GB** |
+
+Three things fall out of that arithmetic. Only about 9.4 GB of a 16 GB executor
+is available for shuffles, joins, sorts and cache **combined**, which is usually
+less than people assume. The container is 10 percent larger than the heap you
+asked for, so a cluster sized to the nearest gigabyte will fail to schedule. And
+with `--executor-cores 4`, those 9650 MB are shared by four concurrent tasks, so
+one task spilling is often a cores-per-executor problem rather than a
+memory-per-executor one.
+
+The minimum is enforced: `spark.executor.memory` below 450 MB is rejected,
+because the reserved 300 MB times 1.5 is the floor `UnifiedMemoryManager`
+requires.
 
 Execution memory (shuffles, joins, sorts) and storage memory (cached blocks)
 share one pool and borrow from each other. Execution can evict cached blocks down
