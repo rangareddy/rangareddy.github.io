@@ -34,10 +34,12 @@ for, which the sentence provides.
 **"`prod.trips.changes` is not an Iceberg metadata table."** (was in
 `Reading only what changed`)
 *Fixed, and it was the most serious defect in the draft.* I invented that table.
-`MetadataTableType` at `apache-iceberg-1.11.0` lists exactly fifteen: `ENTRIES`,
+`MetadataTableType` at `apache-iceberg-1.11.0` lists exactly sixteen: `ENTRIES`,
 `FILES`, `DATA_FILES`, `DELETE_FILES`, `HISTORY`, `METADATA_LOG_ENTRIES`,
 `SNAPSHOTS`, `REFS`, `MANIFESTS`, `PARTITIONS`, `ALL_DATA_FILES`,
-`ALL_DELETE_FILES`, `ALL_FILES`, `ALL_MANIFESTS`, `ALL_ENTRIES`. Change reads go
+`ALL_DELETE_FILES`, `ALL_FILES`, `ALL_MANIFESTS`, `ALL_ENTRIES`,
+`POSITION_DELETES`. (Corrected on 2026-09-15: an earlier revision of this review
+and of the post said fifteen and omitted `POSITION_DELETES`.) Change reads go
 through `create_changelog_view`, whose real parameters (`table`,
 `changelog_view`, `options`, `compute_updates`, `identifier_columns`,
 `net_changes`) and real output columns (`_change_type`, `_change_ordinal`,

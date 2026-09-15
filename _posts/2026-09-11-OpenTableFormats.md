@@ -189,10 +189,12 @@ The two delete kinds are how Iceberg represents row-level deletions without
 rewriting data.
 
 All of this is queryable, which is the fastest way to understand a table you did
-not create. Iceberg exposes `snapshots`, `history`, `files`, `data_files`,
-`delete_files`, `manifests`, `partitions`, `entries`, `refs`,
-`metadata_log_entries` and their `all_` variants. `SELECT * FROM prod.trips.snapshots`
-is usually the first thing worth running.
+not create. `MetadataTableType` at 1.11.0 lists sixteen: `entries`, `files`,
+`data_files`, `delete_files`, `history`, `metadata_log_entries`, `snapshots`,
+`refs`, `manifests`, `partitions`, `position_deletes`, and the `all_` variants
+`all_data_files`, `all_delete_files`, `all_files`, `all_manifests` and
+`all_entries`. `SELECT * FROM prod.trips.snapshots` is usually the first thing
+worth running.
 
 ### Delta Lake
 
