@@ -38,7 +38,41 @@ Software Foundation, used under the
 my own. Where a default changed in Spark 4, it is called out, because those are
 the ones that break a job on upgrade.
 
-## 1. Architecture: the execution model
+## 1. History and major releases
+
+| Year | Milestone |
+|:--|:--|
+| 2009 | Started as a research project in the UC Berkeley AMPLab, built around the RDD paper's idea of reusing data across iterations |
+| 2010 | Open sourced under a BSD licence |
+| 2013 | Donated to the Apache Software Foundation and entered the incubator |
+| 2014 | Became an ASF Top-Level Project, and **1.0.0** released in May |
+| 2016 | **2.0.0** in July: the Dataset API, SparkSession, and Structured Streaming |
+| 2020 | **3.0.0** in June: adaptive query execution and dynamic partition pruning |
+| 2025 | **4.0.0** in May: ANSI mode on by default, the `VARIANT` type, and Spark Connect |
+| 2026 | **4.2.0** in July, the current release |
+
+The 3.5, 4.0 and 4.1 lines are still receiving maintenance releases alongside
+4.2, so "latest" and "the version you should be on" are not always the same
+question. Check which line your platform and connectors support first.
+
+The through-line is that each major version moved work from the user to the
+engine. 1.x asked you to write RDD code and tune it by hand. 2.x gave the
+optimizer a schema to work with. 3.x let it re-plan from runtime statistics.
+4.x turned the remaining silent-correctness footguns into errors.
+
+| Version | What it introduced |
+|:--|:--|
+| 1.x | RDDs, the DataFrame API (1.3), Spark SQL, MLlib, GraphX, Tungsten memory management (1.5) |
+| 2.x | Dataset API and `SparkSession` as the single entry point, Structured Streaming, whole-stage code generation, vectorised Parquet reads |
+| 3.0 | Adaptive query execution, dynamic partition pruning, an improved Catalyst, Kubernetes maturing, accelerator-aware scheduling |
+| 3.1 to 3.5 | Kubernetes GA (3.1), pandas API on Spark (3.2), AQE on by default (3.2), Spark Connect (3.4), error classes and a Python client (3.5) |
+| 4.0 | ANSI mode by default, the `VARIANT` type, collations, Python data sources, a lighter Spark Connect client, structured logging |
+| 4.1 and 4.2 | Continued Spark Connect and declarative pipeline work, plus SQL and streaming refinements |
+
+Only the 4.0 row contains a change likely to break an existing job, and it is
+ANSI mode. The rest are additive.
+
+## 2. Architecture: the execution model
 
 | Concept | Example | Description |
 |:--|:--|:--|
@@ -79,7 +113,81 @@ Transformations are lazy and actions are eager. `filter`, `select`, `join` and
 That is why a typo in a `filter` often surfaces at the `write`, several lines
 later.
 
-## 2. spark-submit
+## 3. RDD, DataFrame and Dataset
+
+| API | Example | Description |
+|:--|:--|:--|
+| RDD | `sc.textFile("s3a://.../trips/").map(lambda l: l.split(","))` | A distributed collection of objects with no schema. You control the partitioning and the functions; Catalyst cannot see inside them |
+| DataFrame | `spark.read.parquet(path).filter("fare_amount > 50")` | A `Dataset[Row]`: rows with a known schema. The optimizer can reorder, prune and push down. The default choice |
+| Dataset | `ds.filter(t => t.fare > 50)` (Scala, Java) | Typed rows of a case class. Compile-time type safety plus the optimizer, at the cost of some serialisation overhead |
+
+| Dimension | RDD | DataFrame | Dataset |
+|:--|:--|:--|:--|
+| Schema | None | Yes, at runtime | Yes, plus compile-time types |
+| Optimized by Catalyst | No | Yes | Yes |
+| Tungsten binary format | No | Yes | Partly: typed lambdas fall back to objects |
+| Type errors caught | Runtime | Runtime for column names | Compile time |
+| Languages | Scala, Java, Python, R | Scala, Java, Python, R | Scala, Java only |
+| Use it for | Unstructured data, custom partitioning, low-level control | Almost everything | Typed domain logic where compile-time safety earns its cost |
+
+In Python, `Dataset` does not exist as a separate API: `DataFrame` is the typed
+and untyped API at once, because Python has no compile-time type checking to
+offer. In Scala, `DataFrame` is literally the alias `Dataset[Row]`.
+
+The practical rule is to stay in DataFrame or SQL. Every time you drop into an
+RDD or a typed lambda, Catalyst loses visibility into what you are doing and can
+no longer reorder, prune or generate code across that step. Reach for an RDD when
+you genuinely need something the structured API cannot express, not by habit.
+
+## 4. RDD operations
+
+Two kinds, and the distinction is the whole execution model: transformations
+build a plan lazily, actions run it.
+
+| Transformation | Example | Description |
+|:--|:--|:--|
+| `map(func)` | `rdd.map(lambda x: x * 2)` | One output element per input element |
+| `filter(func)` | `rdd.filter(lambda x: x > 10)` | Keeps elements where `func` returns true |
+| `flatMap(func)` | `rdd.flatMap(lambda l: l.split(" "))` | Zero or more output items per input item |
+| `mapPartitions(func)` | `rdd.mapPartitions(batch_fn)` | Runs once per partition. Use it to amortise a per-partition setup such as a database connection |
+| `mapPartitionsWithIndex(func)` | `rdd.mapPartitionsWithIndex(fn)` | The same, with the partition index |
+| `sample(withReplacement, fraction, seed)` | `rdd.sample(False, 0.1, 42)` | A random fraction |
+| `union(other)` | `a.union(b)` | All elements of both. No shuffle |
+| `intersection(other)` | `a.intersection(b)` | Elements in both. Shuffles |
+| `distinct([numPartitions])` | `rdd.distinct()` | Deduplicates. Shuffles |
+| `groupByKey([numPartitions])` | `pairs.groupByKey()` | `(K, Iterable<V>)`. Shuffles everything, so prefer a reducing variant |
+| `reduceByKey(func)` | `pairs.reduceByKey(add)` | Combines per key, on the map side first. Much cheaper than `groupByKey` |
+| `aggregateByKey(zero)(seqOp, combOp)` | | Like `reduceByKey` but the result type can differ from the value type |
+| `sortByKey([ascending])` | `pairs.sortByKey()` | Sorts by key. Shuffles |
+| `join(other)` | `a.join(b)` | `(K, (V, W))` for keys present in both |
+| `cogroup(other)` | `a.cogroup(b)` | `(K, (Iterable<V>, Iterable<W>))`. The primitive the joins are built on |
+| `cartesian(other)` | `a.cartesian(b)` | Every pair. Quadratic, so treat with suspicion |
+| `pipe(command)` | `rdd.pipe("my_script.sh")` | Streams each partition through an external process |
+| `coalesce(n)` | `rdd.coalesce(10)` | Fewer partitions without a full shuffle |
+| `repartition(n)` | `rdd.repartition(200)` | Any partition count, with a full shuffle |
+| `repartitionAndSortWithinPartitions(p)` | | Repartition and sort in one pass. Cheaper than doing both separately |
+
+| Action | Example | Description |
+|:--|:--|:--|
+| `reduce(func)` | `rdd.reduce(add)` | Aggregates to a single value with a commutative, associative function |
+| `collect()` | `rdd.collect()` | Brings everything to the driver. The classic driver OOM |
+| `count()` | `rdd.count()` | Number of elements |
+| `first()` | `rdd.first()` | The first element |
+| `take(n)` | `rdd.take(10)` | The first n elements |
+| `takeSample(withReplacement, num)` | `rdd.takeSample(False, 100)` | A random sample, to the driver |
+| `takeOrdered(n, [ordering])` | `rdd.takeOrdered(10)` | The smallest n, by natural or custom order |
+| `saveAsTextFile(path)` | `rdd.saveAsTextFile(path)` | One file per partition |
+| `saveAsSequenceFile(path)` | | Hadoop SequenceFile. Java and Scala |
+| `saveAsObjectFile(path)` | | Java serialisation. Java and Scala |
+| `countByKey()` | `pairs.countByKey()` | A map of key to count, to the driver |
+| `foreach(func)` | `rdd.foreach(send)` | Runs a function for its side effects. Use `foreachPartition` to amortise setup |
+
+Two habits worth forming. Prefer `reduceByKey` over `groupByKey`, because it
+combines on the map side and shuffles far less. And treat every action that
+returns data to the driver (`collect`, `take`, `countByKey`) as a driver memory
+question, not a cluster one.
+
+## 5. spark-submit
 
 ```bash
 spark-submit \
@@ -122,7 +230,7 @@ owning the executor pods:
 > Anything Spark-facing must come before the jar, which is the most common
 > `spark-submit` mistake.
 
-## 3. Memory model
+## 6. Memory model
 
 | Concept | Config | Default | Description |
 |:--|:--|:--|:--|
@@ -157,7 +265,7 @@ share one pool and borrow from each other. Execution can evict cached blocks dow
 to the storage floor; storage can never evict execution. That is why caching a
 large DataFrame can quietly make a shuffle-heavy stage spill.
 
-## 4. Reading and writing
+## 7. Reading and writing
 
 | Operation | Example | Description |
 |:--|:--|:--|
@@ -189,7 +297,55 @@ trips = (spark.read.format("jdbc")
 > the ones in your DataFrame. Set it to `dynamic` for partition-scoped
 > overwrites.
 
-## 5. Joins
+## 8. The Catalyst optimizer
+
+Catalyst is why a DataFrame beats hand-written RDD code: you declare what you
+want and it decides how. Every query passes through four phases, each defined as
+rules over a tree.
+
+```mermaid
+flowchart LR
+  SQL["SQL or<br/>DataFrame code"] --> UL["unresolved<br/>logical plan"]
+  UL -->|"Analyzer<br/>catalog lookup"| AL["analyzed<br/>logical plan"]
+  AL -->|"Optimizer<br/>rule-based"| OL["optimized<br/>logical plan"]
+  OL -->|"SparkPlanner<br/>strategies"| PP["physical plans<br/>candidates"]
+  PP -->|"cost model"| SP["selected<br/>physical plan"]
+  SP -->|"WholeStageCodegen"| RDD["RDDs of<br/>generated Java"]
+```
+
+| Phase | Class | What it does |
+|:--|:--|:--|
+| Analysis | `Analyzer` | Resolves column and table names against the catalog, assigns types, and fails on anything unresolvable |
+| Logical optimization | `Optimizer` | Rule-based rewrites on the resolved tree: predicate pushdown, column pruning, constant folding, boolean simplification, limit pushdown |
+| Physical planning | `SparkPlanner` | Turns each logical operator into one or more physical candidates, such as picking a join strategy, then selects between them |
+| Code generation | `WholeStageCodegenExec` | Collapses a chain of operators into a single generated Java method, removing virtual calls and intermediate rows |
+
+| Concept | Example | Description |
+|:--|:--|:--|
+| Rule executor | `RuleExecutor` | Applies rule batches to fixed point or a set number of iterations. Every phase above is built on it |
+| Predicate pushdown | filter moved below a join or into the scan | The highest-value rewrite. Check it happened rather than assume it |
+| Column pruning | only the projected columns read | Why `SELECT *` on a wide Parquet table costs so much more than naming columns |
+| Constant folding | `WHERE 1 = 1` removed | Evaluates at plan time |
+| Cost-based optimization | `spark.sql.cbo.enabled`, default `false` | Uses table statistics to reorder joins. Needs `ANALYZE TABLE ... COMPUTE STATISTICS` first |
+| Adaptive re-planning | `AdaptiveSparkPlanExec` | Re-runs parts of planning mid-query using real statistics. The subject of the AQE section below |
+| Inspect the result | `df.explain("formatted")` | `formatted`, `extended`, `cost` or `codegen`. `extended` prints all four phases |
+
+```sql
+-- See every phase for a query, which is the fastest way to learn what Catalyst did
+EXPLAIN EXTENDED
+SELECT c.city_name, count(*)
+FROM trips t JOIN cities c ON t.city_id = c.city_id
+WHERE t.fare_amount > 50
+GROUP BY c.city_name;
+```
+
+The reason this matters in practice: Catalyst can only optimise what it can see.
+A SQL expression or a DataFrame column expression is a tree it can rewrite. A
+Python UDF or an RDD lambda is an opaque function it must call as-is, which
+blocks pushdown across that point. That is the real cost of a UDF, and it is
+usually larger than the cost of the function itself.
+
+## 9. Joins
 
 | Strategy | Hint | Description |
 |:--|:--|:--|
@@ -214,7 +370,7 @@ FROM trips t JOIN cities c ON t.city_id = c.city_id;
 The join that hurts is the one where both sides are large and the key is skewed.
 AQE handles the common case automatically; see the skew settings below.
 
-## 6. Shuffle and partitioning
+## 10. Shuffle and partitioning
 
 | Operation | Example | Description |
 |:--|:--|:--|
@@ -230,7 +386,7 @@ does not give you 1000-way parallelism then one file. Because `coalesce` avoids
 the shuffle, it pushes the narrow partition count up the DAG, and the upstream
 work runs with one task. Use `repartition(1)` when you genuinely want the shuffle.
 
-## 7. Adaptive query execution
+## 11. Adaptive query execution
 
 AQE re-optimises the plan mid-flight using statistics from completed stages,
 which is why it beats anything you can set by hand ahead of time.
@@ -264,22 +420,49 @@ larger than 5 times the median **and** larger than 256 MB. On a job whose
 partitions are all under 256 MB, skew handling never fires no matter how uneven
 they are, which is the usual reason "AQE skew join is on but nothing happened".
 
-## 8. Caching
+## 12. Caching and persistence
 
-| Level | Example | Description |
+| Storage level | Available in | Description |
 |:--|:--|:--|
-| `MEMORY_AND_DISK` | `df.cache()` | The default for DataFrames. Spills to disk rather than recomputing |
-| `MEMORY_ONLY` | `df.persist(StorageLevel.MEMORY_ONLY)` | Recomputes anything that does not fit. The RDD default |
-| `MEMORY_AND_DISK_SER` | `persist(StorageLevel.MEMORY_AND_DISK_SER)` | Serialised: smaller, more CPU |
-| `DISK_ONLY` | `persist(StorageLevel.DISK_ONLY)` | For expensive-to-recompute data too big for memory |
+| `MEMORY_ONLY` | all | Deserialized objects in the JVM. Partitions that do not fit are **recomputed** on each use. The default for `rdd.cache()` |
+| `MEMORY_AND_DISK` | all | Deserialized in memory; partitions that do not fit spill to disk and are read back. The default for `df.cache()` |
+| `MEMORY_ONLY_SER` | Java, Scala | Serialized, one byte array per partition. More space-efficient, more CPU to read |
+| `MEMORY_AND_DISK_SER` | Java, Scala | Like `MEMORY_ONLY_SER`, but spills to disk instead of recomputing |
+| `DISK_ONLY` | all | Partitions on disk only |
+| `MEMORY_ONLY_2`, `MEMORY_AND_DISK_2`, `DISK_ONLY_2` | all | The same levels, replicated on two nodes. Rebuild from the replica instead of recomputing when a node is lost |
+| `DISK_ONLY_3` | all | Disk, replicated three ways |
+| `OFF_HEAP` | experimental | Like `MEMORY_ONLY_SER` but in off-heap memory, which must be enabled first |
+
+> **Note:** In Python, objects are always serialized with Pickle, so the `_SER`
+> levels do not exist as a separate choice. The levels available from PySpark are
+> `MEMORY_ONLY`, `MEMORY_ONLY_2`, `MEMORY_AND_DISK`, `MEMORY_AND_DISK_2`,
+> `DISK_ONLY`, `DISK_ONLY_2` and `DISK_ONLY_3`.
+
+The two defaults differ and it catches people: `rdd.cache()` is `MEMORY_ONLY`,
+so anything that does not fit is silently recomputed every time. `df.cache()` is
+`MEMORY_AND_DISK`, so it spills instead. If an RDD cache seems to do nothing,
+that asymmetry is usually why.
+
+| Operation | Example | Description |
+|:--|:--|:--|
+| Cache at the default level | `df.cache()` | Shorthand for `persist()` at the API's default level |
+| Choose a level | `df.persist(StorageLevel.DISK_ONLY)` | `from pyspark import StorageLevel` |
 | Release it | `df.unpersist()` | Cached blocks compete with execution memory. Free them when the branch is done |
-| Checkpoint | `df.checkpoint()` | Writes to reliable storage and truncates the lineage. For very long or iterative plans |
+| Truncate lineage | `df.checkpoint()` | Writes to reliable storage and drops the lineage. For very long or iterative plans |
+| Lightweight variant | `df.localCheckpoint()` | Truncates lineage using executor storage. Faster, but lost if an executor is lost |
+| Inspect what is cached | Spark UI, Storage tab | Shows each cached dataset, its level, and the fraction actually in memory |
+
+The documentation's own selection order is worth following: stay on the default
+if the data fits; move to a serialized level to save space before you move to
+disk; and only spill to disk when recomputing would be more expensive than
+reading it back, which is the case when the computation was expensive or filtered
+a lot of data away.
 
 Cache when a DataFrame is used more than once **and** producing it was expensive.
 Caching something read once makes the job slower, because you pay the write and
 give up memory that execution wanted.
 
-## 9. Spark SQL and ANSI mode
+## 13. Spark SQL and ANSI mode
 
 The biggest behavioural change in the Spark 4 line is ANSI mode.
 `spark.sql.ansi.enabled` now defaults to true, and the default is computed as
@@ -306,7 +489,7 @@ usually pointing at data that was silently becoming `NULL` before. Reach for
 `try_cast` and `try_divide` at the specific expression before turning the flag
 off everywhere.
 
-## 10. Structured Streaming
+## 14. Structured Streaming
 
 The model to hold in your head is that a stream is an unbounded table, with each
 arriving batch appended as new rows:
@@ -370,7 +553,7 @@ Without a watermark, a streaming aggregation keeps state forever and the job
 degrades over days rather than failing outright. The watermark is what lets Spark
 drop state it will never need again.
 
-## 11. Useful functions and patterns
+## 15. Useful functions and patterns
 
 | Pattern | Example | Description |
 |:--|:--|:--|
@@ -397,7 +580,7 @@ latest = (trips
     .drop("rn"))
 ```
 
-## 12. Diagnosing a slow job
+## 16. Diagnosing a slow job
 
 | Symptom | Where to look | Likely cause |
 |:--|:--|:--|
@@ -434,19 +617,29 @@ The Spark UI SQL tab is the most useful page and the least used. It shows the
 physical plan with row counts per node, which answers "did my filter push down"
 and "which side got broadcast" directly, rather than by inference.
 
-## 13. What changed in Spark 4
+## 17. Upgrading to Spark 4
 
-| Change | Description |
-|:--|:--|
-| ANSI mode on by default | `spark.sql.ansi.enabled` is now true. Silent nulls become runtime errors. The single most likely upgrade break |
-| `VARIANT` type | Semi-structured data as a first-class type, without parsing JSON on every read |
-| Spark Connect matured | A thin client protocol, so the driver no longer has to run in your application process |
-| Python data sources | Custom sources and sinks in pure Python, without writing Scala |
-| Collations | String comparison and sorting rules per column, including case-insensitive |
+Section 1 lists what arrived. This is what breaks, which is a shorter and more
+useful list.
 
-When upgrading from the 3.x line, test with `spark.sql.ansi.enabled=true` under
-your old runtime first. That isolates ANSI failures from everything else in the
-upgrade and turns one large change into two small ones.
+| What breaks | Why | What to do |
+|:--|:--|:--|
+| Queries that relied on silent nulls | ANSI mode turns a bad cast, an overflow and a divide by zero into runtime errors | Fix the expression with `try_cast` or `try_divide`, rather than disabling ANSI globally |
+| `INSERT` with a lossy implicit coercion | `spark.sql.storeAssignmentPolicy` is `ANSI`, so the coercion is rejected at analysis time | Cast explicitly in the `SELECT` |
+| Scala 2.12 builds | Spark 4 is Scala 2.13 only | Rebuild against 2.13; check every third-party jar has a 2.13 artifact |
+| Java 8 and 11 runtimes | Spark 4 requires Java 17 or later | Move the cluster runtime before the Spark version |
+| Pinned connector jars | Format bundles are built per Spark line | Take the bundle built for 4.x, for example a `hudi-spark4.x-bundle` |
+
+```sql
+-- The one-line rehearsal: run your suite on the OLD runtime with ANSI on.
+-- Every failure here is a Spark 4 failure you can fix before upgrading.
+SET spark.sql.ansi.enabled = true;
+```
+
+Doing that first splits the upgrade in two. ANSI failures are data and expression
+problems you can fix on the version you already run; everything else is runtime
+and dependency work. Meeting both at once is what makes a Spark 4 upgrade feel
+hard.
 
 ## Conclusion
 
