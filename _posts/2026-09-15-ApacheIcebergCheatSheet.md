@@ -29,7 +29,11 @@ one or two sentences that tell you whether you want it.
 
 Written against the **latest Iceberg release, 1.11.0 as of now**, on Spark. Every
 property, default, enum value and procedure name below was read from the
-`apache-iceberg-1.11.0` tag rather than recalled. Where a claim is specific to a
+`apache-iceberg-1.11.0` tag rather than recalled. Diagrams captioned *Source: Apache
+Iceberg documentation* come from the project's own site assets, &copy; The Apache
+Software Foundation, used under the
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0); the rest are
+my own. Where a claim is specific to a
 version, the version is named.
 
 ## 1. Core architecture
@@ -59,6 +63,17 @@ flowchart LR
 A commit writes a new `metadata.json` and swaps the catalog pointer. Nothing
 already written is mutated, which is what makes an old snapshot readable for as
 long as retention keeps it.
+
+The specification's own view of the same structure, showing how successive
+snapshots share manifests rather than duplicating them:
+
+![Iceberg metadata layout: metadata files point to manifest lists, which point to manifests, which point to data files, with successive snapshots sharing manifests](/assets/images/iceberg-cheat-sheet/iceberg-metadata.png)
+
+*Source: Apache Iceberg documentation.*
+
+Sharing is the part worth noticing. A commit that adds one file writes a new
+manifest and a new manifest list, but reuses every manifest that did not change,
+which is why snapshot history costs metadata rather than data.
 
 ```
 s3a://lakehouse-prod/warehouse/trips/

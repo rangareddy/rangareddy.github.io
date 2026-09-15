@@ -31,7 +31,11 @@ that tells you whether you want it.
 
 Written against the **latest Spark release, 4.2.0 as of now**. Every config key,
 default and since-version below was read from the `v4.2.0` tag rather than
-recalled. Where a default changed in Spark 4, it is called out, because those are
+recalled. Diagrams captioned *Source: Apache Spark documentation* come
+from `docs/img` in the Apache Spark source tree at that tag, &copy; The Apache
+Software Foundation, used under the
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0); the rest are
+my own. Where a default changed in Spark 4, it is called out, because those are
 the ones that break a job on upgrade.
 
 ## 1. Architecture: the execution model
@@ -47,18 +51,9 @@ the ones that break a job on upgrade.
 | Shuffle | `groupBy`, `join`, `repartition` | Redistributes data across executors over the network. The expensive thing you are usually tuning around |
 | Slot | `spark.executor.cores` per executor | How many tasks one executor runs at once. Total parallelism is executors times cores |
 
-```mermaid
-flowchart LR
-  D["driver<br/>SparkSession, DAG, scheduler"] --> CM["cluster manager<br/>YARN, Kubernetes, standalone"]
-  CM --> E1["executor 1<br/>slots + block manager"]
-  CM --> E2["executor 2"]
-  CM --> E3["executor 3"]
-  E1 -.->|"shuffle blocks"| E2
-  E2 -.->|"shuffle blocks"| E3
-  E1 --> D
-  E2 --> D
-  E3 --> D
-```
+![The Spark driver holds the SparkContext, talks to the cluster manager, and schedules tasks onto executors that each hold a cache](/assets/images/spark-cheat-sheet/cluster-overview.png)
+
+*Source: Apache Spark documentation.*
 
 ```mermaid
 flowchart LR
@@ -115,6 +110,13 @@ spark-submit \
 | `--packages` | `org.apache.hudi:hudi-spark3.5-bundle_2.12:1.2.0` | Maven coordinates, resolved at submit time |
 | `--files` | `/etc/app/log4j2.properties` | Files shipped to every working directory |
 | `--conf` | `spark.sql.shuffle.partitions=400` | Any Spark property. Repeatable |
+
+On Kubernetes the same roles map onto pods, with the driver pod creating and
+owning the executor pods:
+
+![On Kubernetes the driver runs in its own pod and requests executor pods from the API server](/assets/images/spark-cheat-sheet/k8s-cluster-mode.png)
+
+*Source: Apache Spark documentation.*
 
 > **Note:** Arguments after the application jar go to your `main`, not to Spark.
 > Anything Spark-facing must come before the jar, which is the most common
@@ -306,6 +308,20 @@ off everywhere.
 
 ## 10. Structured Streaming
 
+The model to hold in your head is that a stream is an unbounded table, with each
+arriving batch appended as new rows:
+
+![A data stream treated as an unbounded input table, with new data appended as rows](/assets/images/spark-cheat-sheet/structured-streaming-stream-as-a-table.png)
+
+*Source: Apache Spark documentation.*
+
+A query over that table produces a result table, recomputed incrementally each
+trigger, and the output mode decides which of its rows get written out:
+
+![Each trigger appends to the input table, updates the result table, and emits rows according to the output mode](/assets/images/spark-cheat-sheet/structured-streaming-model.png)
+
+*Source: Apache Spark documentation.*
+
 | Concept | Example | Description |
 |:--|:--|:--|
 | Source | `spark.readStream.format("kafka")` | Kafka, files, rate, socket. Same DataFrame API as batch |
@@ -335,6 +351,20 @@ off everywhere.
     .outputMode("append")
     .start())
 ```
+
+Event-time windows come in three shapes, and the choice changes how many windows
+a single record lands in:
+
+![Tumbling windows do not overlap, sliding windows do, and session windows are defined by gaps in activity](/assets/images/spark-cheat-sheet/structured-streaming-time-window-types.jpg)
+
+*Source: Apache Spark documentation.*
+
+The watermark is what lets Spark finalise a window and drop its state. Anything
+arriving behind the watermark is too late to be counted:
+
+![The watermark trails the maximum observed event time, finalising windows and dropping state behind it](/assets/images/spark-cheat-sheet/structured-streaming-watermark-append-mode.png)
+
+*Source: Apache Spark documentation.*
 
 Without a watermark, a streaming aggregation keeps state forever and the job
 degrades over days rather than failing outright. The watermark is what lets Spark
@@ -379,6 +409,26 @@ latest = (trips
 | Stage retries repeatedly | Stage page, failure reason | Executor loss, often overhead or a shuffle fetch failure |
 | Planning slower than execution | SQL tab, plan time | Too many files or partitions. Compact, or prune harder |
 | Reads scan everything | SQL tab, physical plan | Predicate not pushed down. Check the filter is on a partition or statistics column |
+
+The stages page is where skew and spill show up, because it gives you the task
+duration percentiles rather than just an average:
+
+![The Spark UI stages page, listing each stage with its task counts, durations, shuffle read and write, and spill](/assets/images/spark-cheat-sheet/AllStagesPage.png)
+
+*Source: Apache Spark documentation.*
+
+And the SQL tab lists each query with its duration and plan:
+
+![The Spark UI SQL tab, listing completed queries with their durations and associated jobs](/assets/images/spark-cheat-sheet/webui-sql-tab.png)
+
+*Source: Apache Spark documentation.*
+
+Opening one gives you the physical plan annotated with row counts per node, which
+answers "did my filter push down" and "which side got broadcast" directly:
+
+![A Spark SQL query DAG showing each physical operator annotated with row counts and timings](/assets/images/spark-cheat-sheet/webui-sql-dag.png)
+
+*Source: Apache Spark documentation.*
 
 The Spark UI SQL tab is the most useful page and the least used. It shows the
 physical plan with row counts per node, which answers "did my filter push down"
