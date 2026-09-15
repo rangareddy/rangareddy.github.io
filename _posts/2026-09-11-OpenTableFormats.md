@@ -9,8 +9,8 @@ description: >-
   All three formats give you ACID commits, time travel and schema evolution, so
   a feature checklist will not tell you which to pick. What separates them is how
   each one tracks table state, how each one applies a row-level update, and what
-  each one asks you to operate. This guide takes all three to source level
-  against Iceberg 1.11.0, Hudi 1.2.0 and Delta Lake 4.4.0.
+  each one asks you to operate. Taken to source level against Iceberg 1.11.0,
+  Hudi 1.2.0 and Delta Lake 4.4.0.
 ---
 
 * content
@@ -18,60 +18,71 @@ description: >-
 
 > **TL;DR**
 >
-> * All three formats solve the same original problem: a directory of Parquet on object storage has no atomic commit, no row-level update and no cheap way to know which files are live. Each adds a metadata layer that answers "which files make up the table right now".
-> * The real difference is the shape of that metadata. Iceberg keeps a tree of immutable snapshots behind one atomic pointer, Delta keeps an ordered log of JSON commits with periodic Parquet checkpoints, and Hudi keeps a timeline of instants plus a record-level index that maps a key to a file group.
-> * That shape decides everything downstream: Hudi's index makes it the natural fit for high-frequency upserts by primary key, while Iceberg's and Delta's per-commit file lists make them a natural fit for large snapshot-oriented writes.
+> * All three solve the same original problem: a directory of Parquet on object storage has no atomic commit, no row-level update and no cheap way to know which files are live. Each adds a metadata layer that answers "which files make up the table right now".
+> * The real difference is the shape of that metadata. Iceberg keeps a tree of immutable snapshots behind one atomic pointer, Delta an ordered log of JSON commits with periodic Parquet checkpoints, and Hudi a timeline of instants plus an index mapping a record key to a file group.
+> * That shape decides everything downstream. Hudi's index makes it the natural fit for high-frequency upserts by primary key; Iceberg's and Delta's per-commit file lists make them the natural fit for large snapshot-oriented writes.
 > * Copy-on-write versus merge-on-read is a choice in all three, not a property of one. Iceberg 1.11.0 defaults `write.delete.mode`, `write.update.mode` and `write.merge.mode` to `copy-on-write`, Delta needs `delta.enableDeletionVectors`, and Hudi asks at table creation.
 > * You can defer the decision. Apache XTable converts metadata between all three over one copy of the Parquet, so the choice of writer no longer dictates the choice of reader.
 
-## Why these formats exist at all
+Every comparison of these three formats hands you the same table. ACID commits:
+yes, yes, yes. Time travel: yes, yes, yes. Schema evolution: yes, yes, yes.
+Every row ticks three times, and you finish the article knowing roughly as much
+as when you started.
+
+That checklist is not wrong. It is just describing the part where the formats
+converged. They all started from the same broken thing and they all fixed it.
+What none of those tables tell you is the part where they did not converge: the
+shape each one chose for its metadata, which is decided once, early, and then
+quietly determines how expensive your updates are, how your writes behave when
+two of them collide, and how much maintenance you inherit.
+
+So this post skips the checklist. One question separates the three, and once you
+can answer it for each format, most of the rest follows.
+
+Written against the latest release of each on Spark, which as of now means
+**Iceberg 1.11.0**, **Hudi 1.2.0** and **Delta Lake 4.4.0**. Versions are named
+throughout rather than assumed, because several of the defaults below are exactly
+the kind of thing that moves between releases. Every version claim, config
+key, default and on-disk path below was read from those release tags. By the end
+you should be able to look at a table directory and name the format that wrote
+it, explain what each one does when you update a single row, and choose from the
+shape of your own workload.
+
+## Why do these formats exist at all?
 
 The architecture they replaced was a directory of Parquet files on object storage
-with a Hive Metastore partition list on top. It works until you need any of five
-things, and then it stops working in a specific, recognisable way.
+with a Hive Metastore partition list on top. It works until you need one of five
+things.
 
 **There is no atomic commit.** A job that writes 400 files and fails at file 250
 leaves 250 files that queries can already see. The usual defence is writing to a
 staging path and renaming, which on S3 is a copy rather than a rename, and is not
 atomic across many files.
 
-**There is no row-level update.** Correcting one row means rewriting the partition
-that contains it. A GDPR erasure request for one customer becomes a rewrite of
-every partition that customer appears in.
+**There is no row-level update.** Correcting one row means rewriting the
+partition that contains it. An erasure request for one customer becomes a rewrite
+of every partition that customer appears in.
 
 **Listing is the query.** To plan a scan the engine lists directories. At a few
 hundred partitions this is invisible. At a hundred thousand it is most of your
 planning time, and on object storage each `LIST` is a paginated API call.
 
 **Readers see torn state.** Without a commit protocol, a reader that starts while
-a writer is mid-flight sees some new files and some old ones. There is no way to
-ask for "the table as of ten minutes ago".
+a writer is mid-flight sees some new files and some old ones, and there is no way
+to ask for the table as it stood ten minutes ago.
 
 **Schema changes are a convention, not a contract.** Renaming a column in the
-metastore does not rename it in the files. Positional column matching means
+metastore does not rename it in the files, and positional column matching means
 adding a column in the middle silently shifts every value to the right.
 
-All three formats answer the same way: stop asking the filesystem what the table
+All three answer the same way: stop asking the filesystem what the table
 contains, and keep an authoritative record instead. Every difference between them
 follows from the shape they chose for that record.
 
-This guide is written against **Iceberg 1.11.0**, **Hudi 1.2.0** and **Delta Lake
-4.4.0**, the current releases at the time of writing, on Spark. Every version
-claim, config key, default and on-disk path below was read from those release
-tags while writing.
+## Which files make up this table right now?
 
-Prerequisites: comfort with Spark and SQL. No internals knowledge of any of the
-three is assumed, and every format-specific term is defined on first use.
-
-By the end you should be able to do three things: look at a table directory and
-name the format that wrote it, explain what each one does when you update a
-single row, and choose between them from the shape of your own workload rather
-than from a feature checklist.
-
-## The question that separates them
-
-Ask each format "which files make up this table right now?" and you get three
-structurally different answers.
+That is the question. Ask it of each format and you get three structurally
+different answers.
 
 ```mermaid
 flowchart TB
@@ -113,11 +124,11 @@ partition values and column statistics. A commit writes a new `metadata.json` an
 atomically swaps the catalog pointer. Nothing is ever mutated, so an old snapshot
 stays readable as long as it is retained.
 
-**Delta answers with a log.** The table's history is an ordered sequence of
-numbered JSON files in `_delta_log`, each recording `add` and `remove` actions.
-The live file set is the result of replaying that log. Because replaying 200,000
-commits would be slow, Delta periodically writes a checkpoint: a Parquet file
-holding the complete state at one version, so readers replay only from there.
+**Delta answers with a log.** The history is an ordered sequence of numbered JSON
+files in `_delta_log`, each recording `add` and `remove` actions, and the live
+file set is the result of replaying them. Because replaying 200,000 commits would
+be slow, Delta periodically writes a checkpoint: a Parquet file holding complete
+state at one version, so readers replay only from there.
 
 **Hudi answers with a timeline plus an index.** The timeline is a directory of
 instants, each an action with a state. Data is organised into file groups, and a
@@ -135,19 +146,21 @@ record without scanning.
 | Key to file lookup | Not available | Not available | Index, several types |
 | Scales planning by | Manifest pruning | Checkpoint frequency | Metadata table |
 
-The row that matters most is **record identity**. Iceberg and Delta describe a
-table as a set of files; neither has a notion of "the row with this primary key".
-Hudi requires a record key at table creation and maintains an index over it. That
-single design decision is why Hudi is the natural fit for a change-data-capture
+One row in that table carries more weight than the rest, and it is **record
+identity**. Iceberg and Delta describe a table as a set of files; neither has a
+notion of "the row with this primary key". Hudi requires a record key at table
+creation and maintains an index over it.
+
+That single decision is why Hudi is the natural fit for a change-data-capture
 (CDC) stream keyed by primary key, where each message is an insert, update or
 delete of one known row, and why Iceberg and Delta are the natural fit for
-snapshot-oriented batch writes. Everything else is detail on top.
+snapshot-oriented batch writes. Everything below is detail on top of it.
 
-## Architecture: what each one puts on disk
+## Architecture: what does each one put on disk?
 
-Recognising a table format from its directory listing is a genuinely useful
-skill, so here is what each one actually writes. One table in all three cases: a
-`trips` table of ride events, partitioned by city.
+Recognising a format from its directory listing is a genuinely useful skill, so
+here is what each one writes. Same table throughout: `trips`, ride events
+partitioned by city.
 
 ### Iceberg
 
@@ -170,21 +183,20 @@ from the manifests, which is what makes partition evolution possible. And nothin
 in the table itself says which `metadata.json` is current. That is the catalog's
 job, which is why Iceberg without a catalog is only half a table.
 
-`FileContent` in Iceberg 1.11.0 enumerates what a manifest entry can describe:
-`DATA`, `POSITION_DELETES`, `EQUALITY_DELETES`, `DATA_MANIFEST` and
-`DELETE_MANIFEST`. The two delete kinds are how Iceberg represents row-level
-deletions without rewriting data, covered below.
+`FileContent` in 1.11.0 enumerates what a manifest entry can describe: `DATA`,
+`POSITION_DELETES`, `EQUALITY_DELETES`, `DATA_MANIFEST` and `DELETE_MANIFEST`.
+The two delete kinds are how Iceberg represents row-level deletions without
+rewriting data.
 
-All of this is queryable. Iceberg exposes the metadata as tables you can select
-from, which is the fastest way to understand a table you did not create:
-`snapshots`, `history`, `files`, `data_files`, `delete_files`, `manifests`,
-`partitions`, `entries`, `refs`, `metadata_log_entries` and their `all_` variants.
-`SELECT * FROM prod.trips.snapshots` is usually the first thing worth running.
+All of this is queryable, which is the fastest way to understand a table you did
+not create. Iceberg exposes `snapshots`, `history`, `files`, `data_files`,
+`delete_files`, `manifests`, `partitions`, `entries`, `refs`,
+`metadata_log_entries` and their `all_` variants. `SELECT * FROM prod.trips.snapshots`
+is usually the first thing worth running.
 
 ### Delta Lake
 
-Delta's own protocol specification gives this layout, and the filenames are
-exact:
+Delta's protocol specification gives this layout, and the filenames are exact:
 
 ```
 s3a://lakehouse-prod/warehouse/trips/
@@ -205,11 +217,11 @@ The version number is zero-padded to 20 digits, which is what makes a plain
 lexicographic `LIST` return commits in version order. `_last_checkpoint` is a
 small pointer file so a reader does not have to list the whole log to find the
 newest checkpoint. `_change_data` holds change-data-feed files, and
-`deletion_vector-*.bin` files hold the bitmaps of logically deleted rows.
+`deletion_vector-*.bin` files hold bitmaps of logically deleted rows.
 
-Note the commit protocol's consequence: commit `N+1` is the file
+The commit protocol follows directly from the naming: commit `N+1` is the file
 `...0000N+1.json`, and the writer that successfully creates that exact filename
-wins. On a store with atomic put-if-absent this is a clean mutual exclusion. On
+wins. On a store with atomic put-if-absent that is clean mutual exclusion. On
 plain S3 it historically was not, which is why Delta on S3 with multiple writers
 needs a commit coordinator.
 
@@ -238,22 +250,22 @@ s3a://lakehouse-prod/warehouse/trips/
     └── .8f3a1c92-...-0_20260911093000123.log.1_0-24-1893     <- log file
 ```
 
-An instant moves through three states, and the filename changes with it:
-`.requested`, then `.inflight`, then the completed form. A filter written against
-`.deltacommit` will not match a pending write, which is deliberate: readers only
-ever see completed instants.
+An instant moves through three states and the filename changes with it:
+`.requested`, `.inflight`, then the completed form. A filter written against
+`.deltacommit` will not match a pending write, which is deliberate, because
+readers only ever see completed instants.
 
 Hudi 1.2.0's timeline has twelve action types, and knowing them saves time when
 reading a real table: `commit`, `deltacommit`, `clean`, `rollback`, `savepoint`,
 `replacecommit`, `clustering`, `compaction`, `logcompaction`, `restore`,
 `indexing` and `schemacommit`.
 
-The `.hoodie/metadata` directory is an internal Hudi table holding file listings,
-column statistics and the record index. It exists so that planning does not
-require listing the data directories, which is Hudi's answer to the same
-scale problem Iceberg solves with manifests and Delta with checkpoints.
+`.hoodie/metadata` is an internal Hudi table holding file listings, column
+statistics and the record index. It exists so planning does not require listing
+data directories, which is Hudi's answer to the same scale problem Iceberg solves
+with manifests and Delta with checkpoints.
 
-## The row-level update, three ways
+## What happens when you update one row?
 
 This is where the formats are most often described wrongly, so it is worth being
 precise. Copy-on-write and merge-on-read are strategies available in all three,
@@ -265,16 +277,13 @@ plain Parquet because there is nothing to reconcile. Writes pay to rewrite files
 that mostly did not change.
 
 **Merge-on-read** means an update records the change separately, as a delete
-marker or a log entry, and the reader reconciles at query time. Writes are cheap
-and fast. Reads pay a merge, and something must eventually compact the accumulated
-changes.
-
-### How each one implements it
+marker or a log entry, and the reader reconciles at query time. Writes are cheap.
+Reads pay a merge, and something must eventually compact the accumulated changes.
 
 **Iceberg** decides per operation, and the defaults surprise people.
 `TableProperties` in 1.11.0 sets `write.delete.mode`, `write.update.mode` and
-`write.merge.mode` all to `copy-on-write`. So a fresh Iceberg table rewrites
-files on `DELETE`, `UPDATE` and `MERGE` unless you say otherwise:
+`write.merge.mode` all to `copy-on-write`. A fresh Iceberg table rewrites files
+on `DELETE`, `UPDATE` and `MERGE` unless you say otherwise:
 
 ```sql
 ALTER TABLE prod.trips SET TBLPROPERTIES (
@@ -284,33 +293,31 @@ ALTER TABLE prod.trips SET TBLPROPERTIES (
 );
 ```
 
-In merge-on-read, Iceberg writes delete files rather than rewriting data.
-Position deletes name a data file and the row positions within it, which is
-precise and cheap to apply. Equality deletes name column values, which avoids
-having to know positions but forces the reader to apply the predicate more
-widely. Format version 3 adds deletion vectors, stored as Puffin blobs, which
-Iceberg 1.11.0 implements in `DeletionVector.java` and its `puffin` package.
-
-Worth knowing about versions: 1.11.0 defaults new tables to format version 2
-(`DEFAULT_TABLE_FORMAT_VERSION = 2`) but can read and write up to version 4
-(`SUPPORTED_TABLE_FORMAT_VERSION = 4`), with row lineage requiring at least
-version 3.
+In merge-on-read, Iceberg writes delete files instead of rewriting data. Position
+deletes name a data file and the row positions within it, which is precise and
+cheap to apply. Equality deletes name column values, which avoids having to know
+positions but forces the reader to apply the predicate more widely. Format
+version 3 adds deletion vectors, stored as Puffin blobs, which 1.11.0 implements
+in `DeletionVector.java` and its `puffin` package. On versions: 1.11.0 defaults
+new tables to format version 2 (`DEFAULT_TABLE_FORMAT_VERSION = 2`) but reads and
+writes up to version 4 (`SUPPORTED_TABLE_FORMAT_VERSION = 4`), with row lineage
+requiring at least version 3.
 
 **Delta** uses deletion vectors, gated on a table property. The protocol is
 explicit that writers only create new deletion vectors when
 `delta.enableDeletionVectors` is `true`, and equally explicit that readers must
-handle deletion vectors whether or not that property is set, because the table
-may contain them from earlier:
+handle deletion vectors whether or not the property is set, because the table may
+already contain them:
 
 ```sql
 ALTER TABLE trips SET TBLPROPERTIES ('delta.enableDeletionVectors' = 'true');
 ```
 
-**Hudi** asks at table creation, through the table type.
-`COPY_ON_WRITE` rewrites base files on update. `MERGE_ON_READ` appends to log
-files beside the base file, and a `compaction` action later merges them into a
-new base file. Hudi's version of this choice is the most consequential of the
-three, because it also changes which query types are available.
+**Hudi** asks at table creation, through the table type. `COPY_ON_WRITE` rewrites
+base files on update. `MERGE_ON_READ` appends to log files beside the base file,
+and a `compaction` action later merges them into a new base file. Hudi's version
+of the choice is the most consequential of the three, because it also changes
+which query types are available.
 
 | | Iceberg 1.11.0 | Delta Lake 4.4.0 | Hudi 1.2.0 |
 |:--|:--|:--|:--|
@@ -320,21 +327,18 @@ three, because it also changes which query types are available.
 | Reader must reconcile | Delete files against data files | Deletion vector bitmaps | Log files against the base file |
 | Compaction | `rewrite_data_files` procedure | `OPTIMIZE` | `compaction` action, inline or async |
 
-The trade is the same sentence in all three cases, and it is worth stating
-plainly: **merge-on-read buys low write latency at the cost of read-side merge
-work and a compaction job you must operate.** Copy-on-write buys simple, fast
-reads at the cost of rewriting files that mostly did not change.
+The trade is the same sentence in all three cases: **merge-on-read buys low write
+latency at the cost of read-side merge work and a compaction job you must
+operate.** Copy-on-write buys simple, fast reads at the cost of rewriting files
+that mostly did not change.
 
-## Hands-on: the same table, three ways
+## What does the same table look like in all three?
 
 One schema throughout: ride events arriving as a CDC stream, keyed by `trip_id`,
 partitioned by `city_id`, with `updated_at` deciding which version of a record
 wins.
 
-### Setting up
-
-Each format needs its own runtime jar and catalog wiring. These are the current
-coordinates for Spark 3.5:
+Each format needs its own runtime jar and catalog wiring:
 
 ```bash
 # Iceberg 1.11.0
@@ -359,7 +363,7 @@ spark-sql \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog
 ```
 
-### Creating the table
+### Creating it
 
 The interesting difference is how much each one needs to be told.
 
@@ -417,7 +421,7 @@ TBLPROPERTIES (
 ### Upserting a CDC batch
 
 ```sql
--- Iceberg and Delta: MERGE is the upsert. You write the matching logic.
+-- Iceberg and Delta: MERGE is the upsert, and you write the matching logic.
 MERGE INTO prod.trips t
 USING trip_updates s
   ON t.trip_id = s.trip_id
@@ -426,8 +430,8 @@ WHEN NOT MATCHED THEN INSERT *;
 ```
 
 ```sql
--- Hudi: the record key and ordering field are already declared, so a plain
--- MERGE INTO works, and so does a bare INSERT with upsert as the operation.
+-- Hudi: the record key and ordering field are already declared, so the
+-- matching logic lives in the table rather than in the statement.
 MERGE INTO trips t
 USING trip_updates s
   ON t.trip_id = s.trip_id
@@ -435,16 +439,16 @@ WHEN MATCHED THEN UPDATE SET *
 WHEN NOT MATCHED THEN INSERT *;
 ```
 
-The difference is not syntax, it is what happens underneath. Iceberg and Delta
-plan a join between the incoming batch and the table to find which files contain
-the matching keys, so the cost scales with how much of the table the join has to
-touch. Hudi looks each key up in its index and goes straight to the file group,
-so the cost scales with the size of the batch. On a small batch against a large
-table, that difference is the whole ballgame.
+The difference is not the syntax, it is what runs underneath. Iceberg and Delta
+plan a join between the incoming batch and the table to find which files hold the
+matching keys, so the cost scales with how much of the table that join touches.
+Hudi looks each key up in its index and goes straight to the file group, so the
+cost scales with the size of the batch. On a small batch against a large table,
+that difference is the whole ballgame.
 
-### Time travel
+### Travelling back in time
 
-All three support it; the syntax and the unit differ.
+All three support it. The syntax and the unit differ.
 
 ```sql
 -- Iceberg: by snapshot id or by timestamp
@@ -455,8 +459,10 @@ SELECT count(*) FROM prod.trips TIMESTAMP AS OF '2026-09-10 09:00:00';
 SELECT count(*) FROM trips VERSION AS OF 42;
 SELECT count(*) FROM trips TIMESTAMP AS OF '2026-09-10 09:00:00';
 
--- Hudi: by instant time, via a read option
+-- Hudi: by instant time, or by a plain timestamp. The documented forms are
+-- yyyyMMddHHmmssSSS, yyyy-MM-dd HH:mm:ss.SSS and yyyy-MM-dd.
 SELECT count(*) FROM trips TIMESTAMP AS OF '20260911093000123';
+SELECT count(*) FROM trips TIMESTAMP AS OF '2026-09-10 09:00:00.000';
 ```
 
 ### Reading only what changed
@@ -485,36 +491,24 @@ ALTER TABLE trips SET TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true');
 SELECT * FROM table_changes('trips', 43, 45);
 ```
 
-```python
-# Hudi: incremental query is a first-class read mode, driven by instant times
-# read off the timeline rather than hardcoded.
-base_path = "s3a://lakehouse-prod/warehouse/trips"
+```sql
+-- Hudi: a table-valued function, with instants read off the timeline.
+CALL show_commits(table => 'trips', limit => 5);
 
-# show_commits returns newest first, with commit_time holding the instant.
-commits = [r.commit_time for r in spark.sql(
-    "CALL show_commits(table => 'trips', limit => 5)").collect()]
-
-# Read everything committed after the second-newest instant, which is the
-# "what changed in the last commit" window.
-begin_instant = commits[1]
-
-changed = (spark.read.format("hudi")
-    .option("hoodie.datasource.query.type", "incremental")
-    .option("hoodie.datasource.read.begin.instanttime", begin_instant)
-    .load(base_path))
-
-changed.select("trip_id", "city_id", "fare_amount", "updated_at").show()
+SELECT trip_id, city_id, fare_amount, updated_at
+FROM hudi_table_changes('trips', 'latest_state', '20260911093000123');
 ```
 
 Hudi's incremental read is the oldest and most developed of the three, because
 incremental consumption was the workload it was built for. Delta's change data
-feed is opt-in per table and must be enabled before the changes you want to read.
-Iceberg's changelog scan covers appends well and is less complete for updates and
-deletes.
+feed is opt-in per table and has to be enabled before the changes you want to
+read. Iceberg's changelog scan covers appends well and asks for more help with
+updates and deletes, which is what the `compute_updates` and `identifier_columns`
+parameters are for.
 
-### Deleting a specific person's rows
+### Deleting one person's rows
 
-The GDPR case, which is where record identity earns its keep.
+The erasure case, which is where record identity earns its keep.
 
 ```sql
 -- Iceberg and Delta: a predicate delete. The engine finds the files, then
@@ -524,24 +518,27 @@ DELETE FROM trips     WHERE rider_id = 'rider-8814f2';
 ```
 
 ```sql
--- Hudi: the same SQL works, and additionally a keyed delete can go straight to
--- the file groups through the index without scanning to find them.
+-- Hudi: the same SQL works, and a keyed delete can go straight to the file
+-- groups through the index without scanning to find them.
 DELETE FROM trips WHERE rider_id = 'rider-8814f2';
 ```
 
-In all three, the delete is logical until maintenance runs. The data is still in
-the old files until copy-on-write rewrites them or compaction merges the delete
-markers away, and the old snapshot remains readable until retention expires it.
-**For a genuine right-to-erasure obligation, the delete is not complete until
-retention has expired the snapshots that still contain the row**, which means
-`expire_snapshots` on Iceberg, `VACUUM` on Delta and cleaning on Hudi are part of
-the compliance story, not just housekeeping.
+In all three the delete is logical until maintenance runs. The data is still in
+the old files until copy-on-write rewrites them or compaction merges the markers
+away, and the old snapshot remains readable until retention expires it. For a
+genuine right-to-erasure obligation the delete is not complete until retention
+has expired the versions that still contain the row, which makes
+`expire_snapshots` on Iceberg, `VACUUM` on Delta and cleaning on Hudi part of the
+compliance story rather than housekeeping.
 
-## Schema and partition evolution
+## Where do they really diverge?
+
+Two places: what you can change about the table's shape after the fact, and what
+happens when two writers meet.
 
 Every format supports adding, dropping, renaming and reordering columns without
 rewriting data, because all three track columns by an assigned id rather than by
-position in the file. The differences are at the edges.
+position in the file. The edges are where they differ:
 
 | Capability | Iceberg 1.11.0 | Delta Lake 4.4.0 | Hudi 1.2.0 |
 |:--|:--|:--|:--|
@@ -561,52 +558,30 @@ keep working.
 day partitions without the writer ever mentioning a `dt` column, because the
 partition is declared as `days(started_at)`. Tables in the other two formats
 typically carry an explicit partition column, and a query that forgets to filter
-on it scans everything.
+on it scans everything. Delta's answer to layout is liquid clustering rather than
+partition evolution, declared with `CLUSTER BY`, which can be changed later and
+does not bake the layout into directory paths.
 
-Delta's answer to layout is liquid clustering rather than partition evolution,
-declared with `CLUSTER BY`, which can be changed later and does not bake the
-layout into directory paths.
+On concurrency, the honest summary is that all three need help beyond their
+defaults. **Iceberg** uses optimistic concurrency: a writer reads the current
+metadata, prepares a new snapshot, and commits by swapping the catalog pointer,
+which fails if another writer moved it first. **Delta** relies on creating the
+next numbered log file, so two writers both attempting
+`...00000000000000000046.json` means one must lose, which requires put-if-absent
+from the storage layer; the `catalogManaged` table feature in 4.4.0 reflects the
+move toward catalogs owning commits. **Hudi** ships optimistic concurrency
+control with an external lock provider, and its file-group model means two
+writers touching different file groups do not conflict at all.
 
-## Concurrency and multiple writers
+Notice what those three have in common: the strength of the commit protocol is a
+property of the catalog or the storage layer, not of the format. An Iceberg table
+on a REST catalog and the same table on a filesystem catalog have different
+correctness guarantees under concurrent writes, and look identical on disk.
+Choose the catalog with the same care as the format, and treat "which component
+provides the atomic compare-and-swap" as a question you can answer for your
+stack.
 
-This is the section most likely to bite you in production, and the honest summary
-is that all three need help beyond their defaults.
-
-**Iceberg** uses optimistic concurrency. A writer reads the current metadata,
-prepares a new snapshot, and commits by swapping the catalog pointer, which fails
-if another writer moved it first; the loser retries. The strength of this depends
-entirely on the catalog providing an atomic compare-and-swap. A Hive Metastore
-does, a REST catalog does, and a plain filesystem catalog on S3 historically did
-not.
-
-**Delta** relies on creating the next numbered log file. Two writers both
-attempting `...00000000000000000046.json` means one must lose, which requires the
-storage layer to offer put-if-absent. On stores that do not, Delta needs a commit
-coordinator, and the `catalogManaged` table feature in 4.4.0 reflects the move
-toward catalogs owning commits.
-
-**Hudi** ships optimistic concurrency control with an external lock provider,
-and its file-group model means two writers touching different file groups do not
-conflict at all. The multi-writer story needs the lock provider configured; it is
-not on by default.
-
-### The catalog is part of the decision
-
-Notice what all three paragraphs above have in common: the strength of the commit
-protocol is a property of the catalog or the storage layer, not of the format. An
-Iceberg table on a REST catalog and the same table on a filesystem catalog have
-different correctness guarantees under concurrent writes, and the table itself
-looks identical. Choose the catalog with the same care as the format, and treat
-"which component provides the atomic compare-and-swap" as a question you can
-answer for your stack.
-
-The failure mode to recognise, in all three, is a writer that fails with a commit
-conflict after doing all its work. That is the system behaving correctly. The
-pathology is two writers that both succeed and one silently loses rows, which is
-what happens when the atomicity assumption underneath the commit protocol does
-not hold.
-
-## Maintenance you have to operate
+## What do you have to operate?
 
 None of the three are maintenance-free, and underestimating this is the most
 common reason a lakehouse project gets into trouble six months in.
@@ -619,18 +594,18 @@ common reason a lakehouse project gets into trouble six months in.
 | Shrink metadata | `CALL prod.system.rewrite_manifests` | Checkpoints, automatic | Timeline archival to `history/` |
 | Re-sort for locality | `rewrite_data_files` with a sort order | `OPTIMIZE ... ZORDER BY`, liquid clustering | `clustering` action |
 
-The costs of skipping each are specific. Never compacting gives you a table of
-tiny files where planning dominates query time. Never expiring gives you storage
-that grows without bound and, for Iceberg and Delta, a metadata layer that grows
-with it. Never compacting a Hudi merge-on-read table means readers merge an
+The cost of skipping each is specific. Never compacting gives you a table of tiny
+files where planning dominates query time. Never expiring gives you storage that
+grows without bound and, for Iceberg and Delta, a metadata layer that grows with
+it. Never compacting a Hudi merge-on-read table means readers merge an
 ever-growing stack of log files on every query.
 
-A useful way to think about the difference: Iceberg and Delta ask you to schedule
+A useful way to hold the difference: Iceberg and Delta ask you to schedule
 maintenance as separate jobs, while Hudi can run compaction and cleaning inline
 with writes. Inline is easier to get right and makes writes slower; scheduled is
 faster on the write path and easier to forget.
 
-## Choosing between them
+## Which one should I pick?
 
 Reduce it to properties of your workload rather than feature counts.
 
@@ -644,74 +619,101 @@ Reduce it to properties of your workload rather than feature counts.
 | Incremental consumption as a first-class pattern | Hudi | Incremental queries were the original design goal, not an added feature |
 | Undecided, or different teams want different things | Any, plus XTable | Metadata conversion means the writer's choice stops dictating the reader's |
 
-### When not to reach for any of them
+There is a row missing from that table, and it is worth saying out loud: **plain
+partitioned Parquet is still a good answer for some tables.** A table format is a
+commit protocol plus a metadata layer, and both cost something. If your data is
+append-only, read by one engine, small enough that listing is not a problem, and
+never needs a row corrected, Parquet with a Hive Metastore is less machinery and
+will not surprise you. The formats start paying for themselves when you need
+atomic commits across many files, row-level mutation, time travel, or planning
+that does not scale with partition count.
 
-A table format is a commit protocol plus a metadata layer, and both cost
-something. If your data is append-only, read by one engine, small enough that
-listing is not a problem, and never needs a row corrected, then plain partitioned
-Parquet with a Hive Metastore is less machinery and will not surprise you. The
-formats start paying for themselves when you need atomic commits across many
-files, row-level mutation, time travel, or planning that does not scale with
-partition count.
+Equally, adopting two of them in one platform wants a reason. The maintenance
+jobs, retention semantics and failure modes all differ, and running two sets of
+them doubles the operational surface for no analytical gain.
 
-Equally, do not adopt two of them in one platform without a reason. The
-maintenance jobs, the retention semantics and the failure modes are all different,
-and running two sets of them doubles the operational surface for no analytical
-gain.
+## Can I avoid choosing?
 
-## You can defer the decision
+Increasingly, yes. [Apache XTable](https://xtable.apache.org/) (incubating) reads
+one format's metadata into a format-agnostic model and writes the other formats'
+metadata beside it, over the same Parquet files. The data is never copied or
+rewritten.
 
-The framing of "pick one" is less true than it was. [Apache
-XTable](https://xtable.apache.org/) (incubating) reads one format's metadata into
-a format-agnostic model and writes the other formats' metadata beside it, over
-the same Parquet files. The data is never copied or rewritten.
-
-That changes the decision in a useful way. A Hudi ingestion pipeline can keep the
+That changes the decision usefully. A Hudi ingestion pipeline can keep the
 index-backed upserts it needs while a Trino-based analytics team reads the same
 tables as Iceberg, and neither side has to move. The cost is a metadata sync job
-with its own schedule, and one constraint worth knowing before adopting it:
-incremental sync only works while the source format still retains history back to
-the last sync, which makes your cleaner and snapshot-expiry settings an input to
-whether the sync stays cheap.
+with its own schedule, plus one constraint worth knowing up front: incremental
+sync only works while the source format still retains history back to the last
+sync, which makes your cleaner and snapshot-expiry settings an input to whether
+the sync stays cheap.
 
 XTable is the right tool when several readers genuinely need different metadata
-over one copy of the data. It is the wrong tool as a way to avoid making a
-decision you are able to make.
+over one copy of the data. It is the wrong tool for avoiding a decision you are
+able to make.
 
-## What failure looks like
+## How do I know it is working?
 
-The useful thing about these formats is that most failures are loud. The quiet
-ones are worth knowing by name.
+Most of what these formats do wrong announces itself. These are the signals worth
+being able to read:
 
 | Symptom | Likely cause |
 |:--|:--|
-| `Cannot commit: stale table metadata` or a retry storm on Iceberg | Two writers contending; check the catalog supports atomic swaps |
+| `Cannot commit: stale table metadata` or a retry storm on Iceberg | Two writers contending. Check the catalog supports atomic swaps |
 | Query planning slower than query execution | Small files, or metadata never compacted |
 | Storage growing far faster than data | Snapshots or log versions never expired |
-| A Hudi merge-on-read table getting steadily slower to read | Compaction not running; log files accumulating per file slice |
+| A Hudi merge-on-read table getting steadily slower to read | Compaction not running, so log files accumulate per file slice |
 | Delta reader errors mentioning a required table feature | The table uses a feature your reader version does not implement |
-| A deleted row still visible via time travel | Working as designed; retention has not expired that version yet |
-| Duplicate keys after a partition value changed, in Hudi | A non-global index where the key moved partitions |
+| A deleted row still visible via time travel | Working as designed. Retention has not expired that version yet |
+| Duplicate keys after a partition value changed, in Hudi | A non-global index, where the key moved partitions |
 
-## Production tips
+The one to read carefully is the commit conflict, because it looks like a problem
+and usually is not. A writer that fails with a conflict after doing all its work
+is the system behaving correctly. The genuine pathology is the opposite: two
+writers that both succeed and one silently loses rows, which is what happens when
+the atomicity assumption underneath the commit protocol does not hold.
 
-* **Give every format a real catalog.** Iceberg's commit atomicity depends on it, Delta 4.x is moving commits toward it with `catalogManaged`, and Hudi needs one for engines to discover tables.
-* **Schedule maintenance before you need it**, not after planning gets slow. Compaction, expiry and orphan cleanup are all cheaper run often.
-* **Set retention deliberately, in both directions.** Long enough for your time-travel and incremental-read needs, short enough that storage and erasure obligations stay under control.
-* **Decide copy-on-write versus merge-on-read from write frequency**, and remember Iceberg defaults all three row-level operations to copy-on-write.
-* **Configure a lock provider before the second writer exists**, not after the first conflict.
-* **On Hudi, choose the index deliberately.** An unset `hoodie.index.type` resolves to `SIMPLE` on Spark, whose cost scales with table size rather than batch size.
-* **Test the delete path end to end** if you have erasure obligations, including retention expiry, rather than assuming `DELETE` is sufficient.
-* **Pin versions per engine.** Iceberg 1.11.0 supports Spark 3.4 through 4.1, Hudi 1.2.0 ships bundles for Spark 3.3 through 4.1, and Delta 4.x targets Spark 4.x while Delta 3.x targets Spark 3.5.
+## Frequently asked questions
+
+**Is one of these faster than the others?**
+Not in a way that survives contact with your workload. The structural differences
+decide cost: an index lookup beats a join when the batch is small relative to the
+table, manifest pruning beats log replay at very high commit counts. Benchmark on
+your own data and hardware, because published numbers rarely share your shape.
+
+**Do I need a catalog, or can I point at a path?**
+Iceberg genuinely needs one, because nothing inside the table says which
+`metadata.json` is current. Delta and Hudi can be read from a path, but you still
+want a catalog for discovery, and Delta 4.x is moving commit responsibility
+toward catalogs with `catalogManaged`.
+
+**Can I convert an existing Parquet dataset without rewriting it?**
+Yes, in all three, and it is worth knowing before planning a migration. Iceberg
+has `add_files`, Delta has `CONVERT TO DELTA`, and Hudi has a `BOOTSTRAP`
+operation that generates metadata pointing at the files already there.
+
+**Which one handles schema evolution best?**
+They are closer than most comparisons suggest. All three track columns by id, so
+add, drop, rename and reorder work without rewriting data. The real gap is
+partition evolution, where Iceberg is alone in letting old data keep its original
+spec.
+
+**If I pick wrong, how expensive is it to change?**
+Much less than it used to be. XTable converts metadata between all three over one
+copy of the data, so the escape hatch is a sync job rather than a full rewrite.
+That is a good reason to decide and move, not a reason to never decide.
+
+**Does merge-on-read mean I do not need compaction?**
+It means the opposite. Merge-on-read defers the work, and compaction is where
+that work happens. All three want the job scheduled and watched.
 
 ## Conclusion
 
-The three formats converged on the same feature list and kept their structural
-differences, which is why a feature comparison is the least useful way to choose
-between them. Iceberg describes a table as an immutable tree of snapshots behind
-one atomic pointer, Delta as an ordered log to be replayed from a checkpoint, and
-Hudi as a timeline of instants over indexed file groups. Ask which of those three
-shapes matches the way your data arrives, and the choice usually makes itself.
+Back to the checklist that started this. It is accurate and it is useless,
+because it describes the part where these three formats agree. Ask instead what
+each one writes down to answer "which files are live", and the differences stop
+being a list of features and become one structural choice you can reason about:
+an immutable tree of snapshots behind an atomic pointer, an ordered log replayed
+from a checkpoint, or a timeline of instants over indexed file groups.
 
 The single most predictive question is whether your writes are keyed. If records
 arrive as a stream of changes to known primary keys, Hudi's index is doing work
@@ -719,15 +721,15 @@ the other two would ask a join to do, and the difference grows as the table grow
 relative to the batch. If records arrive as large batches that replace or append
 to partitions, the index is overhead and Iceberg or Delta will be simpler to run.
 Partition evolution and hidden partitioning are the strongest reasons to prefer
-Iceberg specifically, because they are the two things that are genuinely hard to
-retrofit later.
+Iceberg specifically, because they are the two things genuinely hard to retrofit
+later.
 
-What has changed recently is that this is no longer a one-way door. Metadata
+What has changed recently is that this stopped being a one-way door. Metadata
 conversion means a table written by one format can be read as another over the
-same files, so the cost of choosing imperfectly is lower than it was when these
-comparisons started being written. Pick the format that matches how your data
-arrives, operate its maintenance jobs properly, and treat interoperability as the
-escape hatch it is rather than as a reason to defer the decision indefinitely.
+same files, so choosing imperfectly costs less than it did when these comparisons
+started being written. Pick the format that matches how your data arrives,
+operate its maintenance jobs properly, and treat interoperability as the escape
+hatch it is rather than as a reason to defer the decision indefinitely.
 
 ## References
 

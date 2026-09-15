@@ -101,10 +101,11 @@ operational surface for no analytical gain.
    release tags, and every URL was checked, but the SQL and Python blocks are
    not transcripts. Running the hands-on section against a real cluster before
    publishing would raise confidence further.
-2. **Hudi time travel syntax.** `TIMESTAMP AS OF '20260911093000123'` follows the
-   documented Spark SQL form with an instant string. The instant format and
-   whether a plain timestamp literal is also accepted are worth a quick check on
-   your own 1.2.0 build.
+2. ~~**Hudi time travel syntax.**~~ *Resolved 2026-09-15.* The Hudi SQL queries
+   documentation gives the form as
+   `SELECT * FROM <table> TIMESTAMP AS OF '<yyyy-MM-dd HH:mm:ss.SSS | yyyy-MM-dd | yyyyMMddHHmmssSSS>'`,
+   so an instant string and a plain timestamp literal are both accepted. The post
+   now shows both forms.
 3. **Iceberg `changelog` completeness.** The post says the changelog scan "covers
    appends well and is less complete for updates and deletes". That reflects the
    `compute_updates` and `identifier_columns` parameters existing at all, but it
@@ -113,3 +114,16 @@ operational surface for no analytical gain.
    Cloudflare challenges to every client I tried, so the structure was taken from
    the comprehensive-guide outline rather than from those posts. If there is a
    specific element of them you want mirrored, point me at it.
+
+## Revision note, 2026-09-15
+
+The post was restructured into the house style (narrative opening, question-shaped
+headings, FAQ, conclusion returning to the opening). The findings above were
+recorded against the original section names, several of which have changed:
+`Reading only what changed` and `Deleting a specific person's rows` now sit under
+`What does the same table look like in all three?`, `How each one implements it`
+is now `What happens when you update one row?`, `Concurrency and multiple writers`
+was merged into `Where do they really diverge?`, and `What failure looks like` is
+now `How do I know it is working?`. Every fix described above survives the
+restructure. The Hudi incremental example was also converted from PySpark to the
+`hudi_table_changes` table-valued function, so the post no longer mixes shells.
