@@ -30,18 +30,15 @@ the services needed to keep such a table healthy. Its own documentation describe
 it as bringing database functionality to data lakes, including tables,
 transactions, upserts and deletes, indexes and compaction.
 
-A little history worth knowing, because it explains the design. The repository
-dates to December 2016 and the project was originally called Hoodie, which is
-still visible in its early release tags (`hoodie-0.4.5` through `hoodie-0.4.7`).
-It entered Apache incubation, released `0.5.0-incubating`, and later graduated to
-a top-level project. The docs list Uber, Amazon, ByteDance and Robinhood among
-the organisations running it in production.
+The project has been going since late 2016, and the docs list Uber, Amazon,
+ByteDance and Robinhood among the organisations running it in production.
 
-That origin matters because Hudi was not designed as a general-purpose table
-format that later grew update support. It was designed around a specific problem:
+Its age matters less than its starting point. Hudi was not a general-purpose
+table format that later grew update support. It was designed around one problem:
 a continuous stream of changes to known records, landing on a data lake, needing
 to be applied efficiently and consumed incrementally. Every architectural choice
-below follows from that.
+below follows from that, which is why Hudi looks different from formats that
+started by describing a set of immutable files.
 
 This guide is written against **Hudi 1.2.0**, whose Spark bundles cover Spark 3.3
 through 4.1. Every config key, default, enum value and on-disk path was read from
@@ -49,6 +46,39 @@ the `release-1.2.0` tag while writing.
 
 Prerequisites: comfort with Spark and SQL. No prior Hudi knowledge is assumed,
 and every Hudi-specific term is defined on first use.
+
+## Hudi releases, and which one you are on
+
+Hudi's numbering changed shape at 1.0.0, so it helps to see the recent line laid
+out. Dates are release dates; the table version is the on-disk format version
+that release introduced, taken from `HoodieTableVersion`.
+
+| Release | Date | Table version | Timeline layout |
+|:--|:--|:--|:--|
+| 0.14.0 | 2023-10-05 | 6 | v1, instants directly in `.hoodie/` |
+| 0.15.0 | 2024-06-06 | 6 | v1 |
+| 1.0.0 | 2024-12-11 | 8 | v2, instants in `.hoodie/timeline/` |
+| 1.1.0 | 2025-11-17 | 9 | v2 |
+| 1.2.0 | 2026-05-23 | 9 | v2 |
+
+Patch releases exist on most of those lines, currently up to `0.15.1`, `1.0.2`
+and `1.1.1`. Table version 7 appears in the enum mapped to a `0.16.0` that was
+never released, so in practice you will meet versions 6, 8 and 9.
+
+The jump from 6 to 8 is the one to plan for. It changes the timeline layout, so
+a 0.x reader will not understand a 1.x table's timeline directory. Three
+capabilities this guide relies on arrived across that boundary, each carrying a
+`sinceVersion` in its own config definition:
+
+| Capability | Since |
+|:--|:--|
+| Global record index (`hoodie.metadata.global.record.level.index.enable`) | 0.14.0 |
+| Record merge modes (`hoodie.record.merge.mode`) | 1.0.0 |
+| Partition-scoped record index (`hoodie.metadata.record.level.index.enable`) | 1.1.0 |
+
+If you are on a 0.x release, most of the architecture in this guide still
+applies, but expect the timeline to sit directly in `.hoodie/` and the
+partition-scoped record index to be unavailable.
 
 ## What broke before
 
@@ -77,6 +107,27 @@ its own state, give records an identity, and make the freshness-versus-speed
 trade a configuration choice rather than an architectural one.
 
 ## The four primitives
+
+```mermaid
+flowchart LR
+  SP["Spark"] --> T
+  FL["Flink"] --> T
+  ST["Hudi Streamer"] --> T
+
+  T["a Hudi table"] --> TL["timeline<br/>what happened, and when"]
+  T --> IX["index<br/>key to file group"]
+  T --> MD["metadata table<br/>listings and indexes"]
+  T --> FG["file groups<br/>and file slices"]
+
+  TL --> R["a query"]
+  IX --> R
+  MD --> R
+  FG --> R
+
+  R --> Q1["snapshot"]
+  R --> Q2["read optimized"]
+  R --> Q3["incremental"]
+```
 
 Almost everything in Hudi is built from four things. Learn these and the rest of
 the system reads as composition.
@@ -114,8 +165,18 @@ lives in its own directory, since `hoodie.timeline.path` defaults to `timeline`
 and `hoodie.timeline.history.path` to `history`.
 
 An instant moves through three states, and the filename changes with each:
-`.requested`, then `.inflight`, then a completed form. Readers only ever see
-completed instants, which is where atomicity comes from.
+
+```mermaid
+flowchart LR
+  R["20260915090000123<br/>.deltacommit.requested"] --> I["20260915090000123<br/>.deltacommit.inflight"]
+  I --> C["20260915090000123_20260915090004881<br/>.deltacommit"]
+  I --> X["rollback<br/>on failure"]
+```
+
+Readers only ever see the completed form, which is where atomicity comes from: a
+half-finished write is visible on the timeline as `.inflight`, and invisible to
+queries. A filter written against `.deltacommit` will not match a pending write,
+which is deliberate.
 
 Hudi 1.2.0 defines twelve action types:
 
@@ -244,6 +305,26 @@ burying it in a property you discover later.
 | Storage overhead | Lower | Higher until compaction |
 | Suits | Read-heavy tables written a few times a day | Write-heavy tables fed by a change stream |
 
+```mermaid
+flowchart TB
+  subgraph COW["Copy-on-Write: an update rewrites the base file"]
+    direction LR
+    A1["base @ t1"] --> A2["update at t2"]
+    A2 --> A3["base @ t2<br/>fully rewritten"]
+    A3 --> A4["read = one file"]
+  end
+
+  subgraph MOR["Merge-on-Read: an update appends a log file"]
+    direction LR
+    B1["base @ t1"] --> B2["update at t2"]
+    B2 --> B3["base @ t1<br/>+ log file"]
+    B3 --> B4["read = base merged<br/>with logs"]
+    B3 --> B5["compaction<br/>later"]
+  end
+
+  COW ~~~ MOR
+```
+
 Stated as a sentence each: **Copy-on-Write buys cheap, simple reads at the cost
 of rewriting a whole base file per update. Merge-on-Read buys low write latency
 at the cost of read-side merge work and a compaction job you have to operate.**
@@ -256,6 +337,10 @@ will own compaction.
 
 One schema throughout: ride events arriving as a change stream, keyed by
 `trip_id`, partitioned by `city_id`, ordered by `updated_at`.
+
+Everything below runs in one `spark-sql` shell. Hudi's Spark SQL surface covers
+DDL, upserts, incremental reads and the maintenance procedures, so there is no
+need to switch to the DataFrame API for any step in this guide.
 
 ```bash
 spark-sql \
@@ -294,54 +379,60 @@ TBLPROPERTIES (
 
 ### 2. Upsert a batch of changes
 
-```python
-from pyspark.sql import functions as F
+```sql
+-- The landing data, as an ordinary external table.
+CREATE TABLE IF NOT EXISTS trip_updates (
+  trip_id      STRING,
+  city_id      STRING,
+  rider_id     STRING,
+  fare_amount  DECIMAL(10,2),
+  started_at   TIMESTAMP,
+  updated_at   TIMESTAMP
+) USING parquet
+LOCATION 's3a://lakehouse-prod/raw/trips/dt=2026-09-15';
 
-base_path = "s3a://lakehouse-prod/warehouse/trips"
-
-updates = (spark.read.format("parquet")
-    .load("s3a://lakehouse-prod/raw/trips/dt=2026-09-15/")
-    .select("trip_id", "city_id", "rider_id", "fare_amount", "started_at",
-            F.col("ingested_at").alias("updated_at")))
-
-hudi_options = {
-    "hoodie.table.name": "trips",
-    "hoodie.datasource.write.table.name": "trips",
-    "hoodie.datasource.write.recordkey.field": "trip_id",
-    "hoodie.datasource.write.partitionpath.field": "city_id",
-    "hoodie.datasource.write.table.type": "MERGE_ON_READ",
-    "hoodie.datasource.write.operation": "upsert",
-    "hoodie.index.type": "RECORD_LEVEL_INDEX",
-    # Compact every 5 delta commits rather than never: inline compaction is
-    # off by default, so without this nobody folds the logs back in.
-    "hoodie.compact.inline": "true",
-    "hoodie.compact.inline.max.delta.commits": "5",
-}
-
-(updates.write.format("hudi")
-    .options(**hudi_options)
-    .mode("append")
-    .save(base_path))
+-- The record key and ordering field are already part of the table contract,
+-- so MERGE does not need to restate the conflict rule.
+MERGE INTO trips t
+USING trip_updates s
+  ON t.trip_id = s.trip_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
 ```
 
 Deduplication within the batch and against the table is decided by the ordering
 field: for two records with the same `trip_id`, the one with the larger
-`updated_at` wins.
+`updated_at` wins. Because the table declared `EVENT_TIME_ORDERING`, that holds
+even when the older record arrives last.
 
 ### 3. Read only what changed
 
-```python
-# Read the instants off the timeline rather than hardcoding them.
-commits = [r.commit_time for r in spark.sql(
-    "CALL show_commits(table => 'trips', limit => 5)").collect()]
-begin_instant = commits[1]          # returned newest first
+Hudi 1.2.0 registers table-valued functions, so an incremental read is ordinary
+SQL. `hudi_table_changes` takes the table, a format of `latest_state` or `cdc`,
+a start instant, and optionally an end instant:
 
-changed = (spark.read.format("hudi")
-    .option("hoodie.datasource.query.type", "incremental")
-    .option("hoodie.datasource.read.begin.instanttime", begin_instant)
-    .load(base_path))
+```sql
+-- Which instants exist? commit_time is returned newest first.
+CALL show_commits(table => 'trips', limit => 5);
 
-changed.select("trip_id", "city_id", "fare_amount", "updated_at").show()
+-- Everything that changed after a given instant.
+SELECT trip_id, city_id, fare_amount, updated_at
+FROM hudi_table_changes('trips', 'latest_state', '20260915090000123');
+
+-- Or from the beginning of retained history, using the literal `earliest`.
+SELECT count(*) FROM hudi_table_changes('trips', 'latest_state', 'earliest');
+```
+
+Two companion functions are worth knowing. `hudi_query` picks a query type
+without a read option, and `hudi_metadata` exposes the metadata table as a
+queryable relation:
+
+```sql
+-- Base files only, skipping the log-file merge.
+SELECT count(*) FROM hudi_query('trips', 'read_optimized');
+
+-- What the metadata table knows about this table.
+SELECT type, key FROM hudi_metadata('trips') LIMIT 20;
 ```
 
 ### 4. Delete
@@ -359,7 +450,20 @@ just housekeeping.
 ## What is special in Hudi
 
 Every table format now offers ACID commits, time travel and schema evolution.
-These are the capabilities that are genuinely distinctive.
+Those are table stakes and not a reason to choose one. The eight capabilities
+below are the ones that are either unique to Hudi or materially further along
+here than elsewhere, and each maps to a workload where the difference shows up.
+
+| Capability | What it replaces | Where you feel it |
+|:--|:--|:--|
+| Record-level index | A join to find the rows to update | Upserts on a large table from a small batch |
+| Multi-modal index | A file listing, and a full scan on non-key columns | Planning time, and filters off the key |
+| Incremental query | A watermark column and a custom diff | Chained pipelines, medallion layers |
+| Non-blocking concurrency | Retry-on-conflict between writers | Several streams into one table |
+| Self-running table services | Maintenance procedures you must schedule | Day-two operations |
+| Savepoint and restore | Restoring a table from a backup copy | Recovering from a bad batch |
+| Bootstrap | Rewriting an existing dataset to adopt a format | Migrating terabytes of Parquet |
+| Hudi Streamer | An ingestion job you write and maintain | Getting from a source to a table |
 
 ### 1. A record-level index
 
@@ -378,6 +482,18 @@ index, 1 to 10 for the partitioned one.
 
 The metadata table at `.hoodie/metadata` is an internal Hudi table, and in 1.2.0
 it holds seven kinds of index, each in its own partition:
+
+```mermaid
+flowchart LR
+  Q["planning a query<br/>or a write"] --> MT[".hoodie/metadata"]
+  MT --> P1["files"]
+  MT --> P2["column_stats"]
+  MT --> P3["partition_stats"]
+  MT --> P4["bloom_filters"]
+  MT --> P5["record_index"]
+  MT --> P6["expr_index_name"]
+  MT --> P7["secondary_index_name"]
+```
 
 | Partition | Holds |
 |:--|:--|
@@ -413,6 +529,28 @@ in 1.2.0 has three values:
 | `OPTIMISTIC_CONCURRENCY_CONTROL` | Multiple writers with lock-based conflict resolution; if two write to the same file group, only one succeeds |
 | `NON_BLOCKING_CONCURRENCY_CONTROL` | Multiple writers into the same file group, with conflicts resolved by the reader and the compactor |
 
+```mermaid
+flowchart TB
+  subgraph OCC["optimistic: one writer loses"]
+    direction LR
+    O1["writer A and writer B<br/>both target file group fg-1"] --> O2["both do the work"]
+    O2 --> O3["A commits"]
+    O2 --> O4["B detects the conflict<br/>and aborts"]
+    O4 --> O5["B retries from the start"]
+  end
+
+  subgraph NBCC["non-blocking: both writers commit"]
+    direction LR
+    N1["writer A and writer B<br/>both target file group fg-1"] --> N2["both append log files"]
+    N2 --> N3["A commits"]
+    N2 --> N4["B commits"]
+    N3 --> N5["reader and compactor<br/>reconcile by completion time"]
+    N4 --> N5
+  end
+
+  OCC ~~~ NBCC
+```
+
 Read the third row again. Under optimistic concurrency, which is what Iceberg and
 Delta use, two writers touching the same data means one does all its work and
 then loses. Non-blocking concurrency control lets both succeed and defers the
@@ -420,8 +558,17 @@ reconciliation to read and compaction time. For a Merge-on-Read table fed by
 several concurrent streams, that is the difference between throughput and a retry
 storm.
 
-Note the default is `SINGLE_WRITER`, so multi-writer support is opt-in and needs
-a lock provider configured for the optimistic mode.
+Two constraints keep this honest. The default is `SINGLE_WRITER`, so multi-writer
+support is opt-in and the optimistic mode needs a lock provider configured. And
+non-blocking concurrency control is not general: the docs scope it to
+Merge-on-Read tables using the simple bucket index or the partition-level bucket
+index, and it is not supported between an ingestion writer and clustering, where
+you still use the optimistic mode. Serialization order comes from each commit's
+completion time, which is also what file slicing is based on.
+
+The optimistic mode is not standing still either. Since 0.13.0 Hudi detects
+conflicts early, using markers to spot an overlapping write during the job rather
+than at commit time, so a losing writer wastes less compute before it retries.
 
 ### 5. Table services that run themselves
 
