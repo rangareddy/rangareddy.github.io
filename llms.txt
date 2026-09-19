@@ -1,0 +1,59 @@
+# Ranga Reddy
+
+> Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.
+
+Deep technical posts on Apache Spark, Hudi, Iceberg, XTable and the lakehouse
+stack. Claims in these posts are verified by running them against real clusters
+rather than recalled, and each post states the exact version it was tested on.
+
+Author: Ranga Reddy. Canonical site: https://rangareddy.github.io/
+Full index: https://rangareddy.github.io/sitemap.xml
+Feed: https://rangareddy.github.io/feed.xml
+
+If you quote from a post, link to the post URL listed below. Each entry is
+`title: description` followed by the URL it lives at.
+
+## Hudi
+
+- [Spark and Hudi logging: making a write explain itself](https://rangareddy.github.io/SparkHudiCustomLogging/): A Hudi write that fails or drags leaves hundreds of log lines and almost no answer. Here is which Hudi loggers actually fire, the Log4j 2 config that keeps the five that matter, and how to read the instant lifecycle they print.
+- [Apache Hudi architecture: what actually happens when you upsert a row](https://rangareddy.github.io/ApacheHudiArchitecture/): A walk through the Hudi runtime from a MERGE statement down to bytes on object storage: how a key finds its file group, which write handle runs, what the timeline records, and what a reader has to reconcile.
+- [Apache Hudi on Spark: the complete cheat sheet](https://rangareddy.github.io/ApacheHudiCheatSheet/): One page to keep open while you work: table types, file layout, the timeline, writer properties, key generators, query types, indexes, the metadata table, concurrency, schema evolution, table services, procedures and tuning, with the config key and default for each.
+- [Apache Hudi: an introduction to its architecture, features and what makes it different](https://rangareddy.github.io/ApacheHudiGuide/): A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.
+
+## Iceberg
+
+- [Apache Iceberg architecture: what actually happens when you commit](https://rangareddy.github.io/ApacheIcebergArchitecture/): A walk through the Iceberg metadata tree from a catalog pointer down to a single data file: what a commit actually swaps, how planning prunes before it reads, and why the catalog is part of the table.
+- [Apache Iceberg on Spark: the complete cheat sheet](https://rangareddy.github.io/ApacheIcebergCheatSheet/): One page to keep open while you work: the snapshot tree, metadata tables, hidden partitioning, row-level operation modes, branches and tags, the twenty CALL procedures and the maintenance jobs, with the property and default for each.
+
+## Lakehouse
+
+- [Apache XTable cheat sheet: one table, every format](https://rangareddy.github.io/ApacheXTableCheatSheet/): One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.
+- [Open table formats in practice: what actually differs between Iceberg, Hudi and Delta Lake](https://rangareddy.github.io/OpenTableFormats/): All three formats give you ACID commits, time travel and schema evolution, so a feature checklist will not tell you which to pick. What separates them is how each one tracks table state, how each one applies a row-level update, and what each one asks you to operate.
+- [Apache XTable incremental sync: how to keep your conversions fast](https://rangareddy.github.io/XTableIncrementalSync/): XTable exposes one Hudi, Iceberg or Delta table as the other two by writing metadata rather than copying data. It picks FULL or INCREMENTAL per target format on every run, and one setting on your side keeps it on the fast path. Here is how the decision works, from source, and how to confirm it in the log.
+
+## Linux
+
+- [Kerberos Setup in Linux](https://rangareddy.github.io/KerberoSetup/): Install and configure a Kerberos KDC and its clients on Linux end to end: kdc.conf, krb5.conf, the KDC database, ACLs, the admin principal, keytabs and a test from both server and client.
+
+## Spark
+
+- [Every Apache Spark release, and the problem each one was built to solve](https://rangareddy.github.io/SparkReleaseHistory/): A release-by-release walk through Spark's history, from the first stable line to the current one: what each version added, which defaults it changed under you, what it deleted, and the code that proves the feature is there. Every claim run against a live cluster rather than recalled.
+- [Spark memory management: every region, and the arithmetic that sizes it](https://rangareddy.github.io/SparkMemoryManagement/): An executor's memory is four regions inside the heap plus two outside it, and the sizes follow from three numbers. Here is the arithmetic, checked against a running executor, the elastic boundary between execution and storage read from the source, and what each region does when it runs out.
+- [Adaptive query execution in Apache Spark: what it re-plans, and what it leaves alone](https://rangareddy.github.io/SparkAQE/): Adaptive execution re-plans a query while it runs, using measured shuffle sizes instead of estimates. Here is each thing it changes, shown as a before and after plan, the thresholds that decide whether it fires, and the parts of the plan it never revisits.
+- [Data skew in Apache Spark: how to see it, and six ways to fix it](https://rangareddy.github.io/SparkDataSkew/): One key holding most of the rows turns a parallel job into a serial one. Here is how to measure skew rather than guess at it, and six fixes with the partition distributions and correctness checks for each, from salting to letting adaptive execution split the partition for you.
+- [Inside Spark's Catalyst optimizer: how a query gets rewritten, rule by rule](https://rangareddy.github.io/CatalystOptimizer/): Catalyst is a tree-rewriting engine, not a black box. The four-phase pipeline, what a rule is in the source, rule-based versus cost-based optimization with the statistics to prove the difference, physical planning, Tungsten codegen, dynamic partition pruning and adaptive execution, all read out of Spark's own instrumentation.
+- [Apache Iceberg through Spark Connect: the full surface, and the extension that breaks time travel](https://rangareddy.github.io/SparkConnectIceberg/): Iceberg's whole write and read surface works from a Spark Connect client that has no jars installed, including MERGE, metadata tables, procedures and time travel. One thing breaks it, and it is not Spark Connect: loading Hudi's session extension alongside Iceberg's.
+- [Apache Hudi through Spark Connect: running the full table surface from a thin client](https://rangareddy.github.io/SparkConnectHudi/): Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.
+- [Apache Spark joins in depth: the five strategies and how one gets picked](https://rangareddy.github.io/SparkJoinsInDepth/): Spark has five join strategies and one decision procedure that chooses between them. Here is how each works, the exact order Spark tries them in, which join types quietly forbid which strategy, and what to do per scenario.
+- [200 Apache Spark interview questions, with answers](https://rangareddy.github.io/SparkInterviewQuestions/): Two hundred questions from first principles to production scenarios, each answered in depth with the mechanism, an example and the trap. Grouped by topic and collapsed, so you can drill one section at a time.
+- [Apache Spark architecture: what actually happens when you call an action](https://rangareddy.github.io/ApacheSparkArchitecture/): A walk through the Spark runtime from the driver down to a single task: who schedules what, where memory goes, how a shuffle is written, and which class to read when a job misbehaves.
+- [Apache Spark: the complete cheat sheet](https://rangareddy.github.io/ApacheSparkCheatSheet/): One page to keep open while you work: the execution model, spark-submit, the memory split, join strategies, shuffle and partitioning, adaptive query execution, caching, streaming and the configs that matter, with the default and the version for each.
+- [A Spark JVM playbook: custom logging, class loading, stack size and proxies](https://rangareddy.github.io/SparkTroubleshootingPlaybook/): Four techniques that pay for themselves on nearly every Spark investigation: swap in a custom Log4j 2 config, trace class loading, raise the JVM stack size, and route traffic through an HTTP proxy. All four go through the same two configs, so learning one teaches you the rest.
+- [Spark Submit Command generator using Iceberg Catalog](https://rangareddy.github.io/SparkIcebergSubmitCommand/): Pick a catalog type (Hive, Hadoop, REST or JDBC) plus Spark, Iceberg and Scala versions, and get the spark-shell command with the right iceberg-spark-runtime coordinates and catalog configs. Every version pair comes from the Iceberg release's own build rather than a hand-kept table.
+- [Spark Submit Command Formatter tool](https://rangareddy.github.io/SparkSubmitFormatter/): Paste a spark-submit command and get it back formatted across lines or minified onto one line, with every Spark option resolved to the configuration property it sets and your application's own arguments kept separate.
+- [Spark Configuration Generator tool](https://rangareddy.github.io/SparkConfigurationGenerator/): Enter the node count, cores per node and memory per node for your cluster and get back executor count, executor cores, executor memory and memory overhead, ready to paste into spark-shell.
+
+## Tools
+
+- [Inspecting Parquet files from the command line with parquet-cli](https://rangareddy.github.io/ParquetTools/): parquet-cli is the maintained command-line tool for Parquet, and it does more than parquet-tools ever did. Here is the command-for-command migration, every transcript captured from a real run, plus what to know about rewrite.
+

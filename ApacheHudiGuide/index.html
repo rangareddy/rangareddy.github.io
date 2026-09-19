@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Apache Hudi: an introduction to its architecture, features and what makes it different · Ranga Reddy</title>
+  <meta name="description" content="A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/ApacheHudiGuide/">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Apache Hudi: an introduction to its architecture, features and what makes it different">
+  <meta property="og:description" content="A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.">
+  <meta property="og:url" content="https://rangareddy.github.io/ApacheHudiGuide/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/ApacheHudiGuide.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Apache Hudi: an introduction to its architecture, features and what makes it different">
+  <meta name="twitter:description" content="A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/ApacheHudiGuide.png">
+  <meta property="article:published_time" content="2026-09-07T09:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Apache Hudi: an introduction to its architecture, features and what makes it different",
+    "description": "A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.",
+    "url": "https://rangareddy.github.io/ApacheHudiGuide/",
+    "datePublished": "2026-09-07T09:00:00+05:30",
+    "dateModified": "2026-09-07T09:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/ApacheHudiGuide.png",
+    "keywords": "Hudi, Lakehouse, Spark, Indexing, Streaming",
+    "articleSection": "Hudi",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/ApacheHudiGuide/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Hudi", "item": "https://rangareddy.github.io/category/#hudi" },
+      { "@type": "ListItem", "position": 3, "name": "Apache Hudi: an introduction to its architecture, features and what makes it different", "item": "https://rangareddy.github.io/ApacheHudiGuide/" }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Do I have to use Merge-on-Read?","acceptedAnswer":{"@type":"Answer","text":"No, and it is not the default. hoodie.datasource.write.table.type defaults to Copy-on-Write, which is the right choice for most tables written a few times a day. Merge-on-Read is the option you reach for when writes are frequent and someone will own compaction."}},{"@type":"Question","name":"What if my data has no natural primary key?","acceptedAnswer":{"@type":"Answer","text":"Hudi can build one. hoodie.datasource.write.keygenerator.class selects a key generator, and composite keys built from several columns are ordinary. If nothing in the row identifies it and nothing ever updates, that is a strong sign an append-only pattern suits you better than an indexed one."}},{"@type":"Question","name":"Can I read a Hudi table from Trino or Snowflake?","acceptedAnswer":{"@type":"Answer","text":"Trino and Presto read it through their connectors, per the table above. Beyond that, Apache XTable converts Hudi metadata into Iceberg or Delta metadata over the same Parquet files, so an engine that speaks one of those can read a table Hudi writes without the data being copied."}},{"@type":"Question","name":"Is the metadata table optional?","acceptedAnswer":{"@type":"Answer","text":"Technically, but leave it on. hoodie.metadata.enable has defaulted to true since 0.7.0, the metadata-backed indexes require it, and planning without it means listing object storage on every query."}},{"@type":"Question","name":"How do I move a 0.x table to 1.x?","acceptedAnswer":{"@type":"Answer","text":"Through the table version. 0.x tables are version 6 and 1.x tables are version 8 or 9, and the jump changes the timeline layout, so a 0.x reader will not understand a 1.x timeline directory. Upgrade readers and writers together rather than one at a time."}},{"@type":"Question","name":"Does declaring a record key slow down writes?","acceptedAnswer":{"@type":"Answer","text":"It adds the tagging step, and how much that costs is entirely the index’s doing. With SIMPLE, tagging scans and the cost tracks your table. With a record index it is a point lookup and the cost tracks your batch. That is why setting hoodie.index.type deliberately matters more than almost anything else here."}}]}
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/ApacheHudiGuide.png"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Apache Hudi: an introduction to its architecture, features and what makes it different</h1>
+      <p class="post-head__lede">A foundations-to-production guide to Apache Hudi, covering what it is, the primitives it is built from, how a write and a read actually work, and the capabilities that exist in Hudi and nowhere else, including the record-level index, the multi-modal index, incremental queries and non-blocking concurrency.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-09-07T09:00:00+05:30">Sep 7, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>30 min read</span>
+  <span class="meta__item meta__views" data-views-for="/ApacheHudiGuide/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#hudi">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Hudi
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#hudi">#Hudi</a></li>
+  <li><a class="chip" href="/tag/#lakehouse">#Lakehouse</a></li>
+  <li><a class="chip" href="/tag/#spark">#Spark</a></li>
+  <li><a class="chip" href="/tag/#indexing">#Indexing</a></li>
+  <li><a class="chip" href="/tag/#streaming">#Streaming</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#what-is-apache-hudi" id="markdown-toc-what-is-apache-hudi">What is Apache Hudi?</a></li>
+  <li><a href="#which-hudi-release-are-you-on" id="markdown-toc-which-hudi-release-are-you-on">Which Hudi release are you on?</a></li>
+  <li><a href="#what-problem-was-it-built-for" id="markdown-toc-what-problem-was-it-built-for">What problem was it built for?</a></li>
+  <li><a href="#what-is-hudi-built-from" id="markdown-toc-what-is-hudi-built-from">What is Hudi built from?</a>    <ul>
+      <li><a href="#record-key-and-ordering-field" id="markdown-toc-record-key-and-ordering-field">Record key and ordering field</a></li>
+      <li><a href="#the-timeline" id="markdown-toc-the-timeline">The timeline</a></li>
+      <li><a href="#file-groups-and-file-slices" id="markdown-toc-file-groups-and-file-slices">File groups and file slices</a></li>
+      <li><a href="#the-index" id="markdown-toc-the-index">The index</a></li>
+    </ul>
+  </li>
+  <li><a href="#architecture-what-does-a-table-look-like-on-disk" id="markdown-toc-architecture-what-does-a-table-look-like-on-disk">Architecture: what does a table look like on disk?</a>    <ul>
+      <li><a href="#the-write-path" id="markdown-toc-the-write-path">The write path</a></li>
+      <li><a href="#the-read-path" id="markdown-toc-the-read-path">The read path</a></li>
+    </ul>
+  </li>
+  <li><a href="#copy-on-write-or-merge-on-read" id="markdown-toc-copy-on-write-or-merge-on-read">Copy-on-Write or Merge-on-Read?</a></li>
+  <li><a href="#what-does-it-look-like-end-to-end" id="markdown-toc-what-does-it-look-like-end-to-end">What does it look like end to end?</a>    <ul>
+      <li><a href="#1-create-the-table" id="markdown-toc-1-create-the-table">1. Create the table</a></li>
+      <li><a href="#2-insert-the-first-batch" id="markdown-toc-2-insert-the-first-batch">2. Insert the first batch</a></li>
+      <li><a href="#3-upsert-a-batch-of-changes" id="markdown-toc-3-upsert-a-batch-of-changes">3. Upsert a batch of changes</a></li>
+      <li><a href="#4-read-only-what-changed" id="markdown-toc-4-read-only-what-changed">4. Read only what changed</a></li>
+      <li><a href="#5-delete" id="markdown-toc-5-delete">5. Delete</a></li>
+    </ul>
+  </li>
+  <li><a href="#what-features-do-you-get" id="markdown-toc-what-features-do-you-get">What features do you get?</a></li>
+  <li><a href="#what-is-special-about-hudi" id="markdown-toc-what-is-special-about-hudi">What is special about Hudi?</a>    <ul>
+      <li><a href="#1-a-record-level-index" id="markdown-toc-1-a-record-level-index">1. A record-level index</a></li>
+      <li><a href="#2-a-multi-modal-index-not-just-a-file-listing" id="markdown-toc-2-a-multi-modal-index-not-just-a-file-listing">2. A multi-modal index, not just a file listing</a></li>
+      <li><a href="#3-incremental-queries-as-a-first-class-read-mode" id="markdown-toc-3-incremental-queries-as-a-first-class-read-mode">3. Incremental queries as a first-class read mode</a></li>
+      <li><a href="#4-four-kinds-of-concurrency-control" id="markdown-toc-4-four-kinds-of-concurrency-control">4. Four kinds of concurrency control</a></li>
+      <li><a href="#5-table-services-that-run-themselves" id="markdown-toc-5-table-services-that-run-themselves">5. Table services that run themselves</a></li>
+      <li><a href="#6-savepoint-and-restore" id="markdown-toc-6-savepoint-and-restore">6. Savepoint and restore</a></li>
+      <li><a href="#7-write-operations-beyond-insert-and-upsert" id="markdown-toc-7-write-operations-beyond-insert-and-upsert">7. Write operations beyond insert and upsert</a></li>
+      <li><a href="#8-hudi-streamer" id="markdown-toc-8-hudi-streamer">8. Hudi Streamer</a></li>
+    </ul>
+  </li>
+  <li><a href="#which-engines-can-read-and-write-it" id="markdown-toc-which-engines-can-read-and-write-it">Which engines can read and write it?</a></li>
+  <li><a href="#when-does-a-simpler-choice-win" id="markdown-toc-when-does-a-simpler-choice-win">When does a simpler choice win?</a></li>
+  <li><a href="#production-tips" id="markdown-toc-production-tips">Production tips</a></li>
+  <li><a href="#frequently-asked-questions" id="markdown-toc-frequently-asked-questions">Frequently asked questions</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>Hudi is a lakehouse platform whose defining choice is that a table has record identity. You declare a record key, Hudi indexes it, and an update becomes a point lookup rather than a scan.</li>
+    <li>The architecture rests on four primitives: the timeline of instants, file groups and file slices, the index, and the metadata table. Everything else is built from those.</li>
+    <li>Two table types make the write-versus-read trade explicit. Copy-on-Write rewrites base files for fast reads; Merge-on-Read appends log files for fast writes and compacts later.</li>
+    <li>Three capabilities have no direct equivalent in the other table formats: a record-level index, incremental queries as a first-class read mode, and non-blocking concurrency control, which lets two writers touch the same file group and resolves the conflict at read and compaction time.</li>
+    <li>The metadata table is not just a file listing. It holds seven kinds of index, including column stats, bloom filters, expression indexes and secondary indexes.</li>
+  </ul>
+</blockquote>
+
+<p>The first time you meet Apache Hudi it looks like the other table formats with
+more configuration attached. There is a record key you have to declare, a table
+type you have to pick, and a compaction job somebody has to own, none of which
+Iceberg or Delta ask of you on day one.</p>
+
+<p>Then you hit the workload it was built for: a change stream where one row in a
+hundred million moves every minute, against a table far too large to rewrite. The
+extra configuration stops looking like overhead and starts looking like the point.</p>
+
+<p>The useful thing to understand about Hudi is not its feature list, which now
+overlaps heavily with everyone else’s. It is one decision the project made early
+and never backed away from: <strong>records have identity</strong>. Every distinctive thing
+below is downstream of that.</p>
+
+<h2 id="what-is-apache-hudi">What is Apache Hudi?</h2>
+
+<p>An open lakehouse platform: a table format on object storage plus the services
+needed to keep such a table healthy. Its own documentation describes it as
+bringing database functionality to data lakes, including tables, transactions,
+upserts and deletes, indexes and compaction.</p>
+
+<p>The project has been going since late 2016, and the docs list Uber, Amazon,
+ByteDance and Robinhood among the organisations running it in production.</p>
+
+<p>Its age matters less than its starting point. Hudi was not a general-purpose
+table format that later grew update support. It was designed around one problem:
+a continuous stream of changes to known records, landing on a data lake, needing
+to be applied efficiently and consumed incrementally. Every architectural choice
+below follows from that, which is why Hudi looks different from formats that
+started by describing a set of immutable files.</p>
+
+<p>This guide covers the Hudi <code class="language-plaintext highlighter-rouge">1.x</code> line, whose Spark bundles run on Spark 3.3
+through 4.1. Where a behaviour is specific to one release the release is named;
+otherwise it holds across <code class="language-plaintext highlighter-rouge">1.x</code>. If you are on a newer release, the release table
+in the next section is the thing to re-check first.</p>
+
+<p>Prerequisites: comfort with Spark and SQL. No prior Hudi knowledge is assumed,
+and every Hudi-specific term is defined on first use.</p>
+
+<h2 id="which-hudi-release-are-you-on">Which Hudi release are you on?</h2>
+
+<p>Hudi’s numbering changed shape at 1.0.0, so it helps to see the recent line laid
+out. Dates are release dates; the table version is the on-disk format version
+that release introduced, taken from <code class="language-plaintext highlighter-rouge">HoodieTableVersion</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Release</th>
+      <th style="text-align: left">Date</th>
+      <th style="text-align: left">Table version</th>
+      <th style="text-align: left">Timeline layout</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">0.14.0</td>
+      <td style="text-align: left">2023-10-05</td>
+      <td style="text-align: left">6</td>
+      <td style="text-align: left">v1, instants directly in <code class="language-plaintext highlighter-rouge">.hoodie/</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">0.15.0</td>
+      <td style="text-align: left">2024-06-06</td>
+      <td style="text-align: left">6</td>
+      <td style="text-align: left">v1</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">1.0.0</td>
+      <td style="text-align: left">2024-12-11</td>
+      <td style="text-align: left">8</td>
+      <td style="text-align: left">v2, instants in <code class="language-plaintext highlighter-rouge">.hoodie/timeline/</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">1.1.0</td>
+      <td style="text-align: left">2025-11-17</td>
+      <td style="text-align: left">9</td>
+      <td style="text-align: left">v2</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">1.2.0</td>
+      <td style="text-align: left">2026-05-23</td>
+      <td style="text-align: left">9</td>
+      <td style="text-align: left">v2</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Patch releases exist on most of those lines, currently up to <code class="language-plaintext highlighter-rouge">0.15.1</code>, <code class="language-plaintext highlighter-rouge">1.0.2</code>
+and <code class="language-plaintext highlighter-rouge">1.1.1</code>. Table version 7 appears in the enum mapped to a <code class="language-plaintext highlighter-rouge">0.16.0</code> that was
+never released, so in practice you will meet versions 6, 8 and 9.</p>
+
+<p>The jump from 6 to 8 is the one to plan for. It changes the timeline layout, so
+a 0.x reader will not understand a 1.x table’s timeline directory. Three
+capabilities this guide relies on arrived across that boundary, each carrying a
+<code class="language-plaintext highlighter-rouge">sinceVersion</code> in its own config definition:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Capability</th>
+      <th style="text-align: left">Since</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Global record index (<code class="language-plaintext highlighter-rouge">hoodie.metadata.global.record.level.index.enable</code>)</td>
+      <td style="text-align: left">0.14.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Record merge modes (<code class="language-plaintext highlighter-rouge">hoodie.record.merge.mode</code>)</td>
+      <td style="text-align: left">1.0.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Partition-scoped record index (<code class="language-plaintext highlighter-rouge">hoodie.metadata.record.level.index.enable</code>)</td>
+      <td style="text-align: left">1.1.0</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>If you are on a 0.x release, most of the architecture in this guide still
+applies, but expect the timeline to sit directly in <code class="language-plaintext highlighter-rouge">.hoodie/</code> and the
+partition-scoped record index to be unavailable.</p>
+
+<h2 id="what-problem-was-it-built-for">What problem was it built for?</h2>
+
+<p>The architecture Hudi replaced was Parquet files in partitioned directories with
+a Hive Metastore on top. Four failures drove its design, and each has a symptom
+you may have hit.</p>
+
+<p><strong>Updating one record meant rewriting a partition.</strong> With immutable files and no
+record identity, correcting a single row means reading the partition, merging,
+and writing it back. A change stream delivering a few thousand updates an hour
+turns into rewriting most of your table every hour.</p>
+
+<p><strong>There was no way to ask what changed.</strong> Downstream consumers either reprocessed
+everything or maintained their own high-water marks over a timestamp column,
+which breaks the moment a late record arrives with an older timestamp.</p>
+
+<p><strong>Writes were not atomic.</strong> A job that failed part way left readers seeing half a
+batch, and there was no way to roll back to the previous state.</p>
+
+<p><strong>Freshness and query speed were in direct conflict.</strong> Writing small files often
+kept data fresh and made queries slow; writing large files in batches made
+queries fast and data stale.</p>
+
+<p>Hudi’s answer to all four is the same: give the table an authoritative record of
+its own state, give records an identity, and make the freshness-versus-speed
+trade a configuration choice rather than an architectural one.</p>
+
+<h2 id="what-is-hudi-built-from">What is Hudi built from?</h2>
+
+<pre><code class="language-mermaid">flowchart LR
+  SP["Spark"] --&gt; T
+  FL["Flink"] --&gt; T
+  ST["Hudi Streamer"] --&gt; T
+
+  T["a Hudi table"] --&gt; TL["timeline&lt;br/&gt;what happened, and when"]
+  T --&gt; IX["index&lt;br/&gt;key to file group"]
+  T --&gt; MD["metadata table&lt;br/&gt;listings and indexes"]
+  T --&gt; FG["file groups&lt;br/&gt;and file slices"]
+
+  TL --&gt; R["a query"]
+  IX --&gt; R
+  MD --&gt; R
+  FG --&gt; R
+
+  R --&gt; Q1["snapshot"]
+  R --&gt; Q2["read optimized"]
+  R --&gt; Q3["incremental"]
+</code></pre>
+
+<p>Almost everything in Hudi is built from four things. Learn these and the rest of
+the system reads as composition.</p>
+
+<h3 id="record-key-and-ordering-field">Record key and ordering field</h3>
+
+<p>A Hudi table declares a <strong>record key</strong>, the column or columns that identify a
+record. It is not optional in the way a primary key is optional in a plain
+Parquet table: it is part of the table contract, and it is what makes an update
+addressable.</p>
+
+<p>Alongside it sits an <strong>ordering field</strong>, used to decide which version of a record
+wins when two arrive for the same key. On the 1.x line the SQL property is
+<code class="language-plaintext highlighter-rouge">orderingFields</code>, with <code class="language-plaintext highlighter-rouge">preCombineField</code> kept as a registered alternative; both
+resolve to the table property <code class="language-plaintext highlighter-rouge">hoodie.table.ordering.fields</code>.</p>
+
+<p>How the winner is chosen is itself configurable, through <a href="https://github.com/apache/hudi/blob/master/hudi-common/src/main/java/org/apache/hudi/common/config/RecordMergeMode.java"><code class="language-plaintext highlighter-rouge">RecordMergeMode</code></a>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Merge mode</th>
+      <th style="text-align: left">Winner is</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">COMMIT_TIME_ORDERING</code></td>
+      <td style="text-align: left">The record from the later transaction</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">EVENT_TIME_ORDERING</code></td>
+      <td style="text-align: left">The record with the larger ordering-field value, regardless of transaction time</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">CUSTOM</code></td>
+      <td style="text-align: left">Whatever your merge implementation decides</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">EVENT_TIME_ORDERING</code> is the one that matters for late-arriving data. A correction
+that was generated earlier but arrived later will not overwrite a newer value,
+which is exactly what you want from a change stream and what a naive
+last-write-wins upsert gets wrong.</p>
+
+<h3 id="the-timeline">The timeline</h3>
+
+<p>The <strong>timeline</strong> is Hudi’s record of everything that has happened to the table.
+Each entry is an <strong>instant</strong>: an action, a time, and a state. In 1.x the timeline
+lives in its own directory, since <code class="language-plaintext highlighter-rouge">hoodie.timeline.path</code> defaults to <code class="language-plaintext highlighter-rouge">timeline</code>
+and <code class="language-plaintext highlighter-rouge">hoodie.timeline.history.path</code> to <code class="language-plaintext highlighter-rouge">history</code>.</p>
+
+<p>An instant moves through three states, and the filename changes with each:</p>
+
+<pre><code class="language-mermaid">flowchart LR
+  R["20260915090000123&lt;br/&gt;.deltacommit.requested"] --&gt; I["20260915090000123&lt;br/&gt;.deltacommit.inflight"]
+  I --&gt; C["20260915090000123_20260915090004881&lt;br/&gt;.deltacommit"]
+  I --&gt; X["rollback&lt;br/&gt;on failure"]
+</code></pre>
+
+<p>Readers only ever see the completed form, which is where atomicity comes from: a
+half-finished write is visible on the timeline as <code class="language-plaintext highlighter-rouge">.inflight</code>, and invisible to
+queries. A filter written against <code class="language-plaintext highlighter-rouge">.deltacommit</code> will not match a pending write,
+which is deliberate.</p>
+
+<p>The current release defines twelve action types:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Action</th>
+      <th style="text-align: left">What it records</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">commit</code></td>
+      <td style="text-align: left">A write to a Copy-on-Write table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">deltacommit</code></td>
+      <td style="text-align: left">A write to a Merge-on-Read table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">compaction</code></td>
+      <td style="text-align: left">Merging log files into a new base file</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">logcompaction</code></td>
+      <td style="text-align: left">Merging log blocks without rewriting the base file</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">clustering</code></td>
+      <td style="text-align: left">Reorganising data layout without changing content</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">replacecommit</code></td>
+      <td style="text-align: left">A write that replaces existing file groups</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">clean</code></td>
+      <td style="text-align: left">Removing file slices no longer needed</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">rollback</code></td>
+      <td style="text-align: left">Undoing a failed write</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">savepoint</code></td>
+      <td style="text-align: left">Marking a state to protect from cleaning</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">restore</code></td>
+      <td style="text-align: left">Returning the table to a savepoint</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">indexing</code></td>
+      <td style="text-align: left">Building an index asynchronously</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">schemacommit</code></td>
+      <td style="text-align: left">Recording a schema change</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="file-groups-and-file-slices">File groups and file slices</h3>
+
+<p>Data is organised into <strong>file groups</strong>, each identified by a file ID that never
+changes. A record key, once assigned to a file group, stays there. A <strong>file
+slice</strong> is one version of a group: a base file plus any log files written
+against it.</p>
+
+<p>This is the unit that makes an update local. Without it, “update this record”
+has to be answered against the whole table; with it, the question becomes “which
+file group”, which an index can answer directly.</p>
+
+<h3 id="the-index">The index</h3>
+
+<p>The <strong>index</strong> maps a record key to the file group holding it. This is the piece
+with no equivalent in the other major table formats, and it is why Hudi behaves
+differently on write-heavy workloads.</p>
+
+<p><code class="language-plaintext highlighter-rouge">hoodie.index.type</code> has no default value of its own. The Spark and Java clients
+fall back to <code class="language-plaintext highlighter-rouge">SIMPLE</code> and Flink to <code class="language-plaintext highlighter-rouge">INMEMORY</code>, chosen in code rather than in the
+config, so a writer that never sets it is running <code class="language-plaintext highlighter-rouge">SIMPLE</code>. The full set is
+<code class="language-plaintext highlighter-rouge">INMEMORY</code>, <code class="language-plaintext highlighter-rouge">BLOOM</code>, <code class="language-plaintext highlighter-rouge">GLOBAL_BLOOM</code>, <code class="language-plaintext highlighter-rouge">SIMPLE</code>, <code class="language-plaintext highlighter-rouge">GLOBAL_SIMPLE</code>, <code class="language-plaintext highlighter-rouge">BUCKET</code>,
+<code class="language-plaintext highlighter-rouge">FLINK_STATE</code>, <code class="language-plaintext highlighter-rouge">RECORD_INDEX</code>, <code class="language-plaintext highlighter-rouge">GLOBAL_RECORD_LEVEL_INDEX</code> and
+<code class="language-plaintext highlighter-rouge">RECORD_LEVEL_INDEX</code>.</p>
+
+<p>The distinction that runs through them is global versus partition-scoped. A
+global index enforces that a key is unique across the whole table and can move a
+record between partitions when its partition value changes. A partition-scoped
+index allows the same key in several partitions, which is correct when your
+partitioning is itself part of the identity.</p>
+
+<h2 id="architecture-what-does-a-table-look-like-on-disk">Architecture: what does a table look like on disk?</h2>
+
+<p>Those four primitives produce a specific on-disk shape. A Merge-on-Read table,
+partitioned by city:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>s3a://lakehouse-prod/warehouse/trips/
+├── .hoodie/
+│   ├── hoodie.properties                       &lt;- the table contract
+│   ├── timeline/
+│   │   ├── 20260915090000123.deltacommit.requested
+│   │   ├── 20260915090000123.deltacommit.inflight
+│   │   ├── 20260915090000123_20260915090004881.deltacommit
+│   │   └── history/                            &lt;- archived instants
+│   ├── metadata/                               &lt;- the metadata table
+│   │   ├── files/
+│   │   ├── column_stats/
+│   │   └── record_index/
+│   └── .index_defs/index.json
+└── city_id=sf/
+    ├── 8f3a1c92-...-0_0-24-1893_20260915090000123.parquet    &lt;- base file
+    └── .8f3a1c92-...-0_20260915090000123.log.1_0-31-2104     &lt;- log file
+</code></pre></div></div>
+
+<p>Note that log files begin with a dot, so a plain listing hides them. A
+Merge-on-Read partition can look deceptively like Copy-on-Write at a glance.</p>
+
+<h3 id="the-write-path">The write path</h3>
+
+<pre><code class="language-mermaid">flowchart TB
+  subgraph W["write path"]
+    direction LR
+    A["incoming batch"] --&gt; B["key generation"]
+    B --&gt; C["index lookup&lt;br/&gt;key to file group"]
+    C --&gt; D["partition into&lt;br/&gt;inserts and updates"]
+    D --&gt; E["write base file&lt;br/&gt;or append log block"]
+    E --&gt; F["commit instant&lt;br/&gt;on the timeline"]
+    F --&gt; G["update the&lt;br/&gt;metadata table"]
+  end
+</code></pre>
+
+<p>The index lookup is the step that distinguishes Hudi. On a table format without
+record identity, the equivalent step is a join between the incoming batch and the
+table, whose cost scales with how much of the table the join has to touch. With
+an index, it is a lookup whose cost scales with the batch. On a small batch
+against a large table, that is the whole difference.</p>
+
+<h3 id="the-read-path">The read path</h3>
+
+<p>Reading is a reconciliation, and Hudi lets you choose how much reconciliation you
+want. The three query types come from <code class="language-plaintext highlighter-rouge">DataSourceReadOptions</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Query type</th>
+      <th style="text-align: left">Reads</th>
+      <th style="text-align: left">On Copy-on-Write</th>
+      <th style="text-align: left">On Merge-on-Read</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">snapshot</code> (default)</td>
+      <td style="text-align: left">Latest committed state</td>
+      <td style="text-align: left">Base files</td>
+      <td style="text-align: left">Base files merged with log files</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">read_optimized</code></td>
+      <td style="text-align: left">Base files only</td>
+      <td style="text-align: left">Same as snapshot</td>
+      <td style="text-align: left">State as of the last compaction</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">incremental</code></td>
+      <td style="text-align: left">Records changed between two instants</td>
+      <td style="text-align: left">Supported</td>
+      <td style="text-align: left">Supported</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">read_optimized</code> on a Copy-on-Write table is identical to <code class="language-plaintext highlighter-rouge">snapshot</code>, because
+there are no log files to skip. On Merge-on-Read the gap between the two is
+exactly the set of writes not yet compacted, which makes comparing their row
+counts a useful health check.</p>
+
+<h2 id="copy-on-write-or-merge-on-read">Copy-on-Write or Merge-on-Read?</h2>
+
+<p>Hudi makes you state the trade at table creation, which is more honest than
+burying it in a property you discover later.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left"> </th>
+      <th style="text-align: left">Copy-on-Write</th>
+      <th style="text-align: left">Merge-on-Read</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Update applies by</td>
+      <td style="text-align: left">Rewriting the base file</td>
+      <td style="text-align: left">Appending a log file</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Write latency</td>
+      <td style="text-align: left">Higher, proportional to the files touched</td>
+      <td style="text-align: left">Lower, proportional to the change</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Write amplification</td>
+      <td style="text-align: left">High: a whole base file per update</td>
+      <td style="text-align: left">Low</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Read latency</td>
+      <td style="text-align: left">Low, plain columnar read</td>
+      <td style="text-align: left">Higher on <code class="language-plaintext highlighter-rouge">snapshot</code>, merge at query time</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Freshness</td>
+      <td style="text-align: left">Immediate</td>
+      <td style="text-align: left">Immediate on <code class="language-plaintext highlighter-rouge">snapshot</code>, last compaction on <code class="language-plaintext highlighter-rouge">read_optimized</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Compaction needed</td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Yes</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Storage overhead</td>
+      <td style="text-align: left">Lower</td>
+      <td style="text-align: left">Higher until compaction</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Suits</td>
+      <td style="text-align: left">Read-heavy tables written a few times a day</td>
+      <td style="text-align: left">Write-heavy tables fed by a change stream</td>
+    </tr>
+  </tbody>
+</table>
+
+<pre><code class="language-mermaid">flowchart TB
+  subgraph COW["Copy-on-Write: an update rewrites the base file"]
+    direction LR
+    A1["base @ t1"] --&gt; A2["update at t2"]
+    A2 --&gt; A3["base @ t2&lt;br/&gt;fully rewritten"]
+    A3 --&gt; A4["read = one file"]
+  end
+
+  subgraph MOR["Merge-on-Read: an update appends a log file"]
+    direction LR
+    B1["base @ t1"] --&gt; B2["update at t2"]
+    B2 --&gt; B3["base @ t1&lt;br/&gt;+ log file"]
+    B3 --&gt; B4["read = base merged&lt;br/&gt;with logs"]
+    B3 --&gt; B5["compaction&lt;br/&gt;later"]
+  end
+
+  COW ~~~ MOR
+</code></pre>
+
+<p>Stated as a sentence each: <strong>Copy-on-Write buys cheap, simple reads at the cost
+of rewriting a whole base file per update. Merge-on-Read buys low write latency
+at the cost of read-side merge work and a compaction job you have to operate.</strong></p>
+
+<p>The default is Copy-on-Write: <code class="language-plaintext highlighter-rouge">hoodie.datasource.write.table.type</code> defaults to
+the Copy-on-Write value. Choose Merge-on-Read deliberately, and only if someone
+will own compaction.</p>
+
+<h2 id="what-does-it-look-like-end-to-end">What does it look like end to end?</h2>
+
+<p>One schema throughout: ride events arriving as a change stream, keyed by
+<code class="language-plaintext highlighter-rouge">trip_id</code>, partitioned by <code class="language-plaintext highlighter-rouge">city_id</code>, ordered by <code class="language-plaintext highlighter-rouge">updated_at</code>. Every statement
+below is literal, with the rows written inline, so you can paste the whole
+section into a shell and watch a real table take shape on local disk.</p>
+
+<p>Everything runs in one <code class="language-plaintext highlighter-rouge">spark-sql</code> session. Hudi’s Spark SQL surface covers DDL,
+upserts, incremental reads and the maintenance procedures, so nothing here needs
+the DataFrame API. Swap the bundle for the one matching your Spark line, and the
+<code class="language-plaintext highlighter-rouge">LOCATION</code> for your own warehouse path when you move off a laptop.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>spark-sql <span class="se">\</span>
+  <span class="nt">--packages</span> org.apache.hudi:hudi-spark3.5-bundle_2.12:1.2.0 <span class="se">\</span>
+  <span class="nt">--conf</span> spark.serializer<span class="o">=</span>org.apache.spark.serializer.KryoSerializer <span class="se">\</span>
+  <span class="nt">--conf</span> spark.sql.extensions<span class="o">=</span>org.apache.spark.sql.hudi.HoodieSparkSessionExtension <span class="se">\</span>
+  <span class="nt">--conf</span> spark.sql.catalog.spark_catalog<span class="o">=</span>org.apache.spark.sql.hudi.catalog.HoodieCatalog
+</code></pre></div></div>
+
+<h3 id="1-create-the-table">1. Create the table</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">trips</span> <span class="p">(</span>
+  <span class="n">trip_id</span>      <span class="n">STRING</span><span class="p">,</span>
+  <span class="n">rider_id</span>     <span class="n">STRING</span><span class="p">,</span>
+  <span class="n">fare_amount</span>  <span class="nb">DECIMAL</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">2</span><span class="p">),</span>
+  <span class="n">started_at</span>   <span class="nb">TIMESTAMP</span><span class="p">,</span>
+  <span class="n">updated_at</span>   <span class="nb">TIMESTAMP</span><span class="p">,</span>
+  <span class="n">city_id</span>      <span class="n">STRING</span>          <span class="c1">-- partition column, declared last</span>
+<span class="p">)</span> <span class="k">USING</span> <span class="n">hudi</span>
+<span class="n">PARTITIONED</span> <span class="k">BY</span> <span class="p">(</span><span class="n">city_id</span><span class="p">)</span>
+<span class="k">LOCATION</span> <span class="s1">'file:///tmp/hudi-demo/trips'</span>
+<span class="n">TBLPROPERTIES</span> <span class="p">(</span>
+  <span class="k">type</span> <span class="o">=</span> <span class="s1">'mor'</span><span class="p">,</span>                     <span class="c1">-- append log files, compact later</span>
+  <span class="n">primaryKey</span> <span class="o">=</span> <span class="s1">'trip_id'</span><span class="p">,</span>
+  <span class="c1">-- Renamed in 1.x; preCombineField still resolves as an alternative.</span>
+  <span class="n">orderingFields</span> <span class="o">=</span> <span class="s1">'updated_at'</span><span class="p">,</span>
+  <span class="c1">-- Late corrections must not overwrite newer values.</span>
+  <span class="n">recordMergeMode</span> <span class="o">=</span> <span class="s1">'EVENT_TIME_ORDERING'</span><span class="p">,</span>
+  <span class="c1">-- trip_id is unique within a city, so the partition-scoped index is both</span>
+  <span class="c1">-- correct and cheaper than the global one.</span>
+  <span class="s1">'hoodie.index.type'</span> <span class="o">=</span> <span class="s1">'RECORD_LEVEL_INDEX'</span><span class="p">,</span>
+  <span class="s1">'hoodie.metadata.record.level.index.enable'</span> <span class="o">=</span> <span class="s1">'true'</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<h3 id="2-insert-the-first-batch">2. Insert the first batch</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">trips</span>
+  <span class="p">(</span><span class="n">trip_id</span><span class="p">,</span> <span class="n">rider_id</span><span class="p">,</span> <span class="n">fare_amount</span><span class="p">,</span> <span class="n">started_at</span><span class="p">,</span> <span class="n">updated_at</span><span class="p">,</span> <span class="n">city_id</span><span class="p">)</span>
+<span class="k">VALUES</span>
+  <span class="p">(</span><span class="s1">'trip-1001'</span><span class="p">,</span> <span class="s1">'rider-8814f2'</span><span class="p">,</span> <span class="mi">24</span><span class="p">.</span><span class="mi">50</span><span class="p">,</span>
+   <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:12:04'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:31:10'</span><span class="p">,</span> <span class="s1">'sf'</span><span class="p">),</span>
+  <span class="p">(</span><span class="s1">'trip-1002'</span><span class="p">,</span> <span class="s1">'rider-33c9a1'</span><span class="p">,</span> <span class="mi">11</span><span class="p">.</span><span class="mi">75</span><span class="p">,</span>
+   <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:19:47'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:29:02'</span><span class="p">,</span> <span class="s1">'sf'</span><span class="p">),</span>
+  <span class="p">(</span><span class="s1">'trip-1003'</span><span class="p">,</span> <span class="s1">'rider-70b4de'</span><span class="p">,</span> <span class="mi">38</span><span class="p">.</span><span class="mi">20</span><span class="p">,</span>
+   <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:22:15'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:44:51'</span><span class="p">,</span> <span class="s1">'nyc'</span><span class="p">);</span>
+
+<span class="k">SELECT</span> <span class="n">trip_id</span><span class="p">,</span> <span class="n">city_id</span><span class="p">,</span> <span class="n">fare_amount</span><span class="p">,</span> <span class="n">updated_at</span> <span class="k">FROM</span> <span class="n">trips</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">trip_id</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Two small conventions there are worth copying. The partition column is declared
+last, which is how Hudi’s own DDL examples are written, and the <code class="language-plaintext highlighter-rouge">INSERT</code> names
+its columns rather than relying on position. Together they mean you never have to
+work out whether the table’s column order is the order you typed.</p>
+
+<p>Three rows, two partitions. Because the table declared <code class="language-plaintext highlighter-rouge">trip_id</code> as its primary
+key, those keys are now addressable: the next statement can change one of them by
+name rather than by rewriting a partition.</p>
+
+<h3 id="3-upsert-a-batch-of-changes">3. Upsert a batch of changes</h3>
+
+<p>The interesting batch is one that mixes an update, a correction that arrived
+late, and a brand new trip. Writing it inline makes the ordering rule visible:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MERGE</span> <span class="k">INTO</span> <span class="n">trips</span> <span class="n">t</span>
+<span class="k">USING</span> <span class="p">(</span>
+  <span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="k">VALUES</span>
+    <span class="c1">-- An ordinary update: the fare was adjusted after the trip closed.</span>
+    <span class="p">(</span><span class="s1">'trip-1001'</span><span class="p">,</span> <span class="s1">'rider-8814f2'</span><span class="p">,</span> <span class="mi">27</span><span class="p">.</span><span class="mi">00</span><span class="p">,</span>
+     <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:12:04'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 09:05:33'</span><span class="p">,</span> <span class="s1">'sf'</span><span class="p">),</span>
+    <span class="c1">-- A late arrival: generated BEFORE the row Hudi already holds. With</span>
+    <span class="c1">-- EVENT_TIME_ORDERING this must not win, even though it lands last.</span>
+    <span class="p">(</span><span class="s1">'trip-1002'</span><span class="p">,</span> <span class="s1">'rider-33c9a1'</span><span class="p">,</span> <span class="mi">99</span><span class="p">.</span><span class="mi">99</span><span class="p">,</span>
+     <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:19:47'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 08:15:00'</span><span class="p">,</span> <span class="s1">'sf'</span><span class="p">),</span>
+    <span class="c1">-- A key Hudi has not seen, so it becomes an insert.</span>
+    <span class="p">(</span><span class="s1">'trip-1004'</span><span class="p">,</span> <span class="s1">'rider-70b4de'</span><span class="p">,</span> <span class="mi">16</span><span class="p">.</span><span class="mi">40</span><span class="p">,</span>
+     <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 09:01:58'</span><span class="p">,</span> <span class="nb">TIMESTAMP</span> <span class="s1">'2026-09-15 09:12:20'</span><span class="p">,</span> <span class="s1">'nyc'</span><span class="p">)</span>
+  <span class="k">AS</span> <span class="n">v</span><span class="p">(</span><span class="n">trip_id</span><span class="p">,</span> <span class="n">rider_id</span><span class="p">,</span> <span class="n">fare_amount</span><span class="p">,</span> <span class="n">started_at</span><span class="p">,</span> <span class="n">updated_at</span><span class="p">,</span> <span class="n">city_id</span><span class="p">)</span>
+<span class="p">)</span> <span class="n">s</span>
+  <span class="k">ON</span> <span class="n">t</span><span class="p">.</span><span class="n">trip_id</span> <span class="o">=</span> <span class="n">s</span><span class="p">.</span><span class="n">trip_id</span>
+<span class="k">WHEN</span> <span class="n">MATCHED</span> <span class="k">THEN</span> <span class="k">UPDATE</span> <span class="k">SET</span> <span class="o">*</span>
+<span class="k">WHEN</span> <span class="k">NOT</span> <span class="n">MATCHED</span> <span class="k">THEN</span> <span class="k">INSERT</span> <span class="o">*</span><span class="p">;</span>
+
+<span class="k">SELECT</span> <span class="n">trip_id</span><span class="p">,</span> <span class="n">fare_amount</span><span class="p">,</span> <span class="n">updated_at</span> <span class="k">FROM</span> <span class="n">trips</span> <span class="k">ORDER</span> <span class="k">BY</span> <span class="n">trip_id</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Read the result rather than trusting the statement. <code class="language-plaintext highlighter-rouge">trip-1001</code> takes the new
+fare because its <code class="language-plaintext highlighter-rouge">updated_at</code> moved forward. <code class="language-plaintext highlighter-rouge">trip-1002</code> keeps <code class="language-plaintext highlighter-rouge">11.75</code>, because
+the incoming row carries an older <code class="language-plaintext highlighter-rouge">updated_at</code> and the table was created with
+<code class="language-plaintext highlighter-rouge">recordMergeMode = 'EVENT_TIME_ORDERING'</code>. <code class="language-plaintext highlighter-rouge">trip-1004</code> is inserted. That second
+row is the one worth internalising: a last-write-wins upsert would have accepted
+the stale <code class="language-plaintext highlighter-rouge">99.99</code>, and a change stream will hand you that case eventually.</p>
+
+<p>The record key and ordering field are part of the table contract, so <code class="language-plaintext highlighter-rouge">MERGE</code> did
+not have to restate the conflict rule. That is the difference between declaring
+identity once and re-deriving it in every statement.</p>
+
+<h3 id="4-read-only-what-changed">4. Read only what changed</h3>
+
+<p>The current release registers table-valued functions, so an incremental read is
+ordinary SQL. <code class="language-plaintext highlighter-rouge">hudi_table_changes</code> takes the table, a format of <code class="language-plaintext highlighter-rouge">latest_state</code> or <code class="language-plaintext highlighter-rouge">cdc</code>,
+a start instant, and optionally an end instant:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Which instants exist? commit_time is returned newest first.</span>
+<span class="k">CALL</span> <span class="n">show_commits</span><span class="p">(</span><span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'trips'</span><span class="p">,</span> <span class="k">limit</span> <span class="o">=&gt;</span> <span class="mi">5</span><span class="p">);</span>
+
+<span class="c1">-- Everything that changed after a given instant.</span>
+<span class="k">SELECT</span> <span class="n">trip_id</span><span class="p">,</span> <span class="n">city_id</span><span class="p">,</span> <span class="n">fare_amount</span><span class="p">,</span> <span class="n">updated_at</span>
+<span class="k">FROM</span> <span class="n">hudi_table_changes</span><span class="p">(</span><span class="s1">'trips'</span><span class="p">,</span> <span class="s1">'latest_state'</span><span class="p">,</span> <span class="s1">'20260915090000123'</span><span class="p">);</span>
+
+<span class="c1">-- Or from the beginning of retained history, using the literal `earliest`.</span>
+<span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">hudi_table_changes</span><span class="p">(</span><span class="s1">'trips'</span><span class="p">,</span> <span class="s1">'latest_state'</span><span class="p">,</span> <span class="s1">'earliest'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Two companion functions are worth knowing. <code class="language-plaintext highlighter-rouge">hudi_query</code> picks a query type
+without a read option, and <code class="language-plaintext highlighter-rouge">hudi_metadata</code> exposes the metadata table as a
+queryable relation:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Base files only, skipping the log-file merge.</span>
+<span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">hudi_query</span><span class="p">(</span><span class="s1">'trips'</span><span class="p">,</span> <span class="s1">'read_optimized'</span><span class="p">);</span>
+
+<span class="c1">-- What the metadata table knows about this table.</span>
+<span class="k">SELECT</span> <span class="k">type</span><span class="p">,</span> <span class="k">key</span> <span class="k">FROM</span> <span class="n">hudi_metadata</span><span class="p">(</span><span class="s1">'trips'</span><span class="p">)</span> <span class="k">LIMIT</span> <span class="mi">20</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h3 id="5-delete">5. Delete</h3>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Logical delete. The row stops being returned immediately.</span>
+<span class="k">DELETE</span> <span class="k">FROM</span> <span class="n">trips</span> <span class="k">WHERE</span> <span class="n">rider_id</span> <span class="o">=</span> <span class="s1">'rider-8814f2'</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>The data still exists in older file slices until cleaning removes them. For a
+right-to-erasure obligation the delete is not complete until retention has
+expired those slices, so the cleaner is part of the compliance story rather than
+just housekeeping.</p>
+
+<h2 id="what-features-do-you-get">What features do you get?</h2>
+
+<p>Before the parts that are distinctive, here is the baseline. These are the
+capabilities a Hudi table has because it is a modern table format, and they are
+what you are adopting whichever one you pick.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Feature</th>
+      <th style="text-align: left">What it means on a Hudi table</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">ACID transactions</td>
+      <td style="text-align: left">Writes commit atomically as a completed instant on the timeline. A half-finished write is <code class="language-plaintext highlighter-rouge">.inflight</code> and invisible to queries</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Snapshot isolation</td>
+      <td style="text-align: left">Writers, table services and readers each see a consistent snapshot, so compaction running does not change what a query returns mid-flight</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Upserts and deletes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">MERGE INTO</code>, <code class="language-plaintext highlighter-rouge">UPDATE</code> and <code class="language-plaintext highlighter-rouge">DELETE</code> are ordinary SQL, resolved by record key rather than by rewriting partitions</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Schema evolution</td>
+      <td style="text-align: left">Add, reorder and widen columns without rewriting data, with a stricter and a more flexible mode (below)</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Time travel</td>
+      <td style="text-align: left">Read the table as of an instant or a timestamp with <code class="language-plaintext highlighter-rouge">TIMESTAMP AS OF</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Rollback and restore</td>
+      <td style="text-align: left">A failed write is rolled back automatically; <code class="language-plaintext highlighter-rouge">savepoint</code> and <code class="language-plaintext highlighter-rouge">restore</code> take the whole table back to a marked state</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Incremental queries</td>
+      <td style="text-align: left">Read only the records that changed between two instants, as a first-class query type</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Change data capture</td>
+      <td style="text-align: left">A <code class="language-plaintext highlighter-rouge">cdc</code> read format returns before and after images of changed records</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Partitioning and clustering</td>
+      <td style="text-align: left">Partition on a column, then reorganise layout with the <code class="language-plaintext highlighter-rouge">clustering</code> action without changing content</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Automatic file sizing</td>
+      <td style="text-align: left">Small files are grown toward a target size as part of writing, rather than by a separate job</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Cleaning and retention</td>
+      <td style="text-align: left">The cleaner removes file slices past retention, which is what bounds storage and completes a delete</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Multi-engine reads</td>
+      <td style="text-align: left">Spark, Flink, Trino, Presto and Hive read the table; Spark and Flink write it</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Two of those have enough nuance to be worth a paragraph.</p>
+
+<p><strong>Schema evolution comes in two modes, and the second one is a one-way door.</strong>
+The default, schema evolution on write, handles the common cases: adding columns,
+reordering them, and type promotions within safe widenings. The more flexible
+mode, schema evolution on read, additionally allows columns (including nested
+ones) to be deleted, modified, moved and renamed, and operations on nested array
+columns. You turn it on with <code class="language-plaintext highlighter-rouge">hoodie.schema.on.read.enable=true</code> as a writer
+config or a table property. Two caveats from the documentation are worth knowing
+before you do: it is described as experimental support for backward-incompatible
+changes resolved at read time, and once enabled it cannot be disabled again,
+because the table will already have accepted changes that depend on it.</p>
+
+<p><strong>Time travel reads an old state; restore makes it current again.</strong> They are
+different guarantees and it is easy to conflate them. <code class="language-plaintext highlighter-rouge">TIMESTAMP AS OF</code> gives you
+a query against a past instant while the table stays where it is. <code class="language-plaintext highlighter-rouge">restore</code>
+returns the table itself to a savepoint, which is point-in-time recovery. Both
+are bounded by your cleaner settings: you can only travel back as far as the file
+slices retention has kept.</p>
+
+<h2 id="what-is-special-about-hudi">What is special about Hudi?</h2>
+
+<p>Everything in the table above, every table format now offers in some form, which
+is why a feature checklist is a poor way to choose between them. The eight
+capabilities below are the ones that are either unique to Hudi or materially
+further along here than elsewhere, and each maps to a workload where the
+difference shows up.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Capability</th>
+      <th style="text-align: left">What it replaces</th>
+      <th style="text-align: left">Where you feel it</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Record-level index</td>
+      <td style="text-align: left">A join to find the rows to update</td>
+      <td style="text-align: left">Upserts on a large table from a small batch</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Multi-modal index</td>
+      <td style="text-align: left">A file listing, and a full scan on non-key columns</td>
+      <td style="text-align: left">Planning time, and filters off the key</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Incremental query</td>
+      <td style="text-align: left">A watermark column and a custom diff</td>
+      <td style="text-align: left">Chained pipelines, medallion layers</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Non-blocking concurrency</td>
+      <td style="text-align: left">Retry-on-conflict between writers</td>
+      <td style="text-align: left">Several streams into one table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Self-running table services</td>
+      <td style="text-align: left">Maintenance procedures you must schedule</td>
+      <td style="text-align: left">Day-two operations</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Savepoint and restore</td>
+      <td style="text-align: left">Restoring a table from a backup copy</td>
+      <td style="text-align: left">Recovering from a bad batch</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Bootstrap</td>
+      <td style="text-align: left">Rewriting an existing dataset to adopt a format</td>
+      <td style="text-align: left">Migrating terabytes of Parquet</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Hudi Streamer</td>
+      <td style="text-align: left">An ingestion job you write and maintain</td>
+      <td style="text-align: left">Getting from a source to a table</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="1-a-record-level-index">1. A record-level index</h3>
+
+<p>No other major table format maps a record key to the file that holds it. Iceberg
+and Delta describe a table as a set of files; neither has a notion of “the row
+with this key”, so an update is planned as a join.</p>
+
+<p>Hudi’s index turns that into a lookup. The record index comes in two
+scopes, <code class="language-plaintext highlighter-rouge">GLOBAL_RECORD_LEVEL_INDEX</code> for keys unique table-wide and
+<code class="language-plaintext highlighter-rouge">RECORD_LEVEL_INDEX</code> for keys unique within a partition, with the older
+<code class="language-plaintext highlighter-rouge">RECORD_INDEX</code> name kept as the deprecated spelling of the global one. Their
+sizing defaults differ deliberately: 10 to 10000 file groups for the global
+index, 1 to 10 for the partitioned one.</p>
+
+<h3 id="2-a-multi-modal-index-not-just-a-file-listing">2. A multi-modal index, not just a file listing</h3>
+
+<p>The metadata table at <code class="language-plaintext highlighter-rouge">.hoodie/metadata</code> is an internal Hudi table, and it holds
+seven kinds of index, each in its own partition:</p>
+
+<pre><code class="language-mermaid">flowchart LR
+  Q["planning a query&lt;br/&gt;or a write"] --&gt; MT[".hoodie/metadata"]
+  MT --&gt; P1["files"]
+  MT --&gt; P2["column_stats"]
+  MT --&gt; P3["partition_stats"]
+  MT --&gt; P4["bloom_filters"]
+  MT --&gt; P5["record_index"]
+  MT --&gt; P6["expr_index_name"]
+  MT --&gt; P7["secondary_index_name"]
+</code></pre>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Partition</th>
+      <th style="text-align: left">Holds</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">files</code></td>
+      <td style="text-align: left">Partition to file listing, so planning does not list object storage</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">column_stats</code></td>
+      <td style="text-align: left">Per-column min/max per file, for data skipping</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">partition_stats</code></td>
+      <td style="text-align: left">Column statistics aggregated per partition</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">bloom_filters</code></td>
+      <td style="text-align: left">Bloom filters for <code class="language-plaintext highlighter-rouge">BLOOM</code> index lookups</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">record_index</code></td>
+      <td style="text-align: left">Record key to file group, the index above</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">expr_index_&lt;name&gt;</code></td>
+      <td style="text-align: left">An index over an expression rather than a raw column</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">secondary_index_&lt;name&gt;</code></td>
+      <td style="text-align: left">An index on a non-key column</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Expression and secondary indexes are the notable ones. A secondary index lets a
+query filter efficiently on a column that is not the record key, which is
+otherwise a full scan. An expression index covers a derived value, so a filter on
+a function of a column can still prune.</p>
+
+<h3 id="3-incremental-queries-as-a-first-class-read-mode">3. Incremental queries as a first-class read mode</h3>
+
+<p><code class="language-plaintext highlighter-rouge">hoodie.datasource.query.type = incremental</code> returns the records that changed
+between two instants. This is not a change-data-feed bolted on later; it is one
+of the three query types the format was designed around, and it is why Hudi is
+often the source of a chained pipeline where each stage consumes only its
+upstream’s changes.</p>
+
+<h3 id="4-four-kinds-of-concurrency-control">4. Four kinds of concurrency control</h3>
+
+<p>Most table formats have one concurrency story. Hudi documents four, because it
+draws a line between three kinds of process that touch a table: <strong>writers</strong> that
+issue write operations, <strong>table services</strong> that rewrite data or metadata for
+optimisation and bookkeeping, and <strong>readers</strong> that run queries. Different pairs
+of those get different mechanisms.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Control</th>
+      <th style="text-align: left">Governs</th>
+      <th style="text-align: left">What it gives you</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Snapshot isolation</td>
+      <td style="text-align: left">Writers, table services and readers, all three</td>
+      <td style="text-align: left">Everyone operates on a consistent snapshot of the table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Multiversion concurrency control (MVCC)</td>
+      <td style="text-align: left">Writer against table service, and table service against table service</td>
+      <td style="text-align: left">Compaction and cleaning run while a writer is working, without blocking it</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Optimistic concurrency control (OCC)</td>
+      <td style="text-align: left">Writer against writer</td>
+      <td style="text-align: left">Standard relational database semantics, with lock-based conflict resolution</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Non-blocking concurrency control (NBCC)</td>
+      <td style="text-align: left">Writer against writer</td>
+      <td style="text-align: left">Streaming semantics, with no live-locks or starvation between writers</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The first two are why you can run compaction against a live table at all, and
+they need no configuration: MVCC is how a table service and a writer share a file
+group without either waiting. The second two are the choice you actually make,
+and they are selected through <code class="language-plaintext highlighter-rouge">WriteConcurrencyMode</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Mode</th>
+      <th style="text-align: left">Behaviour</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">SINGLE_WRITER</code></td>
+      <td style="text-align: left">One active writer. The default, and the highest throughput</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">OPTIMISTIC_CONCURRENCY_CONTROL</code></td>
+      <td style="text-align: left">Multiple writers with lock-based conflict resolution; if two write to the same file group, only one succeeds</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">NON_BLOCKING_CONCURRENCY_CONTROL</code></td>
+      <td style="text-align: left">Multiple writers into the same file group, with conflicts resolved by the reader and the compactor</td>
+    </tr>
+  </tbody>
+</table>
+
+<pre><code class="language-mermaid">flowchart TB
+  subgraph OCC["optimistic: one writer loses"]
+    direction LR
+    O1["writer A and writer B&lt;br/&gt;both target file group fg-1"] --&gt; O2["both do the work"]
+    O2 --&gt; O3["A commits"]
+    O2 --&gt; O4["B detects the conflict&lt;br/&gt;and aborts"]
+    O4 --&gt; O5["B retries from the start"]
+  end
+
+  subgraph NBCC["non-blocking: both writers commit"]
+    direction LR
+    N1["writer A and writer B&lt;br/&gt;both target file group fg-1"] --&gt; N2["both append log files"]
+    N2 --&gt; N3["A commits"]
+    N2 --&gt; N4["B commits"]
+    N3 --&gt; N5["reader and compactor&lt;br/&gt;reconcile by completion time"]
+    N4 --&gt; N5
+  end
+
+  OCC ~~~ NBCC
+</code></pre>
+
+<p>The last row is the interesting one. Under optimistic concurrency, which is what
+Iceberg and Delta use, two writers touching the same data means one does all its
+work and then loses. Non-blocking concurrency control lets both succeed and defers the
+reconciliation to read and compaction time. For a Merge-on-Read table fed by
+several concurrent streams, that is the difference between throughput and a retry
+storm.</p>
+
+<p>Two constraints keep this honest. The default is <code class="language-plaintext highlighter-rouge">SINGLE_WRITER</code>, so multi-writer
+support is opt-in and the optimistic mode needs a lock provider configured. And
+non-blocking concurrency control is not general: the docs scope it to
+Merge-on-Read tables using the simple bucket index or the partition-level bucket
+index, and it is not supported between an ingestion writer and clustering, where
+you still use the optimistic mode. Serialization order comes from each commit’s
+completion time, which is also what file slicing is based on.</p>
+
+<p>The optimistic mode is not standing still either. Since 0.13.0 Hudi detects
+conflicts early, using markers to spot an overlapping write during the job rather
+than at commit time, so a losing writer wastes less compute before it retries.</p>
+
+<h3 id="5-table-services-that-run-themselves">5. Table services that run themselves</h3>
+
+<p>Hudi ships the maintenance as part of the platform rather than as procedures you
+remember to call, and each can run inline with writes or asynchronously:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Service</th>
+      <th style="text-align: left">Does</th>
+      <th style="text-align: left">Timeline action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Compaction</td>
+      <td style="text-align: left">Merges log files into a new base file</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">compaction</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Log compaction</td>
+      <td style="text-align: left">Merges log blocks without rewriting the base file</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">logcompaction</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Clustering</td>
+      <td style="text-align: left">Reorganises layout, sorting and file sizing</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">clustering</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Cleaning</td>
+      <td style="text-align: left">Removes file slices past retention</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">clean</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Indexing</td>
+      <td style="text-align: left">Builds an index without blocking writers</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">indexing</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="6-savepoint-and-restore">6. Savepoint and restore</h3>
+
+<p><code class="language-plaintext highlighter-rouge">savepoint</code> marks a state and protects it from cleaning; <code class="language-plaintext highlighter-rouge">restore</code> returns the
+table to it. Together they are a point-in-time recovery mechanism at the table
+level, which is a different guarantee from time travel: time travel lets you read
+an old state, restore makes it current again.</p>
+
+<h3 id="7-write-operations-beyond-insert-and-upsert">7. Write operations beyond insert and upsert</h3>
+
+<p><a href="https://github.com/apache/hudi/blob/master/hudi-common/src/main/java/org/apache/hudi/common/model/WriteOperationType.java"><code class="language-plaintext highlighter-rouge">WriteOperationType</code></a> includes <code class="language-plaintext highlighter-rouge">INSERT</code>, <code class="language-plaintext highlighter-rouge">UPSERT</code>, <code class="language-plaintext highlighter-rouge">BULK_INSERT</code>,
+<code class="language-plaintext highlighter-rouge">DELETE</code>, <code class="language-plaintext highlighter-rouge">BOOTSTRAP</code>, <code class="language-plaintext highlighter-rouge">INSERT_OVERWRITE</code>, <code class="language-plaintext highlighter-rouge">INSERT_OVERWRITE_TABLE</code>,
+<code class="language-plaintext highlighter-rouge">DELETE_PARTITION</code>, <code class="language-plaintext highlighter-rouge">BUCKET_RESCALE</code>, <code class="language-plaintext highlighter-rouge">CLUSTER</code>, <code class="language-plaintext highlighter-rouge">COMPACT</code>, <code class="language-plaintext highlighter-rouge">LOG_COMPACT</code>,
+<code class="language-plaintext highlighter-rouge">INDEX</code> and <code class="language-plaintext highlighter-rouge">ALTER_SCHEMA</code>.</p>
+
+<p><code class="language-plaintext highlighter-rouge">BOOTSTRAP</code> deserves a mention: it turns an existing Parquet dataset into a Hudi
+table by generating metadata that points at the existing files, rather than
+rewriting terabytes to adopt the format.</p>
+
+<h3 id="8-hudi-streamer">8. Hudi Streamer</h3>
+
+<p>The project ships a managed ingestion utility, <a href="https://github.com/apache/hudi/blob/master/hudi-utilities/src/main/java/org/apache/hudi/utilities/streamer/HoodieStreamer.java"><code class="language-plaintext highlighter-rouge">HoodieStreamer</code></a> in
+<code class="language-plaintext highlighter-rouge">hudi-utilities</code>, which reads from a source, applies transformations and writes a
+Hudi table with checkpointing and schema handling built in. Most table formats
+leave ingestion entirely to you.</p>
+
+<h2 id="which-engines-can-read-and-write-it">Which engines can read and write it?</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Engine</th>
+      <th style="text-align: left">Snapshot</th>
+      <th style="text-align: left">Read-optimized</th>
+      <th style="text-align: left">Incremental</th>
+      <th style="text-align: left">Writes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Spark</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Flink</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Trino</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Through the connector</td>
+      <td style="text-align: left">No</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Presto</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Through the connector</td>
+      <td style="text-align: left">No</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Hive</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Limited</td>
+      <td style="text-align: left">No</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Writes are a Spark and Flink story; the other engines read. If your ingestion is
+neither Spark nor Flink, that is worth confirming before adopting Hudi.</p>
+
+<h2 id="when-does-a-simpler-choice-win">When does a simpler choice win?</h2>
+
+<p>Hudi’s design assumes records have identity and change over time. Where that
+assumption holds, everything above earns its keep. Where it does not, there are
+good simpler answers, and recognising them is part of using the tool well.</p>
+
+<p><strong>Append-only tables</strong> need no index and no merge. <code class="language-plaintext highlighter-rouge">bulk_insert</code> skips tagging
+entirely, and if you never correct a row, plain partitioned Parquet is less
+machinery with fewer surprises.</p>
+
+<p><strong>Read-heavy tables written a few times a day</strong> do well on Copy-on-Write with
+inline table services, which keeps every read a plain columnar scan and leaves
+nothing to schedule.</p>
+
+<p><strong>Teams still building operational capacity</strong> are better served by Copy-on-Write
+with inline services than by Merge-on-Read. You can move to Merge-on-Read later,
+once someone owns compaction, and the table type is a decision you make per table
+rather than once for the platform.</p>
+
+<p><strong>Ingestion outside Spark and Flink</strong> wants a check against the table above
+first, since those two are where the write support lives.</p>
+
+<h2 id="production-tips">Production tips</h2>
+
+<ul>
+  <li><strong>Set <code class="language-plaintext highlighter-rouge">hoodie.index.type</code> explicitly.</strong> An absent value still resolves to <code class="language-plaintext highlighter-rouge">SIMPLE</code> on Spark, whose cost scales with table size rather than batch size.</li>
+  <li><strong>Choose the index scope from your data model.</strong> Global versus partition-scoped changes correctness when partition values mutate, not just speed.</li>
+  <li><strong>Use <code class="language-plaintext highlighter-rouge">EVENT_TIME_ORDERING</code></strong> when late-arriving corrections must not overwrite newer values.</li>
+  <li><strong>Decide who runs compaction before production.</strong> <code class="language-plaintext highlighter-rouge">hoodie.compact.inline</code> is <code class="language-plaintext highlighter-rouge">false</code> by default.</li>
+  <li><strong>Leave the metadata table enabled.</strong> The metadata-backed indexes need it, and planning without it means listing object storage.</li>
+  <li><strong>Point heavy dashboards at <code class="language-plaintext highlighter-rouge">read_optimized</code></strong> on Merge-on-Read tables when last-compaction freshness is acceptable.</li>
+  <li><strong>Configure a lock provider before the second writer exists</strong>, and consider non-blocking concurrency control for Merge-on-Read tables with concurrent streams.</li>
+  <li><strong>Treat cleaning as part of your erasure story</strong>, not as housekeeping.</li>
+</ul>
+
+<h2 id="frequently-asked-questions">Frequently asked questions</h2>
+
+<p><strong>Do I have to use Merge-on-Read?</strong>
+No, and it is not the default. <code class="language-plaintext highlighter-rouge">hoodie.datasource.write.table.type</code> defaults to
+Copy-on-Write, which is the right choice for most tables written a few times a
+day. Merge-on-Read is the option you reach for when writes are frequent and
+someone will own compaction.</p>
+
+<p><strong>What if my data has no natural primary key?</strong>
+Hudi can build one. <code class="language-plaintext highlighter-rouge">hoodie.datasource.write.keygenerator.class</code> selects a key
+generator, and composite keys built from several columns are ordinary. If nothing
+in the row identifies it and nothing ever updates, that is a strong sign an
+append-only pattern suits you better than an indexed one.</p>
+
+<p><strong>Can I read a Hudi table from Trino or Snowflake?</strong>
+Trino and Presto read it through their connectors, per the table above. Beyond
+that, Apache XTable converts Hudi metadata into Iceberg or Delta metadata over
+the same Parquet files, so an engine that speaks one of those can read a table
+Hudi writes without the data being copied.</p>
+
+<p><strong>Is the metadata table optional?</strong>
+Technically, but leave it on. <code class="language-plaintext highlighter-rouge">hoodie.metadata.enable</code> has defaulted to <code class="language-plaintext highlighter-rouge">true</code>
+since 0.7.0, the metadata-backed indexes require it, and planning without it
+means listing object storage on every query.</p>
+
+<p><strong>How do I move a 0.x table to 1.x?</strong>
+Through the table version. 0.x tables are version 6 and 1.x tables are version 8
+or 9, and the jump changes the timeline layout, so a 0.x reader will not
+understand a 1.x timeline directory. Upgrade readers and writers together rather
+than one at a time.</p>
+
+<p><strong>Does declaring a record key slow down writes?</strong>
+It adds the tagging step, and how much that costs is entirely the index’s doing.
+With <code class="language-plaintext highlighter-rouge">SIMPLE</code>, tagging scans and the cost tracks your table. With a record index
+it is a point lookup and the cost tracks your batch. That is why setting
+<code class="language-plaintext highlighter-rouge">hoodie.index.type</code> deliberately matters more than almost anything else here.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Back to the configuration that looks like overhead on day one. The record key,
+the table type and the compaction job are not accessories bolted onto a table
+format; they are the three places where the decision that records have identity
+becomes something you have to act on. The index exists because keys are
+addressable. Incremental queries exist because the timeline knows which records
+changed in each instant. Non-blocking concurrency is possible because file groups
+localise where a change lands. Formats that describe a table only as a set of
+files cannot offer those things without first adding the concept Hudi started
+with.</p>
+
+<p>That choice has a cost, and it is worth being clear about. An index has to be
+maintained, table services have to be operated, and a Merge-on-Read table that
+nobody compacts gets slower every day without ever raising an error. Hudi asks
+more of its operators than a format designed for append-mostly batch writes, and
+it repays that in workloads where small batches of changes arrive continuously
+against a large table.</p>
+
+<p>If you are evaluating it, the most predictive question is whether your writes are
+keyed. A stream of inserts, updates and deletes to known primary keys is the
+shape Hudi was built for, and the index is doing work that other formats ask a
+join to do. Large batch appends that replace partitions are the shape where that
+machinery is overhead. Start there, pick the table type from your write
+frequency, and decide who owns compaction before you need it.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://hudi.apache.org/docs/overview">Apache Hudi overview</a> for the project’s own description and capability list</li>
+  <li><a href="https://hudi.apache.org/docs/table_types">Hudi table types</a> for Copy-on-Write versus Merge-on-Read and the query types each supports</li>
+  <li><a href="https://hudi.apache.org/docs/indexes">Hudi indexes</a> for choosing between the index types described above</li>
+  <li><a href="https://hudi.apache.org/docs/configurations/">Hudi configuration reference</a> for every <code class="language-plaintext highlighter-rouge">hoodie.*</code> key with its default and since-version</li>
+  <li><a href="/OpenTableFormats/">Open table formats in practice</a> for how Hudi compares with Iceberg and Delta Lake</li>
+</ul>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/SparkReleaseHistory/">
+          <span class="card--mini__date">Sep 19, 2026</span>
+          <span class="card--mini__title">Every Apache Spark release, and the problem each one was built to solve</span>
+        </a><a class="card card--mini" href="/SparkMemoryManagement/">
+          <span class="card--mini__date">Sep 18, 2026</span>
+          <span class="card--mini__title">Spark memory management: every region, and the arithmetic that sizes it</span>
+        </a><a class="card card--mini" href="/SparkAQE/">
+          <span class="card--mini__date">Sep 18, 2026</span>
+          <span class="card--mini__title">Adaptive query execution in Apache Spark: what it re-plans, and what it leaves alone</span>
+        </a><a class="card card--mini" href="/SparkDataSkew/">
+          <span class="card--mini__date">Sep 18, 2026</span>
+          <span class="card--mini__title">Data skew in Apache Spark: how to see it, and six ways to fix it</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/OpenTableFormats/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">Open table formats in practice: what actually differs between Iceberg, Hudi and Delta Lake</span>
+  </a>
+  <a class="post-nav__link post-nav__link--next" href="/ApacheHudiCheatSheet/" rel="next">
+    <span class="post-nav__label">Next<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <span class="post-nav__title">Apache Hudi on Spark: the complete cheat sheet</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Apache%20Hudi:%20an%20introduction%20to%20its%20architecture,%20features%20and%20what%20makes%20it%20different&url=https://rangareddy.github.io/ApacheHudiGuide/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/ApacheHudiGuide/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/ApacheHudiGuide/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Spark Release History</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Fixing Data Skew</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Inside Apache Spark Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Spark Submit for Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/SparkReleaseHistory/">
+        Every Apache Spark release, and the problem each one was built to solve
+        <time datetime="2026-09-19T08:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkMemoryManagement/">
+        Spark memory management: every region, and the arithmetic that sizes it
+        <time datetime="2026-09-18T19:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkAQE/">
+        Adaptive query execution in Apache Spark: what it re-plans, and what it leaves alone
+        <time datetime="2026-09-18T17:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkDataSkew/">
+        Data skew in Apache Spark: how to see it, and six ways to fix it
+        <time datetime="2026-09-18T15:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/CatalystOptimizer/">
+        Inside Spark's Catalyst optimizer: how a query gets rewritten, rule by rule
+        <time datetime="2026-09-18T13:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkConnectIceberg/">
+        Apache Iceberg through Spark Connect: the full surface, and the extension that breaks time travel
+        <time datetime="2026-09-18T11:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkConnectHudi/">
+        Apache Hudi through Spark Connect: running the full table surface from a thin client
+        <time datetime="2026-09-18T09:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkJoinsInDepth/">
+        Apache Spark joins in depth: the five strategies and how one gets picked
+        <time datetime="2026-09-17T09:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">4</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">2</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">3</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">15</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>
