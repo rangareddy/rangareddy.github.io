@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Life of a read query in Iceberg: four prunes before a byte of data is read · Ranga Reddy</title>
+  <meta name="description" content="Planning an Iceberg query is a sequence of eliminations against metadata. Each level discards work the next level would have done, and the last one only works if your data is sorted. Here is each step with the metadata it reads.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/IcebergReadPath/">
+  <meta name="google-site-verification" content="p3-xmuuDZGnVmE6SSwGmQ2JXJDhDsZPAh79ydnDlQA4">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Life of a read query in Iceberg: four prunes before a byte of data is read">
+  <meta property="og:description" content="Planning an Iceberg query is a sequence of eliminations against metadata. Each level discards work the next level would have done, and the last one only works if your data is sorted. Here is each step with the metadata it reads.">
+  <meta property="og:url" content="https://rangareddy.github.io/IcebergReadPath/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/IcebergReadPath.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Life of a read query in Iceberg: four prunes before a byte of data is read">
+  <meta name="twitter:description" content="Planning an Iceberg query is a sequence of eliminations against metadata. Each level discards work the next level would have done, and the last one only works if your data is sorted. Here is each step with the metadata it reads.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/IcebergReadPath.png">
+  <meta property="article:published_time" content="2026-08-18T10:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Life of a read query in Iceberg: four prunes before a byte of data is read",
+    "description": "Planning an Iceberg query is a sequence of eliminations against metadata. Each level discards work the next level would have done, and the last one only works if your data is sorted. Here is each step with the metadata it reads.",
+    "url": "https://rangareddy.github.io/IcebergReadPath/",
+    "datePublished": "2026-08-18T10:00:00+05:30",
+    "dateModified": "2026-08-18T10:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/IcebergReadPath.png",
+    "keywords": "Iceberg, Pruning, Metadata, Query",
+    "articleSection": "Iceberg",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/IcebergReadPath/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Iceberg", "item": "https://rangareddy.github.io/category/#iceberg" },
+      { "@type": "ListItem", "position": 3, "name": "Life of a read query in Iceberg: four prunes before a byte of data is read", "item": "https://rangareddy.github.io/IcebergReadPath/" }
+    ]
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/IcebergReadPath.png"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Life of a read query in Iceberg: four prunes before a byte of data is read</h1>
+      <p class="post-head__lede">Planning an Iceberg query is a sequence of eliminations against metadata. Each level discards work the next level would have done, and the last one only works if your data is sorted. Here is each step with the metadata it reads.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-08-18T10:00:00+05:30">Aug 18, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>9 min read</span>
+  <span class="meta__item meta__views" data-views-for="/IcebergReadPath/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#iceberg">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Iceberg
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#iceberg">#Iceberg</a></li>
+  <li><a class="chip" href="/tag/#pruning">#Pruning</a></li>
+  <li><a class="chip" href="/tag/#metadata">#Metadata</a></li>
+  <li><a class="chip" href="/tag/#query">#Query</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#the-four-levels" id="markdown-toc-the-four-levels">The four levels</a>    <ul>
+      <li><a href="#1-the-catalog-resolves-the-pointer" id="markdown-toc-1-the-catalog-resolves-the-pointer">1. The catalog resolves the pointer</a></li>
+      <li><a href="#2-the-metadata-file-selects-a-snapshot" id="markdown-toc-2-the-metadata-file-selects-a-snapshot">2. The metadata file selects a snapshot</a></li>
+      <li><a href="#3-the-manifest-list-drops-whole-manifests" id="markdown-toc-3-the-manifest-list-drops-whole-manifests">3. The manifest list drops whole manifests</a></li>
+      <li><a href="#4-manifests-drop-individual-files" id="markdown-toc-4-manifests-drop-individual-files">4. Manifests drop individual files</a></li>
+    </ul>
+  </li>
+  <li><a href="#hidden-partitioning-at-read-time" id="markdown-toc-hidden-partitioning-at-read-time">Hidden partitioning at read time</a></li>
+  <li><a href="#what-makes-the-last-prune-fail" id="markdown-toc-what-makes-the-last-prune-fail">What makes the last prune fail</a></li>
+  <li><a href="#proving-each-prune" id="markdown-toc-proving-each-prune">Proving each prune fired</a></li>
+  <li><a href="#when-bounds-stop-working" id="markdown-toc-when-bounds-stop-working">When column bounds stop working</a></li>
+  <li><a href="#the-cost-model" id="markdown-toc-the-cost-model">The cost model, stated</a></li>
+  <li><a href="#planning-cost" id="markdown-toc-planning-cost">Why planning cost is metadata, not partitions</a></li>
+  <li><a href="#reading-the-evidence" id="markdown-toc-reading-the-evidence">Reading the evidence yourself</a></li>
+  <li><a href="#common-misconceptions" id="markdown-toc-common-misconceptions">Common misconceptions</a></li>
+  <li><a href="#a-model-worth-keeping" id="markdown-toc-a-model-worth-keeping">A model worth keeping</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+  <li><a href="#trademarks" id="markdown-toc-trademarks">Trademarks</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>Planning is four steps: <strong>catalog → metadata.json → manifest list → manifests → data files</strong>, and each discards candidates before the next runs.</li>
+    <li>The manifest list carries a partition range per manifest. A one-day filter discarded two of three manifests <strong>without opening them</strong>.</li>
+    <li>Manifests carry per-file column bounds keyed by <strong>field id</strong>, not column name — the same identity that makes renames safe.</li>
+    <li><strong>No step lists a directory.</strong> Planning cost scales with manifest count, which you control with <code class="language-plaintext highlighter-rouge">rewrite_manifests</code>, not with partition count.</li>
+    <li>The column-bounds prune only works if data is sorted. Unsorted files have wide, overlapping min/max, and nothing is skipped.</li>
+  </ul>
+</blockquote>
+
+<h2 id="the-four-levels">The four levels</h2>
+
+<p>A read query never asks the filesystem what exists. It asks metadata, and each
+level of metadata is smaller and more selective than the data below it.</p>
+
+<pre><code class="language-mermaid">flowchart TB
+    Q["SELECT ... WHERE event_ts = '2026-01-06'"] --&gt; C["1. catalog&lt;br/&gt;which metadata.json is current?"]
+    C --&gt; M["2. metadata.json&lt;br/&gt;schema, specs, snapshot list"]
+    M --&gt; ML["3. manifest list&lt;br/&gt;drop manifests by partition range"]
+    ML --&gt; MF["4. manifests&lt;br/&gt;drop files by partition value&lt;br/&gt;then by column bounds"]
+    MF --&gt; D["open the surviving Parquet files"]
+</code></pre>
+
+<p><img src="/assets/images/iceberg/read-pruning.png" alt="Query planning in four steps: the catalog resolves the current metadata, the metadata file selects a snapshot, the manifest list discards manifests whose partition range cannot match, and the surviving manifests discard individual files by partition value and column bounds" /></p>
+
+<h3 id="1-the-catalog-resolves-the-pointer">1. The catalog resolves the pointer</h3>
+
+<p>One lookup: for this table name, which metadata file is current? That answer is
+the isolation boundary. Every subsequent step reads from that one file, so a
+commit landing mid-query cannot change what this query sees.</p>
+
+<h3 id="2-the-metadata-file-selects-a-snapshot">2. The metadata file selects a snapshot</h3>
+
+<p>The metadata file holds the schema, every partition spec the table has ever used,
+and the snapshot list. Normally the current snapshot is chosen; a time-travel
+query picks a different one by id or timestamp. Everything downstream is relative
+to that choice.</p>
+
+<h3 id="3-the-manifest-list-drops-whole-manifests">3. The manifest list drops whole manifests</h3>
+
+<p>This is where the first real elimination happens, and it is cheap because the
+manifest list is one small Avro file summarising each manifest, including the
+range of partition values inside it.</p>
+
+<p>From a table with three daily partitions:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>manifest af2b689e-...-m0.avro files=1
+    partition_summaries=[lower_bound='2026-01-07', upper_bound='2026-01-07']
+manifest aef10e73-...-m0.avro files=1
+    partition_summaries=[lower_bound='2026-01-06', upper_bound='2026-01-06']
+manifest 53fea6b1-...-m0.avro files=1
+    partition_summaries=[lower_bound='2026-01-05', upper_bound='2026-01-05']
+</code></pre></div></div>
+
+<p>A filter for 2026-01-06 keeps the middle manifest and <strong>discards the other two
+without opening them</strong>. On a real table where one manifest covers hundreds of
+files, that is hundreds of files eliminated by reading a few hundred bytes.</p>
+
+<h3 id="4-manifests-drop-individual-files">4. Manifests drop individual files</h3>
+
+<p>Surviving manifests are opened, and they carry, per data file, the partition
+value and the min/max of each column:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>file 00000-5-...parquet  rows=3000  partition=Row(event_ts_day=2026-01-06)
+    lower_bounds={1: ..., 2: ..., 3: 'r0', 4: ...}
+    upper_bounds={1: ..., 2: ..., 3: 'r2', 4: ...}
+</code></pre></div></div>
+
+<p>Two prunes happen here. The partition value eliminates files in the wrong
+partition. Then column bounds eliminate files whose min/max cannot contain a
+matching row — a filter <code class="language-plaintext highlighter-rouge">region = 'r5'</code> against a file whose region range is
+<code class="language-plaintext highlighter-rouge">r0</code>–<code class="language-plaintext highlighter-rouge">r2</code> skips it without reading it.</p>
+
+<p>The bounds keys are <strong>field ids</strong>. <code class="language-plaintext highlighter-rouge">3</code> is <code class="language-plaintext highlighter-rouge">region</code> because the schema says field 3
+is named <code class="language-plaintext highlighter-rouge">region</code> today. Rename the column and the bounds keep working, because
+nothing recorded the name.</p>
+
+<h2 id="hidden-partitioning-at-read-time">Hidden partitioning at read time</h2>
+
+<p>The query does not mention the partition column:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span>
+<span class="k">WHERE</span> <span class="n">event_ts</span> <span class="o">&gt;=</span> <span class="nb">timestamp</span><span class="s1">'2026-01-06 00:00:00'</span>
+  <span class="k">AND</span> <span class="n">event_ts</span> <span class="o">&lt;</span>  <span class="nb">timestamp</span><span class="s1">'2026-01-07 00:00:00'</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>partition directories on disk: ['event_ts_day=2026-01-05',
+                                'event_ts_day=2026-01-06',
+                                'event_ts_day=2026-01-07']
+rows matched = 3000
+</code></pre></div></div>
+
+<p>The table is partitioned by <code class="language-plaintext highlighter-rouge">days(event_ts)</code>; the filter names <code class="language-plaintext highlighter-rouge">event_ts</code>.
+Iceberg applies the same transform to the predicate and matches it against
+partition values in the manifests. No user needs to know the physical layout, and
+nobody can forget to filter on it.</p>
+
+<p>This also works <strong>across partition specs</strong>. A table whose layout changed from
+month to day keeps both, and because both specs derive from <code class="language-plaintext highlighter-rouge">source-id: 2</code> — the
+same column — one predicate prunes files under either.</p>
+
+<h2 id="what-makes-the-last-prune-fail">What makes the last prune fail</h2>
+
+<p>Column bounds are only useful when they are narrow, and that depends entirely on
+how the data was written.</p>
+
+<p>Rows arriving in random order put a wide range of every column in every file. The
+min/max then overlap across all files, no file can be excluded, and the prune
+does nothing — while still looking healthy in the metadata.</p>
+
+<p>Sorting is the fix, and it is why <code class="language-plaintext highlighter-rouge">WRITE ORDERED BY</code> and sorting compaction are
+not cosmetic:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span> <span class="k">WRITE</span> <span class="n">ORDERED</span> <span class="k">BY</span> <span class="n">region</span><span class="p">,</span> <span class="n">event_ts</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>After a sorting rewrite, each file holds a narrow slice of the sort column, the
+bounds stop overlapping, and filters on that column start eliminating files.</p>
+
+<p><strong>Choose the sort column to match your filters.</strong> Sorting by a column nobody
+filters on costs a rewrite and prunes nothing.</p>
+
+<h2 id="proving-each-prune">Proving each prune fired</h2>
+
+<p>Pruning is invisible unless you look, and “the query was fast” is not evidence.
+Two ways to see it.</p>
+
+<p><strong>The Spark plan</strong> names the filters the scan received:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">"local.db.events"</span><span class="p">)</span>
+      <span class="p">.</span><span class="nb">filter</span><span class="p">(</span><span class="s">"event_ts &gt;= timestamp'2026-01-06' AND event_ts &lt; timestamp'2026-01-07'"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">explain</span><span class="p">(</span><span class="s">"formatted"</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>The scan node reports the pushed filters. What it does <em>not</em> tell you is how many
+files survived, which is the number that matters.</p>
+
+<p><strong>The metadata tables</strong> answer that directly. Compare the whole table against
+what a filter leaves:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- every data file in the current snapshot</span>
+<span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">AS</span> <span class="n">all_files</span><span class="p">,</span> <span class="k">sum</span><span class="p">(</span><span class="n">record_count</span><span class="p">)</span> <span class="k">AS</span> <span class="n">all_rows</span>
+<span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">files</span><span class="p">;</span>
+
+<span class="c1">-- what one day's partition actually holds</span>
+<span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">AS</span> <span class="n">day_files</span><span class="p">,</span> <span class="k">sum</span><span class="p">(</span><span class="n">record_count</span><span class="p">)</span> <span class="k">AS</span> <span class="n">day_rows</span>
+<span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">files</span>
+<span class="k">WHERE</span> <span class="n">partition</span><span class="p">.</span><span class="n">event_ts_day</span> <span class="o">=</span> <span class="nb">date</span><span class="s1">'2026-01-06'</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>If <code class="language-plaintext highlighter-rouge">day_files</code> is close to <code class="language-plaintext highlighter-rouge">all_files</code>, the partition transform is not matching
+your filters and the first prune is doing nothing.</p>
+
+<p><strong>Manifest-level pruning</strong> is visible the same way:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">path</span><span class="p">,</span> <span class="n">added_data_files_count</span><span class="p">,</span> <span class="n">partition_summaries</span>
+<span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">manifests</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Each row carries a <code class="language-plaintext highlighter-rouge">lower_bound</code> and <code class="language-plaintext highlighter-rouge">upper_bound</code>. Where those ranges overlap
+heavily across manifests, the manifest prune cannot discard much — which happens
+when writes interleave partitions, and is what <code class="language-plaintext highlighter-rouge">rewrite_manifests</code> fixes by
+regrouping files so each manifest covers a tight range.</p>
+
+<h2 id="when-bounds-stop-working">When column bounds stop working</h2>
+
+<p>The fourth prune is the one that silently degrades, because nothing reports that
+it stopped helping.</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">lower_bounds</span><span class="p">,</span> <span class="n">upper_bounds</span>
+<span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">files</span> <span class="k">LIMIT</span> <span class="mi">5</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Bounds are keyed by field id, so <code class="language-plaintext highlighter-rouge">3</code> is whichever column has field id 3. Two
+failure patterns:</p>
+
+<p><strong>Overlapping ranges.</strong> Every file spans nearly the whole domain of the column,
+so no filter can exclude any file. This is what unsorted ingestion produces, and
+the fix is a sorting compaction:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span> <span class="k">WRITE</span> <span class="n">ORDERED</span> <span class="k">BY</span> <span class="n">region</span><span class="p">,</span> <span class="n">event_ts</span><span class="p">;</span>
+<span class="k">CALL</span> <span class="k">local</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span><span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.events'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p><strong>Bounds that are not collected.</strong> Iceberg writes column statistics for a bounded
+number of columns, governed by <code class="language-plaintext highlighter-rouge">write.metadata.metrics.default</code> and per-column
+overrides. On very wide tables the default mode can leave your filter column
+without bounds at all:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">ALTER</span> <span class="k">TABLE</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span> <span class="k">SET</span> <span class="n">TBLPROPERTIES</span> <span class="p">(</span>
+  <span class="s1">'write.metadata.metrics.default'</span> <span class="o">=</span> <span class="s1">'truncate(16)'</span><span class="p">,</span>
+  <span class="s1">'write.metadata.metrics.column.region'</span> <span class="o">=</span> <span class="s1">'full'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">counts</code> collects only row counts — no bounds, so no pruning. <code class="language-plaintext highlighter-rouge">truncate(n)</code>
+stores shortened bounds, which is usually enough for prefix filters. <code class="language-plaintext highlighter-rouge">full</code>
+stores complete values, which matters for high-selectivity columns and costs
+metadata size on wide ones.</p>
+
+<p><strong>A filter on a column with no bounds reads every file</strong>, and the plan looks
+identical to one that prunes perfectly.</p>
+
+<h2 id="the-cost-model">The cost model, stated</h2>
+
+<p>Planning reads, in order: one catalog call, one <code class="language-plaintext highlighter-rouge">metadata.json</code>, one manifest
+list, then <em>m</em> manifests. Data files opened are whatever survives.</p>
+
+<p>So planning cost is roughly <strong>O(manifests)</strong>, not O(partitions) and not O(files).
+That has two consequences worth holding on to.</p>
+
+<p>A table with 50,000 partitions and 20 manifests plans quickly. A table with 50
+partitions and 20,000 manifests — which is what a per-minute streaming writer
+produces in two weeks — plans slowly. <strong>Partition count is not the driver;
+commit count is.</strong></p>
+
+<p>And because manifests are merged automatically once
+<code class="language-plaintext highlighter-rouge">commit.manifest.min-count-to-merge</code> (default 100) is exceeded, the problem
+usually appears on tables where commits are frequent enough to outrun that
+merging, not on tables that simply have a lot of data.</p>
+
+<h2 id="planning-cost">Why planning cost is metadata, not partitions</h2>
+
+<p>No step in the sequence lists a directory. That is the structural difference from
+Hive-style tables, where planning is a listing per partition and cost grows with
+partition count.</p>
+
+<p>Iceberg’s planning cost grows with <strong>the number of manifests to read</strong>, which
+grows with the number of commits. A streaming table committing every minute
+accumulates manifests quickly, and the symptom is distinctive: <strong>time spent before
+any task starts</strong>, growing while the data stays the same size.</p>
+
+<p><code class="language-plaintext highlighter-rouge">rewrite_manifests</code> is the fix, and it is a different job from data compaction:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CALL</span> <span class="k">local</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_manifests</span><span class="p">(</span><span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.events'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>A measured run elsewhere took a table from 9 manifests to 1.</p>
+
+<h2 id="reading-the-evidence">Reading the evidence yourself</h2>
+
+<p>Three queries answer whether pruning can work on your table:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- how many manifests must planning read?</span>
+<span class="k">SELECT</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">manifests</span><span class="p">;</span>
+
+<span class="c1">-- do partition ranges separate cleanly, or do they overlap?</span>
+<span class="k">SELECT</span> <span class="n">path</span><span class="p">,</span> <span class="n">partition_summaries</span> <span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">manifests</span><span class="p">;</span>
+
+<span class="c1">-- are column bounds narrow, or does every file span everything?</span>
+<span class="k">SELECT</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">lower_bounds</span><span class="p">,</span> <span class="n">upper_bounds</span> <span class="k">FROM</span> <span class="k">local</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">events</span><span class="p">.</span><span class="n">files</span> <span class="k">LIMIT</span> <span class="mi">10</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Overlapping bounds across most files means the third prune is doing nothing, and
+sorting is the lever. A large manifest count means planning is paying for
+history, and <code class="language-plaintext highlighter-rouge">rewrite_manifests</code> is the lever.</p>
+
+<h2 id="common-misconceptions">Common misconceptions</h2>
+
+<p><strong>“Iceberg is fast because it is Parquet.”</strong> The data files are the same Parquet a
+Hive table uses. The difference is how many of them get opened.</p>
+
+<p><strong>“Partition pruning is the optimization.”</strong> It is one of four. Manifest-level
+pruning happens before it, and column-bounds pruning after.</p>
+
+<p><strong>“More partitions prune better.”</strong> More partitions mean more metadata and more
+small files. Pruning quality comes from filters matching the partition transform
+and from sorted data, not from partition count.</p>
+
+<p><strong>“Statistics are collected by a separate job.”</strong> Bounds are written into
+manifests by the writer, as part of the commit.</p>
+
+<p><strong>“Time travel is slower.”</strong> It selects a different snapshot at step 2 and then
+behaves identically.</p>
+
+<h2 id="a-model-worth-keeping">A model worth keeping</h2>
+
+<p>Planning is a funnel: one catalog lookup, one metadata file, one manifest list,
+some manifests, and then only the data files that survived.</p>
+
+<p>Each level exists to avoid the level below. When queries slow down, the question
+is which level stopped eliminating — manifests accumulating makes step 3
+expensive, and unsorted data makes step 4 useless.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://iceberg.apache.org/spec/#scan-planning">Iceberg table specification</a> for scan planning and manifest contents</li>
+  <li><a href="https://iceberg.apache.org/docs/latest/spark-queries/">Iceberg Spark queries</a> for metadata tables and time travel syntax</li>
+  <li><a href="/ApacheIcebergArchitecture/">Apache Iceberg architecture</a> for the metadata tree these steps traverse</li>
+  <li><a href="/IcebergWritePath/">Life of a write query in Iceberg</a> for how the metadata this reads gets created</li>
+  <li><a href="/IcebergProductionGuide/">Running Iceberg in production</a> for the maintenance that keeps planning fast</li>
+</ul>
+
+<h2 id="trademarks">Trademarks</h2>
+
+<p>Apache Iceberg, Apache Spark, Apache Parquet, Apache Hive, Apache and the Apache
+feather logo are either registered trademarks or trademarks of The Apache
+Software Foundation in the United States and other countries.</p>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/DatalakeDockerDemos/">
+          <span class="card--mini__date">Sep 19, 2026</span>
+          <span class="card--mini__title">Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta</span>
+        </a><a class="card card--mini" href="/IcebergProductionGuide/">
+          <span class="card--mini__date">Sep 17, 2026</span>
+          <span class="card--mini__title">Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule</span>
+        </a><a class="card card--mini" href="/IcebergHiveMigration/">
+          <span class="card--mini__date">Sep 15, 2026</span>
+          <span class="card--mini__title">Migrating Hive tables to Iceberg: snapshot first, migrate second</span>
+        </a><a class="card card--mini" href="/IcebergInteroperability/">
+          <span class="card--mini__date">Sep 13, 2026</span>
+          <span class="card--mini__title">One table, three formats: Iceberg, Delta and Hudi interoperability</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/IcebergThreeTierArchitecture/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">The three tiers of an Iceberg table: catalog, metadata, data</span>
+  </a>
+  <a class="post-nav__link post-nav__link--next" href="/IcebergWritePath/" rel="next">
+    <span class="post-nav__label">Next<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <span class="post-nav__title">Life of a write query in Iceberg: three files, one pointer swap, and what ACID means here</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Life%20of%20a%20read%20query%20in%20Iceberg:%20four%20prunes%20before%20a%20byte%20of%20data%20is%20read&url=https://rangareddy.github.io/IcebergReadPath/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/IcebergReadPath/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/IcebergReadPath/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/DatalakeDockerDemos/" hidden>
+      <a href="/DatalakeDockerDemos/">Datalake Docker Demos</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergProductionGuide/" hidden>
+      <a href="/IcebergProductionGuide/">Iceberg In Production</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergHiveMigration/" hidden>
+      <a href="/IcebergHiveMigration/">Hive To Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergInteroperability/" hidden>
+      <a href="/IcebergInteroperability/">Lakehouse Interoperability</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCdcPipelines/" hidden>
+      <a href="/IcebergCdcPipelines/">CDC Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergTimeTravel/" hidden>
+      <a href="/IcebergTimeTravel/">Iceberg Time Travel</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCopyOnWriteMergeOnRead/" hidden>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">Copy-on-Write vs Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergStreamingIngestion/" hidden>
+      <a href="/IcebergStreamingIngestion/">Streaming Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergIngestion/" hidden>
+      <a href="/IcebergIngestion/">Iceberg Ingestion</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergPartitioning/" hidden>
+      <a href="/IcebergPartitioning/">Iceberg Partitioning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSchemaEvolution/" hidden>
+      <a href="/IcebergSchemaEvolution/">Iceberg Schema Evolution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergFormatVersions/" hidden>
+      <a href="/IcebergFormatVersions/">Iceberg Format Versions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCatalogs/" hidden>
+      <a href="/IcebergCatalogs/">Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergWritePath/" hidden>
+      <a href="/IcebergWritePath/">Iceberg Write Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergReadPath/" hidden>
+      <a href="/IcebergReadPath/">Iceberg Read Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergThreeTierArchitecture/" hidden>
+      <a href="/IcebergThreeTierArchitecture/">Iceberg Three Tiers</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergLocalPlayground/" hidden>
+      <a href="/IcebergLocalPlayground/">Iceberg Playground</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/WhyIcebergExists/" hidden>
+      <a href="/WhyIcebergExists/">Why Iceberg Exists</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/TableMaintenance/" hidden>
+      <a href="/TableMaintenance/">Table Maintenance</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/StructuredStreamingInternals/" hidden>
+      <a href="/StructuredStreamingInternals/">Structured Streaming</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkPerformanceOptimization/" hidden>
+      <a href="/SparkPerformanceOptimization/">Spark Performance Tuning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShuffleInternals/" hidden>
+      <a href="/SparkShuffleInternals/">Spark Shuffle Internals</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataFusionComet/" hidden>
+      <a href="/SparkDataFusionComet/">DataFusion Comet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergPolaris/" hidden>
+      <a href="/SparkIcebergPolaris/">Iceberg on Polaris</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Spark Submit for Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShufflePartitionGenerator/" hidden>
+      <a href="/SparkShufflePartitionGenerator/">Shuffle Partition Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkStreamingCustomLogging/" hidden>
+      <a href="/SparkStreamingCustomLogging/">Streaming Query Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Spark Release History</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Fixing Data Skew</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiMergeOnRead/" hidden>
+      <a href="/HudiMergeOnRead/">Hudi Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Inside Apache Spark Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIndexTypes/" hidden>
+      <a href="/HudiIndexTypes/">Hudi Index Types</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/DatalakeDockerDemos/">
+        Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta
+        <time datetime="2026-09-19T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergProductionGuide/">
+        Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule
+        <time datetime="2026-09-17T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergHiveMigration/">
+        Migrating Hive tables to Iceberg: snapshot first, migrate second
+        <time datetime="2026-09-15T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergInteroperability/">
+        One table, three formats: Iceberg, Delta and Hudi interoperability
+        <time datetime="2026-09-13T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCdcPipelines/">
+        CDC into Iceberg: the delete files nobody counted
+        <time datetime="2026-09-09T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergTimeTravel/">
+        Time travel and rollback in Iceberg: undoing a bad write in one statement
+        <time datetime="2026-09-07T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">
+        Copy-on-write or merge-on-read: choosing how an Iceberg table pays for a delete
+        <time datetime="2026-09-05T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergStreamingIngestion/">
+        Streaming into Iceberg: availableNow, checkpoints, and the snapshot count nobody watches
+        <time datetime="2026-09-03T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">19</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">21</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Apache Hudi through Spark Connect: running the full table surface from a thin client · Ranga Reddy</title>
+  <meta name="description" content="Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/SparkConnectHudi/">
+  <meta name="google-site-verification" content="p3-xmuuDZGnVmE6SSwGmQ2JXJDhDsZPAh79ydnDlQA4">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Apache Hudi through Spark Connect: running the full table surface from a thin client">
+  <meta property="og:description" content="Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.">
+  <meta property="og:url" content="https://rangareddy.github.io/SparkConnectHudi/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/SparkConnectHudi.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Apache Hudi through Spark Connect: running the full table surface from a thin client">
+  <meta name="twitter:description" content="Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/SparkConnectHudi.png">
+  <meta property="article:published_time" content="2026-07-03T10:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Apache Hudi through Spark Connect: running the full table surface from a thin client",
+    "description": "Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.",
+    "url": "https://rangareddy.github.io/SparkConnectHudi/",
+    "datePublished": "2026-07-03T10:00:00+05:30",
+    "dateModified": "2026-07-03T10:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/SparkConnectHudi.png",
+    "keywords": "Spark, SparkConnect, Hudi, Lakehouse",
+    "articleSection": "Spark",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/SparkConnectHudi/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Spark", "item": "https://rangareddy.github.io/category/#spark" },
+      { "@type": "ListItem", "position": 3, "name": "Apache Hudi through Spark Connect: running the full table surface from a thin client", "item": "https://rangareddy.github.io/SparkConnectHudi/" }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does the client need the Hudi jar?","acceptedAnswer":{"@type":"Answer","text":"No, and that is the main reason to use Connect for Hudi work. The client sends a plan naming a table and the server resolves it. A virtualenv with pyspark is the whole client-side dependency, which also removes the jar-version skew that usually makes onboarding painful."}},{"@type":"Question","name":"Can one server serve Hudi and Iceberg together?","acceptedAnswer":{"@type":"Answer","text":"Mostly, and the cost falls entirely on Iceberg. spark.sql.extensions takes a comma-separated list, Hudi takes over spark_catalog while Iceberg gets a named catalog, and both formats’ DDL and DML work. But loading Hudi’s extension alongside Iceberg’s breaks Iceberg’s"}},{"@type":"Question","name":"Why does my MERGE fail with a parse error?","acceptedAnswer":{"@type":"Answer","text":"Because the session extension is not loaded on the server, from either a wrong class name or a jar missing from the server classpath. MERGE and UPDATE on Hudi are extension-provided syntax, so without it the statement is not merely unsupported, it is unparseable."}},{"@type":"Question","name":"Can I set hoodie.* options per job from the client?","acceptedAnswer":{"@type":"Answer","text":"Write-time hoodie.* options travel fine, because they are passed with the write rather than baked into the session. What you cannot change from a client is the session-level set: the extension, the catalog and the serializer."}},{"@type":"Question","name":"Is the partition-column reordering a Spark Connect bug?","acceptedAnswer":{"@type":"Answer","text":"No. It is how Hudi stores a partitioned table, and a classic session behaves the same way. Connect only makes it more visible, because the error arrives without a local stack trace to poke at."}},{"@type":"Question","name":"Do client and server versions have to match?","acceptedAnswer":{"@type":"Answer","text":"Match them. An older client is tolerated: a 3.5.9 client drove the 4.0.2 server through every example here. A newer one is not, and the failure is specific rather than general. A pip-installed 4.2.0 client ran every SQL statement against the 4.0.2 server and then failed on createDataFrame with SQL_CONF_NOT_FOUND for spark.sql.session.localRelationSizeLimit, because it expects a config the older server does not have. That is why the install line above is pinned."}}]}
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/SparkConnectHudi.png"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Apache Hudi through Spark Connect: running the full table surface from a thin client</h1>
+      <p class="post-head__lede">Spark Connect splits the driver in two, which changes where Hudi has to be installed. Here is how to run a server that speaks Hudi, every operation that works from a client with no jars, and the four that do not, each one run rather than assumed.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-07-03T10:00:00+05:30">Jul 3, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>21 min read</span>
+  <span class="meta__item meta__views" data-views-for="/SparkConnectHudi/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#spark">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Spark
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#spark">#Spark</a></li>
+  <li><a class="chip" href="/tag/#sparkconnect">#SparkConnect</a></li>
+  <li><a class="chip" href="/tag/#hudi">#Hudi</a></li>
+  <li><a class="chip" href="/tag/#lakehouse">#Lakehouse</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#architecture-what-spark-connect-changes-for-hudi" id="markdown-toc-architecture-what-spark-connect-changes-for-hudi">Architecture: what Spark Connect changes for Hudi</a></li>
+  <li><a href="#starting-a-server-that-speaks-hudi" id="markdown-toc-starting-a-server-that-speaks-hudi">Starting a server that speaks Hudi</a>    <ul>
+      <li><a href="#the-extension-class-name-which-is-the-usual-mistake" id="markdown-toc-the-extension-class-name-which-is-the-usual-mistake">The extension class name, which is the usual mistake</a></li>
+    </ul>
+  </li>
+  <li><a href="#connecting-the-client" id="markdown-toc-connecting-the-client">Connecting the client</a></li>
+  <li><a href="#copy-on-write-tables-the-full-dml-surface" id="markdown-toc-copy-on-write-tables-the-full-dml-surface">Copy-on-write tables, the full DML surface</a>    <ul>
+      <li><a href="#the-partitioning-trap" id="markdown-toc-the-partitioning-trap">The partitioning trap</a></li>
+      <li><a href="#update-merge-and-delete" id="markdown-toc-update-merge-and-delete">Update, merge and delete</a></li>
+    </ul>
+  </li>
+  <li><a href="#schema-evolution-two-of-four-operations" id="markdown-toc-schema-evolution-two-of-four-operations">Schema evolution: two of four operations</a></li>
+  <li><a href="#merge-on-read-and-what-the-two-query-types-show" id="markdown-toc-merge-on-read-and-what-the-two-query-types-show">Merge-on-read, and what the two query types show</a></li>
+  <li><a href="#incremental-queries-and-time-travel" id="markdown-toc-incremental-queries-and-time-travel">Incremental queries and time travel</a></li>
+  <li><a href="#procedures-and-metadata-over-grpc" id="markdown-toc-procedures-and-metadata-over-grpc">Procedures and metadata, over gRPC</a>    <ul>
+      <li><a href="#rollback_to_instant-only-unwinds-the-newest-instant" id="markdown-toc-rollback_to_instant-only-unwinds-the-newest-instant"><code class="language-plaintext highlighter-rouge">rollback_to_instant</code> only unwinds the newest instant</a></li>
+    </ul>
+  </li>
+  <li><a href="#what-the-thin-client-cannot-do" id="markdown-toc-what-the-thin-client-cannot-do">What the thin client cannot do</a></li>
+  <li><a href="#common-misconceptions" id="markdown-toc-common-misconceptions">Common misconceptions</a></li>
+  <li><a href="#production-notes" id="markdown-toc-production-notes">Production notes</a></li>
+  <li><a href="#frequently-asked-questions" id="markdown-toc-frequently-asked-questions">Frequently asked questions</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+  <li><a href="#trademarks" id="markdown-toc-trademarks">Trademarks</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>Spark Connect moves planning to a server, so the Hudi bundle, <code class="language-plaintext highlighter-rouge">spark.sql.extensions</code>, the Kryo serializer and <a href="https://github.com/apache/hudi/blob/master/hudi-spark-datasource/hudi-spark-common/src/main/scala/org/apache/spark/sql/hudi/catalog/HoodieCatalog.scala"><code class="language-plaintext highlighter-rouge">HoodieCatalog</code></a> all belong to the <strong>server</strong> at startup. A client cannot add them later.</li>
+    <li>The client becomes a <code class="language-plaintext highlighter-rouge">pip install</code> with no Spark, no Java and no Hudi jar. Everything below was driven from one.</li>
+    <li>Almost the whole surface works: COW and MOR, partitioned tables, <code class="language-plaintext highlighter-rouge">INSERT</code>, <code class="language-plaintext highlighter-rouge">UPDATE</code>, <code class="language-plaintext highlighter-rouge">MERGE</code>, <code class="language-plaintext highlighter-rouge">DELETE</code>, incremental queries, time travel, 12 stored procedures and the metadata table functions.</li>
+    <li>Four things do not. <code class="language-plaintext highlighter-rouge">RENAME COLUMN</code> and <code class="language-plaintext highlighter-rouge">DROP COLUMN</code> are rejected outright, <code class="language-plaintext highlighter-rouge">rollback_to_instant</code> only unwinds the newest instant, and <code class="language-plaintext highlighter-rouge">hudi_table_changes</code> in CDC mode needs a CDC-enabled table.</li>
+    <li>The trap that costs the most time is not a Connect issue at all: <strong>partitioning moves the partition column to the end of the schema</strong>, so a positional <code class="language-plaintext highlighter-rouge">INSERT</code> fails with an error that blames the wrong column.</li>
+  </ul>
+</blockquote>
+
+<p>Hudi is not part of Spark. It arrives as a bundle jar, installs a Catalyst
+extension, registers a catalog and needs a specific serializer. All four are
+session-level concerns, and Spark Connect moves the session to the far side of a
+gRPC connection.</p>
+
+<p>So the practical question is not whether Hudi works through Spark Connect. It is
+which half of your setup goes where, and what the failures look like when a piece
+lands on the wrong side. This post answers that by running the whole thing: one
+Connect server, one client with nothing installed, and every Hudi operation worth
+using, including the ones that fail.</p>
+
+<p>Every result quoted here came out of that run. Where something failed I say so,
+and where a failure turned out to be my own mistake rather than a limitation I
+say that too, because the error messages in two of those cases point somewhere
+misleading.</p>
+
+<h2 id="architecture-what-spark-connect-changes-for-hudi">Architecture: what Spark Connect changes for Hudi</h2>
+
+<p>In a classic session your process owns the SparkSession, the analyzer, the
+catalog and the scheduler. Hudi’s extension and catalog are installed into
+<em>your</em> session, by your own <code class="language-plaintext highlighter-rouge">spark-submit</code> line.</p>
+
+<p>Spark Connect cuts that in half:</p>
+
+<pre><code class="language-mermaid">flowchart TB
+  subgraph C["client, your laptop"]
+    A["DataFrame and SQL calls"] --&gt; B["unresolved plan&lt;br/&gt;as protobuf"]
+  end
+  B --&gt;|"gRPC, port 15002"| S
+  subgraph S["Spark Connect server, the driver"]
+    D["analyzer plus HoodieCatalog"] --&gt; E["Catalyst optimiser plus&lt;br/&gt;HoodieSparkSessionExtension"]
+    E --&gt; F["physical plan"]
+  end
+  F --&gt; X["executors, Hudi bundle on the classpath"]
+  X --&gt;|"Arrow batches"| A
+</code></pre>
+
+<p>The client cannot resolve <code class="language-plaintext highlighter-rouge">default.trips_cow</code> because it has no catalog and no
+idea what a Hudi table is. It sends the operation and lets the server work it
+out. Everything below follows from that single split.</p>
+
+<p>Hudi plugs into Spark at four points, and Connect puts all four on the server:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">What Hudi needs</th>
+      <th style="text-align: left">Config</th>
+      <th style="text-align: left">Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">The bundle jar</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--jars</code> or <code class="language-plaintext highlighter-rouge">--packages</code></td>
+      <td style="text-align: left">Contains the <code class="language-plaintext highlighter-rouge">DataSource</code>, the catalog and the procedures</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">A Catalyst extension</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.sql.extensions</code></td>
+      <td style="text-align: left">Provides <code class="language-plaintext highlighter-rouge">MERGE</code>, <code class="language-plaintext highlighter-rouge">UPDATE</code>, <code class="language-plaintext highlighter-rouge">CALL</code> and the table-valued functions</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">A catalog</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.sql.catalog.spark_catalog</code></td>
+      <td style="text-align: left">Lets <code class="language-plaintext highlighter-rouge">USING hudi</code> tables live in the default catalog</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Kryo serialization</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.serializer</code></td>
+      <td style="text-align: left">Hudi’s internal types do not survive the Java serializer</td>
+    </tr>
+  </tbody>
+</table>
+
+<pre><code class="language-mermaid">flowchart TB
+  subgraph CL["client"]
+    P["pip install pyspark&lt;br/&gt;no Java, no Hudi jar"]
+  end
+  subgraph SV["server, fixed at startup"]
+    J["hudi-spark4.0-bundle"]
+    K["HoodieSparkSessionExtension"]
+    L["HoodieCatalog over spark_catalog"]
+    M["KryoSerializer"]
+  end
+  P --&gt;|"SQL and DataFrame"| SV
+  J --- K --- L --- M
+</code></pre>
+
+<p>None of the four can be set by a client. <code class="language-plaintext highlighter-rouge">spark.conf.set</code> reaches the server for
+runtime SQL configs, but <code class="language-plaintext highlighter-rouge">spark.sql.extensions</code> is read once while the session is
+built, before any client connects. A client can <strong>read</strong> it, which is the fastest
+way to tell a broken server from a broken query.</p>
+
+<h2 id="starting-a-server-that-speaks-hudi">Starting a server that speaks Hudi</h2>
+
+<p>Use <code class="language-plaintext highlighter-rouge">--packages</code> when the host can reach Maven Central, <code class="language-plaintext highlighter-rouge">--jars</code> with
+pre-downloaded files when it cannot. Both were run for this post.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$SPARK_HOME</span>/sbin/start-connect-server.sh <span class="se">\</span>
+  <span class="nt">--packages</span> org.apache.hudi:hudi-spark4.0-bundle_2.13:1.2.0 <span class="se">\</span>
+  <span class="nt">--conf</span> spark.sql.extensions<span class="o">=</span>org.apache.spark.sql.hudi.HoodieSparkSessionExtension <span class="se">\</span>
+  <span class="nt">--conf</span> spark.serializer<span class="o">=</span>org.apache.spark.serializer.KryoSerializer <span class="se">\</span>
+  <span class="nt">--conf</span> spark.sql.catalog.spark_catalog<span class="o">=</span>org.apache.spark.sql.hudi.catalog.HoodieCatalog <span class="se">\</span>
+  <span class="nt">--conf</span> spark.sql.warehouse.dir<span class="o">=</span>/tmp/warehouse/spark <span class="se">\</span>
+  <span class="nt">--master</span> <span class="s2">"local[4]"</span>
+</code></pre></div></div>
+
+<p>The coordinate encodes two compatibilities at once, and both are hard failures
+rather than warnings:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Coordinate part</th>
+      <th style="text-align: left">Must match</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">hudi-spark4.0-bundle</code></td>
+      <td style="text-align: left">Your Spark minor version, 4.0 here</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">_2.13</code></td>
+      <td style="text-align: left">Spark’s Scala binary version</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Spark 4 is Scala 2.13 only, so a <code class="language-plaintext highlighter-rouge">_2.12</code> bundle never loads.</p>
+
+<h3 id="the-extension-class-name-which-is-the-usual-mistake">The extension class name, which is the usual mistake</h3>
+
+<p>Hudi’s session extension is
+<code class="language-plaintext highlighter-rouge">org.apache.spark.sql.hudi.HoodieSparkSessionExtension</code>. It lives under
+<code class="language-plaintext highlighter-rouge">org.apache.spark.sql</code>, <strong>not</strong> under <code class="language-plaintext highlighter-rouge">org.apache.hudi</code>, which is where most
+people reach for it first, and where I reached for it first.</p>
+
+<p>Getting it wrong does not stop the server. That is what makes it expensive: the
+server starts, reports healthy, and then every <code class="language-plaintext highlighter-rouge">MERGE</code> and <code class="language-plaintext highlighter-rouge">CALL</code> fails later
+with an error about syntax or a missing table. The only evidence is a warning in
+the server log at startup:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>WARN SparkSession: Cannot use org.apache.hudi.HoodieSparkSessionExtension to configure session extensions.
+java.lang.ClassNotFoundException: org.apache.hudi.HoodieSparkSessionExtension
+</code></pre></div></div>
+
+<p>Two habits remove this whole class of problem. Read the name out of the jar
+rather than from memory:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>unzip <span class="nt">-l</span> hudi-spark4.0-bundle_2.13-1.2.0.jar | <span class="nb">grep </span>SessionExtension
+<span class="c">#   11028  org/apache/spark/sql/hudi/HoodieSparkSessionExtension.class</span>
+</code></pre></div></div>
+
+<p>And confirm from the client that the server loaded it:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">print</span><span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">conf</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">"spark.sql.extensions"</span><span class="p">))</span>
+<span class="c1"># org.apache.spark.sql.hudi.HoodieSparkSessionExtension
+</span></code></pre></div></div>
+
+<p>That one line separates “my SQL is wrong” from “the server is misconfigured”, and
+it is the first thing to run when a <code class="language-plaintext highlighter-rouge">MERGE</code> is rejected.</p>
+
+<h2 id="connecting-the-client">Connecting the client</h2>
+
+<p>The client needs <code class="language-plaintext highlighter-rouge">pyspark</code> and gRPC. No Java, no <code class="language-plaintext highlighter-rouge">SPARK_HOME</code>, no Hudi jar. Pin
+it to the version your server runs:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pip <span class="nb">install</span> <span class="s2">"pyspark[connect]==4.0.2"</span>
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pyspark.sql</span> <span class="kn">import</span> <span class="n">SparkSession</span>
+
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="p">.</span><span class="n">builder</span><span class="p">.</span><span class="n">remote</span><span class="p">(</span><span class="s">"sc://localhost:15002"</span><span class="p">).</span><span class="n">getOrCreate</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">version</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">spark.version</code> reports the <strong>server’s</strong> version, so it tells you nothing about
+your client. Check the client separately with <code class="language-plaintext highlighter-rouge">pyspark.__version__</code>.</p>
+
+<p>The pin matters more than it looks, and a bare <code class="language-plaintext highlighter-rouge">pip install "pyspark[connect]"</code>
+is the wrong instruction. It installs whatever is newest on PyPI, and a client
+newer than the server fails on the first <code class="language-plaintext highlighter-rouge">createDataFrame</code>:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SparkNoSuchElementException: [SQL_CONF_NOT_FOUND] The SQL config
+"spark.sql.session.localRelationSizeLimit" cannot be found. SQLSTATE: 42K0I
+</code></pre></div></div>
+
+<p>The newer client asks the older server for a SQL config that does not exist
+there. Every SQL statement in this post still works in that configuration, so
+the failure looks arbitrary: DDL, <code class="language-plaintext highlighter-rouge">MERGE</code>, procedures and metadata queries all
+succeed, and only the paths that build a local relation break.</p>
+
+<p>The gap is not symmetric. An <strong>older</strong> client against a newer server was fine: a
+<code class="language-plaintext highlighter-rouge">3.5.9</code> client drove the same <code class="language-plaintext highlighter-rouge">4.0.2</code> server through every example here,
+<code class="language-plaintext highlighter-rouge">createDataFrame</code> included. A <strong>newer</strong> client against an older server was not.
+Match the versions, and when you cannot, be the older side.</p>
+
+<h2 id="copy-on-write-tables-the-full-dml-surface">Copy-on-write tables, the full DML surface</h2>
+
+<p>Hudi installs over the default catalog rather than adding a named one, so tables
+are ordinary two-part names. The Hudi specifics go in <code class="language-plaintext highlighter-rouge">TBLPROPERTIES</code>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  CREATE TABLE default.trips_cow (
+    trip_id    BIGINT,
+    rider_id   BIGINT,
+    city       STRING,
+    fare       DECIMAL(10,2),
+    started_at TIMESTAMP)
+  USING hudi
+  PARTITIONED BY (city)
+  TBLPROPERTIES (
+    primaryKey      = 'trip_id',
+    preCombineField = 'started_at',
+    type            = 'cow')
+  LOCATION '/tmp/warehouse/trips_cow'"""</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">primaryKey</code> is what makes an <code class="language-plaintext highlighter-rouge">UPDATE</code> or <code class="language-plaintext highlighter-rouge">MERGE</code> possible at all, since Hudi
+needs a record key to find the row it is replacing. <code class="language-plaintext highlighter-rouge">preCombineField</code> decides
+which version wins when two records share a key. <code class="language-plaintext highlighter-rouge">type = 'cow'</code> selects
+<strong>copy-on-write</strong>, where an update rewrites the whole base file, as opposed to
+merge-on-read, which appends a delta log and merges at query time.</p>
+
+<h3 id="the-partitioning-trap">The partitioning trap</h3>
+
+<p>Now the thing that will cost you an afternoon. This insert looks obviously
+correct and fails:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  INSERT INTO default.trips_cow VALUES
+    (1, 101, 'Hyderabad', 245.50, TIMESTAMP '2026-09-01 08:15:00')"""</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AnalysisException: [INCOMPATIBLE_DATA_FOR_TABLE.CANNOT_SAFELY_CAST]
+Cannot write incompatible data for the table `spark_catalog`.`default`.`trips_cow`:
+Cannot safely cast `fare` "STRING" to "DECIMAL(10,2)". SQLSTATE: KD000
+</code></pre></div></div>
+
+<p>The error names <code class="language-plaintext highlighter-rouge">fare</code>, and <code class="language-plaintext highlighter-rouge">fare</code> is fine. Look at the schema Hudi actually
+created:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">f</span><span class="p">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">spark</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">"default.trips_cow"</span><span class="p">).</span><span class="n">schema</span><span class="p">.</span><span class="n">fields</span>
+ <span class="k">if</span> <span class="ow">not</span> <span class="n">f</span><span class="p">.</span><span class="n">name</span><span class="p">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">"_hoodie"</span><span class="p">)]</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>['trip_id', 'rider_id', 'fare', 'started_at', 'city']
+</code></pre></div></div>
+
+<p><strong>Partitioning moves the partition column to the end of the schema.</strong> The table
+was declared with <code class="language-plaintext highlighter-rouge">city</code> third, and it is stored fifth. A positional
+<code class="language-plaintext highlighter-rouge">INSERT ... VALUES</code> maps by position, so <code class="language-plaintext highlighter-rouge">'Hyderabad'</code> lands on <code class="language-plaintext highlighter-rouge">fare</code>, and the
+cast error is a truthful report of a problem one column to the left of where you
+are looking.</p>
+
+<p>Two fixes. Name the columns, which is worth doing on any Hudi table whether it is
+partitioned or not:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  INSERT INTO default.trips_cow (trip_id, rider_id, city, fare, started_at) VALUES
+    (1, 101, 'Hyderabad', 245.50, TIMESTAMP '2026-09-01 08:15:00'),
+    (2, 102, 'Bengaluru', 180.00, TIMESTAMP '2026-09-01 09:30:00'),
+    (3, 103, 'Hyderabad', 320.75, TIMESTAMP '2026-09-02 07:45:00')"""</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Or supply the values in Hudi’s stored order, with the partition column last.
+Both were verified; the explicit column list is the one to use, because it
+survives a later <code class="language-plaintext highlighter-rouge">ADD COLUMNS</code>.</p>
+
+<h3 id="update-merge-and-delete">Update, merge and delete</h3>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"UPDATE default.trips_cow SET fare = 250.00 WHERE trip_id = 1"</span><span class="p">)</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  MERGE INTO default.trips_cow t
+  USING (SELECT 4L AS trip_id, 104L AS rider_id, 'Pune' AS city,
+                CAST(99.00 AS DECIMAL(10,2)) AS fare,
+                TIMESTAMP '2026-09-03 10:00:00' AS started_at) s
+    ON t.trip_id = s.trip_id
+  WHEN MATCHED     THEN UPDATE SET *
+  WHEN NOT MATCHED THEN INSERT *"""</span><span class="p">)</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"DELETE FROM default.trips_cow WHERE trip_id = 2"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>All three are extension-provided syntax, so they are also a working test that the
+server loaded <a href="https://github.com/apache/hudi/blob/master/hudi-spark-datasource/hudi-spark/src/main/scala/org/apache/spark/sql/hudi/HoodieSparkSessionExtension.scala"><code class="language-plaintext highlighter-rouge">HoodieSparkSessionExtension</code></a>. Results from the sequence above:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>count after INSERT                      3
+fare for trip_id 1 after UPDATE         250.00
+count after MERGE (Pune inserted)       4
+count after DELETE                      3
+count WHERE city = 'Hyderabad'          2
+SHOW PARTITIONS   city=Bengaluru, city=Hyderabad, city=Pune
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">SHOW PARTITIONS</code> still listing <code class="language-plaintext highlighter-rouge">city=Bengaluru</code> after its only row was deleted
+is correct: the partition directory and its metadata remain until cleaning
+removes them.</p>
+
+<p>The five Hudi bookkeeping columns come through the client untouched, which is a
+quick way to confirm you are reading a real Hudi table and not a directory of
+Parquet:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">spark</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">"default.trips_cow"</span><span class="p">).</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="p">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">"_hoodie"</span><span class="p">)]</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>['_hoodie_commit_time', '_hoodie_commit_seqno', '_hoodie_record_key',
+ '_hoodie_partition_path', '_hoodie_file_name']
+</code></pre></div></div>
+
+<h2 id="schema-evolution-two-of-four-operations">Schema evolution: two of four operations</h2>
+
+<p><code class="language-plaintext highlighter-rouge">ADD COLUMNS</code> works, and old rows read back <code class="language-plaintext highlighter-rouge">NULL</code> for the new column as they
+should:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"ALTER TABLE default.trips_cow ADD COLUMNS (pay_method STRING)"</span><span class="p">)</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  INSERT INTO default.trips_cow (trip_id, rider_id, city, fare, started_at, pay_method)
+  VALUES (5, 105, 'Chennai', 75.25, TIMESTAMP '2026-09-04 11:00:00', 'upi')"""</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pay_method for trip_id 5           upi
+rows WHERE pay_method IS NULL      3
+</code></pre></div></div>
+
+<p>Widening a column type with <code class="language-plaintext highlighter-rouge">ALTER COLUMN ... TYPE</code> is accepted too. The other
+two are not:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"ALTER TABLE default.trips_cow RENAME COLUMN pay_method TO pm"</span><span class="p">)</span>
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"ALTER TABLE default.trips_cow DROP COLUMN pay_method"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AnalysisException: [UNSUPPORTED_FEATURE.TABLE_OPERATION] The feature is not supported:
+Table `spark_catalog`.`default`.`trips_cow` does not support RENAME COLUMN.
+
+AnalysisException: [UNSUPPORTED_FEATURE.TABLE_OPERATION] The feature is not supported:
+Table `spark_catalog`.`default`.`trips_cow` does not support DROP COLUMN
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Operation</th>
+      <th style="text-align: left">Through Spark Connect</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">ADD COLUMNS</code></td>
+      <td style="text-align: left">Works</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">ALTER COLUMN ... TYPE</code> (widening)</td>
+      <td style="text-align: left">Works</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">RENAME COLUMN</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UNSUPPORTED_FEATURE.TABLE_OPERATION</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">DROP COLUMN</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UNSUPPORTED_FEATURE.TABLE_OPERATION</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Plan schema changes as additive. A rename means writing a new column and
+backfilling it, so decide column names before the table has data you care about.</p>
+
+<h2 id="merge-on-read-and-what-the-two-query-types-show">Merge-on-read, and what the two query types show</h2>
+
+<p>Merge-on-read is where Hudi’s read path becomes visible, and the divergence is
+easy to demonstrate through a thin client:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  CREATE TABLE default.trips_mor (
+    trip_id BIGINT, rider_id BIGINT, city STRING,
+    fare DECIMAL(10,2), started_at TIMESTAMP)
+  USING hudi
+  TBLPROPERTIES (primaryKey = 'trip_id', preCombineField = 'started_at', type = 'mor')
+  LOCATION '/tmp/warehouse/trips_mor'"""</span><span class="p">)</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"""
+  INSERT INTO default.trips_mor VALUES
+    (1, 101, 'Hyderabad', 245.50, TIMESTAMP '2026-09-01 08:15:00'),
+    (2, 102, 'Bengaluru', 180.00, TIMESTAMP '2026-09-01 09:30:00')"""</span><span class="p">)</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"UPDATE default.trips_mor SET fare = 999.99 WHERE trip_id = 1"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Now read the same row two ways:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># snapshot, the default: base files merged with the delta logs
+</span><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"SELECT fare FROM default.trips_mor WHERE trip_id = 1"</span><span class="p">).</span><span class="n">collect</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># read-optimised: base files only, ignoring the logs
+</span><span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.query.type"</span><span class="p">,</span> <span class="s">"read_optimized"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_mor"</span><span class="p">)</span>
+      <span class="p">.</span><span class="nb">filter</span><span class="p">(</span><span class="s">"trip_id = 1"</span><span class="p">).</span><span class="n">select</span><span class="p">(</span><span class="s">"fare"</span><span class="p">).</span><span class="n">collect</span><span class="p">()[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>snapshot         999.99
+read_optimized   245.50
+</code></pre></div></div>
+
+<p>That gap is the whole merge-on-read trade, measured: the snapshot read pays a
+merge to be correct, the read-optimised read is cheaper and stale until
+compaction. Both paths work identically through Connect.</p>
+
+<p>Compaction is where expectations need managing. <code class="language-plaintext highlighter-rouge">run_compaction</code> is not a
+command that compacts on demand:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL run_compaction(op =&gt; 'scheduleandexecute', table =&gt; 'default.trips_mor')"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0 rows returned, and CALL show_compaction(...) reports 0 pending compactions
+</code></pre></div></div>
+
+<p>Nothing was scheduled because the delta-commit threshold was not met, which on
+these defaults takes more delta commits than two updates produce. Setting
+<code class="language-plaintext highlighter-rouge">hoodie.compact.inline.max.delta.commits</code> to <code class="language-plaintext highlighter-rouge">1</code> at table creation went the other
+way: compaction then ran inline on the write itself, and the read-optimised query
+returned <code class="language-plaintext highlighter-rouge">999.99</code> immediately, with still nothing left for <code class="language-plaintext highlighter-rouge">run_compaction</code> to
+do. Either way the procedure returning zero rows is not a failure, and the way to
+verify compaction is to watch the read-optimised query catch up, not to read the
+procedure’s return value.</p>
+
+<h2 id="incremental-queries-and-time-travel">Incremental queries and time travel</h2>
+
+<p>This is the Hudi capability with no direct equivalent in the other formats, and
+it survives the trip through gRPC intact. The DataFrame writer path, where the
+<code class="language-plaintext highlighter-rouge">hoodie.*</code> options are explicit:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">Decimal</span>
+<span class="kn">from</span> <span class="nn">pyspark.sql</span> <span class="kn">import</span> <span class="n">functions</span> <span class="k">as</span> <span class="n">F</span>
+
+<span class="n">trips</span> <span class="o">=</span> <span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+        <span class="p">[(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">107</span><span class="p">,</span> <span class="s">"Kochi"</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">(</span><span class="s">"55.00"</span><span class="p">),</span> <span class="s">"2026-09-06 10:00:00"</span><span class="p">),</span>
+         <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">108</span><span class="p">,</span> <span class="s">"Kochi"</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">(</span><span class="s">"65.00"</span><span class="p">),</span> <span class="s">"2026-09-06 11:00:00"</span><span class="p">)],</span>
+        <span class="s">"trip_id bigint, rider_id bigint, city string, "</span>
+        <span class="s">"fare decimal(10,2), started_at string"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">"started_at"</span><span class="p">,</span> <span class="n">F</span><span class="p">.</span><span class="n">to_timestamp</span><span class="p">(</span><span class="s">"started_at"</span><span class="p">)))</span>
+
+<span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">"hoodie.table.name"</span><span class="p">:</span> <span class="s">"trips_df"</span><span class="p">,</span>
+    <span class="s">"hoodie.datasource.write.recordkey.field"</span><span class="p">:</span> <span class="s">"trip_id"</span><span class="p">,</span>
+    <span class="s">"hoodie.datasource.write.precombine.field"</span><span class="p">:</span> <span class="s">"started_at"</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="p">(</span><span class="n">trips</span><span class="p">.</span><span class="n">write</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s">"hoodie.datasource.write.operation"</span><span class="p">:</span> <span class="s">"bulk_insert"</span><span class="p">})</span>
+      <span class="p">.</span><span class="n">mode</span><span class="p">(</span><span class="s">"overwrite"</span><span class="p">).</span><span class="n">save</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>The three write operations behave as their names promise, which is worth checking
+once rather than assuming. First an <code class="language-plaintext highlighter-rouge">upsert</code> of a row that already exists:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">changed</span> <span class="o">=</span> <span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+        <span class="p">[(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">107</span><span class="p">,</span> <span class="s">"Kochi"</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">(</span><span class="s">"77.77"</span><span class="p">),</span> <span class="s">"2026-09-06 12:00:00"</span><span class="p">)],</span>
+        <span class="s">"trip_id bigint, rider_id bigint, city string, "</span>
+        <span class="s">"fare decimal(10,2), started_at string"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">"started_at"</span><span class="p">,</span> <span class="n">F</span><span class="p">.</span><span class="n">to_timestamp</span><span class="p">(</span><span class="s">"started_at"</span><span class="p">)))</span>
+
+<span class="c1"># upsert matches on the record key, so the row count does not grow
+</span><span class="p">(</span><span class="n">changed</span><span class="p">.</span><span class="n">write</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+        <span class="p">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s">"hoodie.datasource.write.operation"</span><span class="p">:</span> <span class="s">"upsert"</span><span class="p">})</span>
+        <span class="p">.</span><span class="n">mode</span><span class="p">(</span><span class="s">"append"</span><span class="p">).</span><span class="n">save</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>Then the same two original rows again, this time with <code class="language-plaintext highlighter-rouge">insert</code>:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># insert does NOT match on the record key
+</span><span class="p">(</span><span class="n">trips</span><span class="p">.</span><span class="n">write</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s">"hoodie.datasource.write.operation"</span><span class="p">:</span> <span class="s">"insert"</span><span class="p">})</span>
+      <span class="p">.</span><span class="n">mode</span><span class="p">(</span><span class="s">"append"</span><span class="p">).</span><span class="n">save</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">))</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>after bulk_insert of 2 rows              2 rows
+after upsert of trip_id 7                2 rows, fare now 77.77
+after insert of the same 2 rows again    4 rows
+</code></pre></div></div>
+
+<p>The last line is the one to notice. <code class="language-plaintext highlighter-rouge">insert</code> does not deduplicate on the record
+key, so re-sending rows you already have doubles them. <code class="language-plaintext highlighter-rouge">upsert</code> is what most
+pipelines want, and it is not what every path defaults to.</p>
+
+<p>Time travel reads a table as of an instant:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">commits</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+           <span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">)</span>
+           <span class="p">.</span><span class="n">select</span><span class="p">(</span><span class="s">"_hoodie_commit_time"</span><span class="p">).</span><span class="n">distinct</span><span class="p">()</span>
+           <span class="p">.</span><span class="n">orderBy</span><span class="p">(</span><span class="s">"_hoodie_commit_time"</span><span class="p">).</span><span class="n">collect</span><span class="p">()]</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">).</span><span class="n">option</span><span class="p">(</span><span class="s">"as.of.instant"</span><span class="p">,</span> <span class="n">commits</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> \
+     <span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">).</span><span class="n">count</span><span class="p">()</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>commit times            ['20260918093803909', '20260918093804944', '20260918093805997']
+as.of.instant, first    2
+current                 4
+</code></pre></div></div>
+
+<p>Two rows against four is time travel working over a gRPC connection. And the
+incremental read, which returns only what changed after an instant:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.query.type"</span><span class="p">,</span> <span class="s">"incremental"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.read.begin.instanttime"</span><span class="p">,</span> <span class="s">"0"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="s">"/tmp/warehouse/trips_df"</span><span class="p">)</span>
+      <span class="p">.</span><span class="n">count</span><span class="p">())</span>
+</code></pre></div></div>
+
+<p>Passing <code class="language-plaintext highlighter-rouge">0</code> means “everything”, which is how you check the plumbing before
+wiring a real watermark. In production you store the last processed
+<code class="language-plaintext highlighter-rouge">_hoodie_commit_time</code> and pass that instead. The commit times are timestamps, so
+yours will differ from the ones above; every other number here is reproducible
+from a clean warehouse.</p>
+
+<h2 id="procedures-and-metadata-over-grpc">Procedures and metadata, over gRPC</h2>
+
+<p>People assume the <code class="language-plaintext highlighter-rouge">CALL</code> interface will not survive Spark Connect. It does. These
+all ran from the thin client:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Procedure</th>
+      <th style="text-align: left">What it returned</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">show_commits</code></td>
+      <td style="text-align: left">The instant timeline, newest first</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">show_table_properties</code></td>
+      <td style="text-align: left">The <code class="language-plaintext highlighter-rouge">hoodie.*</code> properties as stored</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">show_commit_files</code></td>
+      <td style="text-align: left">Files touched by one instant</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">show_fsview_latest</code></td>
+      <td style="text-align: left">The latest file slices for a partition</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">stats_file_sizes</code></td>
+      <td style="text-align: left">File-size distribution</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">stats_wa</code></td>
+      <td style="text-align: left">Write-amplification statistics</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">run_clean</code></td>
+      <td style="text-align: left">Cleans older file versions</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">run_clustering</code></td>
+      <td style="text-align: left">Reorganises data files</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">run_compaction</code></td>
+      <td style="text-align: left">Schedules or runs MOR compaction</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">create_savepoint</code>, <code class="language-plaintext highlighter-rouge">show_savepoints</code></td>
+      <td style="text-align: left">Savepoint management</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">rollback_to_instant</code></td>
+      <td style="text-align: left">Unwinds a commit, with the limit below</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL show_commits(table =&gt; 'default.trips_cow', limit =&gt; 10)"</span><span class="p">).</span><span class="n">count</span><span class="p">()</span>
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL stats_wa(table =&gt; 'default.trips_cow')"</span><span class="p">).</span><span class="n">count</span><span class="p">()</span>
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL run_clean(table =&gt; 'default.trips_cow')"</span><span class="p">).</span><span class="n">count</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>The table-valued functions work as well, with one argument requirement that is
+easy to miss:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"SELECT count(*) FROM hudi_metadata('default.trips_cow')"</span><span class="p">).</span><span class="n">collect</span><span class="p">()</span>
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"SELECT count(*) FROM hudi_table_changes('default.trips_cow','latest_state','earliest')"</span><span class="p">).</span><span class="n">collect</span><span class="p">()</span>
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"SELECT count(*) FROM hudi_filesystem_view('default.trips_cow','city=Hyderabad')"</span><span class="p">).</span><span class="n">collect</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">hudi_filesystem_view</code> takes a <strong>partition</strong> as its second argument. Called with
+only a table name it returns zero rows rather than an error, which reads like an
+empty table:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>hudi_filesystem_view('default.trips_cow')                    0
+hudi_filesystem_view('default.trips_cow','city=Hyderabad')   3
+hudi_filesystem_view('default.trips_mor','')                 1
+</code></pre></div></div>
+
+<p>For a non-partitioned table pass the empty string. And <code class="language-plaintext highlighter-rouge">hudi_table_changes</code> in
+<code class="language-plaintext highlighter-rouge">cdc</code> mode needs a table created with CDC enabled:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>IllegalArgumentException: It isn't a CDC hudi table on file:/tmp/warehouse/trips_cow
+</code></pre></div></div>
+
+<p>That is a table-property problem, not a Connect one. Enable
+<code class="language-plaintext highlighter-rouge">hoodie.table.cdc.enabled</code> at creation if you want the CDC feed.</p>
+
+<h3 id="rollback_to_instant-only-unwinds-the-newest-instant"><code class="language-plaintext highlighter-rouge">rollback_to_instant</code> only unwinds the newest instant</h3>
+
+<p>This one deserves its own note because the error is opaque and my first
+explanation for it was wrong. Rolling back the newest instant works:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">instants</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span>
+    <span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL show_commits(table =&gt; 'default.trips_cow', limit =&gt; 30)"</span><span class="p">).</span><span class="n">collect</span><span class="p">())</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">sql</span><span class="p">(</span><span class="s">"CALL rollback_to_instant(table =&gt; 'default.trips_cow', "</span>
+          <span class="s">"instant_time =&gt; '%s')"</span> <span class="o">%</span> <span class="n">instants</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]).</span><span class="n">collect</span><span class="p">()</span>
+<span class="c1"># [Row(rollback_result=True)], and the row count drops by that commit
+</span></code></pre></div></div>
+
+<p>Rolling back an older instant fails:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>UnknownException: (org.apache.hudi.exception.HoodieRollbackException)
+Failed to rollback file:///tmp/warehouse/trips commits 20260918094116830
+</code></pre></div></div>
+
+<p>I first assumed a savepoint on the table was blocking it, and tested that:
+creating a savepoint and then rolling back the newest instant still succeeded, so
+the savepoint was not the cause. The actual rule is simpler. Rollback unwinds the
+tip of the timeline, one commit at a time. It is not “restore to this point”, and
+the way to go further back is repeated rollbacks or a savepoint plus restore.</p>
+
+<p>The practical mistake this invites is an ordering one. <code class="language-plaintext highlighter-rouge">show_commits</code> returns
+instants newest first, so the first row it hands you is the newest, while sorting
+those instants ascending puts the oldest first. Sorting a list of Hudi instants
+and passing the front of it gives <code class="language-plaintext highlighter-rouge">rollback_to_instant</code> exactly the argument it
+cannot process, which is how I produced the failure above in the first place.</p>
+
+<h2 id="what-the-thin-client-cannot-do">What the thin client cannot do</h2>
+
+<p>The limitations are narrow and all follow from the client not having a JVM.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">sparkContext</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PySparkAttributeError: [JVM_ATTRIBUTE_NOT_SUPPORTED] Attribute `sparkContext` is not
+supported in Spark Connect as it depends on the JVM.
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">).</span><span class="n">rdd</span><span class="p">.</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="p">.</span><span class="nb">id</span><span class="p">).</span><span class="n">collect</span><span class="p">()</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PySparkNotImplementedError: [NOT_IMPLEMENTED] rdd is not implemented.
+</code></pre></div></div>
+
+<p>Neither matters much for table work, since Hudi is driven through SQL and the
+DataFrame API anyway. What does bite is subtler. <strong>A Python <code class="language-plaintext highlighter-rouge">float</code> for a
+<code class="language-plaintext highlighter-rouge">decimal</code> column fails with an empty error</strong>, where a classic session coerces it:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">109</span><span class="p">,</span> <span class="s">"Kochi"</span><span class="p">,</span> <span class="mf">75.25</span><span class="p">,</span> <span class="s">"2026-09-05 12:00:00"</span><span class="p">)],</span>
+    <span class="s">"trip_id bigint, rider_id bigint, city string, "</span>
+    <span class="s">"fare decimal(10,2), started_at string"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AssertionError
+</code></pre></div></div>
+
+<p>That is the entire message. The traceback points at <code class="language-plaintext highlighter-rouge">convert_decimal</code> in
+<code class="language-plaintext highlighter-rouge">pyspark/sql/conversion.py</code>, which does
+<code class="language-plaintext highlighter-rouge">assert isinstance(value, decimal.Decimal)</code>. Pass <code class="language-plaintext highlighter-rouge">Decimal("75.25")</code> and it
+works. Any Hudi table with a money column hits this on the first
+<code class="language-plaintext highlighter-rouge">createDataFrame</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Classic session</th>
+      <th style="text-align: left">Spark Connect client</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.sparkContext</code> available</td>
+      <td style="text-align: left">Raises <code class="language-plaintext highlighter-rouge">JVM_ATTRIBUTE_NOT_SUPPORTED</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">df.rdd</code> available</td>
+      <td style="text-align: left">Raises <code class="language-plaintext highlighter-rouge">NOT_IMPLEMENTED</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">float</code> coerced into a <code class="language-plaintext highlighter-rouge">decimal</code> column</td>
+      <td style="text-align: left">Bare <code class="language-plaintext highlighter-rouge">AssertionError</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Hudi jar and extension per submit</td>
+      <td style="text-align: left">Server-side only, fixed at startup</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">SQL, DML, procedures, TVFs, incremental reads</td>
+      <td style="text-align: left">All work unchanged</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="common-misconceptions">Common misconceptions</h2>
+
+<p><strong>“One server can serve Hudi and Iceberg with no interference.”</strong> Nearly, and
+the exception is measurable. Loading Hudi’s session extension alongside
+Iceberg’s breaks <strong>Iceberg’s</strong> SQL time travel, which then fails with
+<code class="language-plaintext highlighter-rouge">[INTERNAL_ERROR] Found the unresolved operator: 'TimeTravelRelation</code>. It is
+one-directional: Hudi’s own DML, procedures, incremental reads and
+<code class="language-plaintext highlighter-rouge">as.of.instant</code> all keep working.</p>
+
+<p><strong>“The extension class lives under the project’s own package.”</strong> Hudi’s does
+not. It is <code class="language-plaintext highlighter-rouge">org.apache.spark.sql.hudi.HoodieSparkSessionExtension</code>, under
+<code class="language-plaintext highlighter-rouge">org.apache.spark.sql</code>. Getting it wrong does not stop the server: it starts,
+logs one <code class="language-plaintext highlighter-rouge">Cannot use</code> warning, and then every <code class="language-plaintext highlighter-rouge">MERGE</code> fails later for reasons
+that look unrelated.</p>
+
+<p><strong>”<code class="language-plaintext highlighter-rouge">--jars</code> is not enough for a session extension, it needs the driver
+classpath.”</strong> It is enough. That conclusion came from a wrong class name, not a
+classpath problem, and <code class="language-plaintext highlighter-rouge">--jars</code> alone loads both extensions correctly once the
+name is right.</p>
+
+<p><strong>“A bare <code class="language-plaintext highlighter-rouge">AssertionError</code> from the client is a client bug.”</strong> It is usually a
+type error. The Connect client asserts the exact type during Arrow conversion,
+so a Python <code class="language-plaintext highlighter-rouge">float</code> in a <code class="language-plaintext highlighter-rouge">decimal</code> column fails with an empty message where a
+classic session would have coerced it.</p>
+
+<h2 id="production-notes">Production notes</h2>
+
+<ul>
+  <li><strong>Treat the server config as a contract.</strong> The jar, the extension, the catalog and Kryo are fixed at startup, so a change means a restart. Nobody’s client can work around a server that was started wrong.</li>
+  <li><strong>Check the extension before debugging SQL.</strong> <code class="language-plaintext highlighter-rouge">spark.conf.get("spark.sql.extensions")</code> from the client, and <code class="language-plaintext highlighter-rouge">grep "Cannot use"</code> on the server log, resolve most “MERGE is not supported” reports.</li>
+  <li><strong>Always name columns in <code class="language-plaintext highlighter-rouge">INSERT</code>.</strong> It costs one line and removes the partition-reordering trap permanently, including after a later <code class="language-plaintext highlighter-rouge">ADD COLUMNS</code>.</li>
+  <li><strong>Design schema changes as additive.</strong> <code class="language-plaintext highlighter-rouge">RENAME COLUMN</code> and <code class="language-plaintext highlighter-rouge">DROP COLUMN</code> are rejected, so a rename is a new column plus a backfill.</li>
+  <li><strong>Use <code class="language-plaintext highlighter-rouge">upsert</code>, not <code class="language-plaintext highlighter-rouge">insert</code>, unless you mean to duplicate.</strong> The <code class="language-plaintext highlighter-rouge">insert</code> operation does not deduplicate on the record key.</li>
+  <li><strong>Do not judge compaction by the procedure’s return value.</strong> <code class="language-plaintext highlighter-rouge">run_compaction</code> returning zero rows usually means the delta-commit threshold was not met. Watch the read-optimised query instead.</li>
+  <li><strong>Pass <code class="language-plaintext highlighter-rouge">Decimal</code> for decimal columns</strong> in <code class="language-plaintext highlighter-rouge">createDataFrame</code>, and prefer <code class="language-plaintext highlighter-rouge">CAST(... AS DECIMAL(10,2))</code> inside SQL.</li>
+  <li><strong>Keep Kryo set even on a server you think is Iceberg-only</strong>, because one shared server usually ends up serving both.</li>
+  <li><strong>Think twice before adding Hudi’s extension to a server that serves Iceberg.</strong> It breaks Iceberg’s SQL time travel, one-directionally, and nothing warns you at startup.</li>
+</ul>
+
+<h2 id="frequently-asked-questions">Frequently asked questions</h2>
+
+<p><strong>Does the client need the Hudi jar?</strong>
+No, and that is the main reason to use Connect for Hudi work. The client sends a
+plan naming a table and the server resolves it. A virtualenv with <code class="language-plaintext highlighter-rouge">pyspark</code> is
+the whole client-side dependency, which also removes the jar-version skew that
+usually makes onboarding painful.</p>
+
+<p><strong>Can one server serve Hudi and Iceberg together?</strong>
+Mostly, and the cost falls entirely on Iceberg. <code class="language-plaintext highlighter-rouge">spark.sql.extensions</code> takes a
+comma-separated list, Hudi takes over <code class="language-plaintext highlighter-rouge">spark_catalog</code> while Iceberg gets a named
+catalog, and both formats’ DDL and DML work. But loading Hudi’s extension
+alongside Iceberg’s breaks <strong>Iceberg’s</strong> SQL time travel, which then fails with
+<code class="language-plaintext highlighter-rouge">[INTERNAL_ERROR] Found the unresolved operator: 'TimeTravelRelation</code>. Hudi is
+unaffected in that arrangement: its own DML, procedures, incremental reads and
+<code class="language-plaintext highlighter-rouge">as.of.instant</code> time travel all keep working. The measurement and the workaround
+are in <a href="/SparkConnectIceberg/">Apache Iceberg through Spark Connect</a>.</p>
+
+<p><strong>Why does my <code class="language-plaintext highlighter-rouge">MERGE</code> fail with a parse error?</strong>
+Because the session extension is not loaded on the server, from either a wrong
+class name or a jar missing from the server classpath. <code class="language-plaintext highlighter-rouge">MERGE</code> and <code class="language-plaintext highlighter-rouge">UPDATE</code> on
+Hudi are extension-provided syntax, so without it the statement is not merely
+unsupported, it is unparseable.</p>
+
+<p><strong>Can I set <code class="language-plaintext highlighter-rouge">hoodie.*</code> options per job from the client?</strong>
+Write-time <code class="language-plaintext highlighter-rouge">hoodie.*</code> options travel fine, because they are passed with the write
+rather than baked into the session. What you cannot change from a client is the
+session-level set: the extension, the catalog and the serializer.</p>
+
+<p><strong>Is the partition-column reordering a Spark Connect bug?</strong>
+No. It is how Hudi stores a partitioned table, and a classic session behaves the
+same way. Connect only makes it more visible, because the error arrives without
+a local stack trace to poke at.</p>
+
+<p><strong>Do client and server versions have to match?</strong>
+Match them. An older client is tolerated: a <code class="language-plaintext highlighter-rouge">3.5.9</code> client drove the <code class="language-plaintext highlighter-rouge">4.0.2</code>
+server through every example here. A newer one is not, and the failure is
+specific rather than general. A pip-installed <code class="language-plaintext highlighter-rouge">4.2.0</code> client ran every SQL
+statement against the <code class="language-plaintext highlighter-rouge">4.0.2</code> server and then failed on <code class="language-plaintext highlighter-rouge">createDataFrame</code> with
+<code class="language-plaintext highlighter-rouge">SQL_CONF_NOT_FOUND</code> for <code class="language-plaintext highlighter-rouge">spark.sql.session.localRelationSizeLimit</code>, because it
+expects a config the older server does not have. That is why the install line
+above is pinned.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>The useful reframing is that Spark Connect forces a separation which was always
+there. Hudi is infrastructure: a jar, a Catalyst extension, a catalog and a
+serializer. Your query is not. Classic Spark let you blur the two by shipping
+jars with every submit, and most <code class="language-plaintext highlighter-rouge">--packages</code> lines in most runbooks are that
+blur made permanent.</p>
+
+<p>Connect makes you decide once, on the server, and then hands every client a clean
+API with nothing to install. The cost is exactly the flexibility you were abusing:
+no per-job jars, no per-job extensions, no <code class="language-plaintext highlighter-rouge">sparkContext</code> escape hatch. For a
+team sharing a Hudi lakehouse, that is a good trade.</p>
+
+<p>What is worth carrying away is how few of the failures were about Spark Connect.
+An extension class under a package that looks wrong but is not, a partition
+column silently moved to the end of the schema, <code class="language-plaintext highlighter-rouge">insert</code> where <code class="language-plaintext highlighter-rouge">upsert</code> was
+meant, <code class="language-plaintext highlighter-rouge">rollback_to_instant</code> that only unwinds the tip, and a <code class="language-plaintext highlighter-rouge">float</code> where a
+<code class="language-plaintext highlighter-rouge">Decimal</code> belongs. Every one of those behaves identically in a classic session.
+Reproduce a failure locally before blaming the transport, which is the habit that
+turned two of my own confident wrong answers here into the right ones.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://spark.apache.org/docs/latest/spark-connect-overview.html">Spark Connect overview</a> for the architecture and the client APIs</li>
+  <li><a href="https://hudi.apache.org/docs/sql_ddl/">Hudi Spark SQL DDL</a> and <a href="https://hudi.apache.org/docs/procedures/">SQL procedures</a> for table properties and the <code class="language-plaintext highlighter-rouge">CALL</code> surface</li>
+  <li><a href="https://hudi.apache.org/docs/configurations/">Hudi configuration reference</a> for the <code class="language-plaintext highlighter-rouge">hoodie.*</code> write and read options used above</li>
+  <li><a href="https://github.com/apache/spark/blob/master/python/pyspark/sql/conversion.py"><code class="language-plaintext highlighter-rouge">conversion.py</code></a>, whose <code class="language-plaintext highlighter-rouge">convert_decimal</code> is the assertion behind the empty <code class="language-plaintext highlighter-rouge">AssertionError</code></li>
+  <li><a href="/ApacheHudiArchitecture/">Apache Hudi architecture</a> for the timeline, file slices and compaction machinery underneath all of this</li>
+</ul>
+
+<h2 id="trademarks">Trademarks</h2>
+
+<p>Apache Spark, Apache Hudi, Apache Iceberg, Apache Hive, Apache Parquet and Apache are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.</p>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/DatalakeDockerDemos/">
+          <span class="card--mini__date">Sep 19, 2026</span>
+          <span class="card--mini__title">Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta</span>
+        </a><a class="card card--mini" href="/IcebergInteroperability/">
+          <span class="card--mini__date">Sep 13, 2026</span>
+          <span class="card--mini__title">One table, three formats: Iceberg, Delta and Hudi interoperability</span>
+        </a><a class="card card--mini" href="/WhyIcebergExists/">
+          <span class="card--mini__date">Aug 12, 2026</span>
+          <span class="card--mini__title">What Hive tables could not do, and why Iceberg exists</span>
+        </a><a class="card card--mini" href="/TableMaintenance/">
+          <span class="card--mini__date">Aug 10, 2026</span>
+          <span class="card--mini__title">Table maintenance for Iceberg and Hudi: compaction, expiry, and the space you did not reclaim</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/SparkJoinsInDepth/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">Apache Spark joins in depth: the five strategies and how one gets picked</span>
+  </a>
+  <a class="post-nav__link post-nav__link--next" href="/SparkConnectIceberg/" rel="next">
+    <span class="post-nav__label">Next<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <span class="post-nav__title">Apache Iceberg through Spark Connect: the full surface, and the extension that breaks time travel</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Apache%20Hudi%20through%20Spark%20Connect:%20running%20the%20full%20table%20surface%20from%20a%20thin%20client&url=https://rangareddy.github.io/SparkConnectHudi/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/SparkConnectHudi/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/SparkConnectHudi/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/DatalakeDockerDemos/" hidden>
+      <a href="/DatalakeDockerDemos/">Datalake Docker Demos</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergProductionGuide/" hidden>
+      <a href="/IcebergProductionGuide/">Iceberg In Production</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergHiveMigration/" hidden>
+      <a href="/IcebergHiveMigration/">Hive To Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergInteroperability/" hidden>
+      <a href="/IcebergInteroperability/">Lakehouse Interoperability</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCdcPipelines/" hidden>
+      <a href="/IcebergCdcPipelines/">CDC Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergTimeTravel/" hidden>
+      <a href="/IcebergTimeTravel/">Iceberg Time Travel</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCopyOnWriteMergeOnRead/" hidden>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">Copy-on-Write vs Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergStreamingIngestion/" hidden>
+      <a href="/IcebergStreamingIngestion/">Streaming Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergIngestion/" hidden>
+      <a href="/IcebergIngestion/">Iceberg Ingestion</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergPartitioning/" hidden>
+      <a href="/IcebergPartitioning/">Iceberg Partitioning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSchemaEvolution/" hidden>
+      <a href="/IcebergSchemaEvolution/">Iceberg Schema Evolution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergFormatVersions/" hidden>
+      <a href="/IcebergFormatVersions/">Iceberg Format Versions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCatalogs/" hidden>
+      <a href="/IcebergCatalogs/">Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergWritePath/" hidden>
+      <a href="/IcebergWritePath/">Iceberg Write Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergReadPath/" hidden>
+      <a href="/IcebergReadPath/">Iceberg Read Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergThreeTierArchitecture/" hidden>
+      <a href="/IcebergThreeTierArchitecture/">Iceberg Three Tiers</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergLocalPlayground/" hidden>
+      <a href="/IcebergLocalPlayground/">Iceberg Playground</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/WhyIcebergExists/" hidden>
+      <a href="/WhyIcebergExists/">Why Iceberg Exists</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/TableMaintenance/" hidden>
+      <a href="/TableMaintenance/">Table Maintenance</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/StructuredStreamingInternals/" hidden>
+      <a href="/StructuredStreamingInternals/">Structured Streaming</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkPerformanceOptimization/" hidden>
+      <a href="/SparkPerformanceOptimization/">Spark Performance Tuning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShuffleInternals/" hidden>
+      <a href="/SparkShuffleInternals/">Spark Shuffle Internals</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataFusionComet/" hidden>
+      <a href="/SparkDataFusionComet/">DataFusion Comet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergPolaris/" hidden>
+      <a href="/SparkIcebergPolaris/">Iceberg on Polaris</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Spark Submit for Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShufflePartitionGenerator/" hidden>
+      <a href="/SparkShufflePartitionGenerator/">Shuffle Partition Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkStreamingCustomLogging/" hidden>
+      <a href="/SparkStreamingCustomLogging/">Streaming Query Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Spark Release History</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Fixing Data Skew</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiMergeOnRead/" hidden>
+      <a href="/HudiMergeOnRead/">Hudi Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Inside Apache Spark Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIndexTypes/" hidden>
+      <a href="/HudiIndexTypes/">Hudi Index Types</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/DatalakeDockerDemos/">
+        Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta
+        <time datetime="2026-09-19T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergProductionGuide/">
+        Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule
+        <time datetime="2026-09-17T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergHiveMigration/">
+        Migrating Hive tables to Iceberg: snapshot first, migrate second
+        <time datetime="2026-09-15T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergInteroperability/">
+        One table, three formats: Iceberg, Delta and Hudi interoperability
+        <time datetime="2026-09-13T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCdcPipelines/">
+        CDC into Iceberg: the delete files nobody counted
+        <time datetime="2026-09-09T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergTimeTravel/">
+        Time travel and rollback in Iceberg: undoing a bad write in one statement
+        <time datetime="2026-09-07T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">
+        Copy-on-write or merge-on-read: choosing how an Iceberg table pays for a delete
+        <time datetime="2026-09-05T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergStreamingIngestion/">
+        Streaming into Iceberg: availableNow, checkpoints, and the snapshot count nobody watches
+        <time datetime="2026-09-03T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">19</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">21</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>

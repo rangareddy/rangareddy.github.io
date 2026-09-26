@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Apache XTable cheat sheet: one table, every format · Ranga Reddy</title>
+  <meta name="description" content="One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/ApacheXTableCheatSheet/">
+  <meta name="google-site-verification" content="p3-xmuuDZGnVmE6SSwGmQ2JXJDhDsZPAh79ydnDlQA4">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Apache XTable cheat sheet: one table, every format">
+  <meta property="og:description" content="One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.">
+  <meta property="og:url" content="https://rangareddy.github.io/ApacheXTableCheatSheet/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/ApacheXTableCheatSheet.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Apache XTable cheat sheet: one table, every format">
+  <meta name="twitter:description" content="One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/ApacheXTableCheatSheet.png">
+  <meta property="article:published_time" content="2026-06-23T10:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Apache XTable cheat sheet: one table, every format",
+    "description": "One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.",
+    "url": "https://rangareddy.github.io/ApacheXTableCheatSheet/",
+    "datePublished": "2026-06-23T10:00:00+05:30",
+    "dateModified": "2026-06-23T10:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/ApacheXTableCheatSheet.png",
+    "keywords": "XTable, Hudi, Iceberg, Delta, Paimon, Reference",
+    "articleSection": "Lakehouse",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/ApacheXTableCheatSheet/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Lakehouse", "item": "https://rangareddy.github.io/category/#lakehouse" },
+      { "@type": "ListItem", "position": 3, "name": "Apache XTable cheat sheet: one table, every format", "item": "https://rangareddy.github.io/ApacheXTableCheatSheet/" }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does converting cost me a rewrite of the data?","acceptedAnswer":{"@type":"Answer","text":"No. Only metadata is written. The cost scales with commits and file counts, not with rows, so a large table costs about what a small one does."}},{"@type":"Question","name":"Can I write through both formats at once?","acceptedAnswer":{"@type":"Answer","text":"Treat one format as the writer and the others as read-only projections of it. Two writers committing to the same files through different metadata trees have no shared concurrency control, and nothing coordinates them."}},{"@type":"Question","name":"Why does my Parquet source fail with “not supported”?","acceptedAnswer":{"@type":"Answer","text":"xtable-conversion-defaults.yaml has no PARQUET entry even though ParquetConversionSourceProvider exists. Supply a converters config with --convertersConfig naming that provider class."}},{"@type":"Question","name":"Can I convert to Paimon?","acceptedAnswer":{"@type":"Answer","text":"Not in 0.4.0. Paimon is a source only, since no Paimon target is registered."}},{"@type":"Question","name":"What happened to OneTable?","acceptedAnswer":{"@type":"Answer","text":"Same project, renamed on entering the Apache Incubator. Artifacts and packages are org.apache.xtable; anything naming OneTable predates the donation."}},{"@type":"Question","name":"How do I know a run was incremental rather than full?","acceptedAnswer":{"@type":"Answer","text":"The controller logs its fallback, including “No previous InternalTable sync for target. Falling back to snapshot sync.” The incremental sync post goes through the decision in detail."}}]}
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/ApacheXTableCheatSheet.png"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Apache XTable cheat sheet: one table, every format</h1>
+      <p class="post-head__lede">One page to keep open while you work: what XTable converts, where the metadata lands, the build, the config file, every RunSync flag, catalog registration and the engine matrix.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-06-23T10:00:00+05:30">Jun 23, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>18 min read</span>
+  <span class="meta__item meta__views" data-views-for="/ApacheXTableCheatSheet/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#lakehouse">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Lakehouse
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#xtable">#XTable</a></li>
+  <li><a class="chip" href="/tag/#hudi">#Hudi</a></li>
+  <li><a class="chip" href="/tag/#iceberg">#Iceberg</a></li>
+  <li><a class="chip" href="/tag/#delta">#Delta</a></li>
+  <li><a class="chip" href="/tag/#paimon">#Paimon</a></li>
+  <li><a class="chip" href="/tag/#reference">#Reference</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#what-does-xtable-actually-do" id="markdown-toc-what-does-xtable-actually-do">What does XTable actually do?</a></li>
+  <li><a href="#which-formats-convert-to-which" id="markdown-toc-which-formats-convert-to-which">Which formats convert to which?</a></li>
+  <li><a href="#where-does-the-converted-metadata-land" id="markdown-toc-where-does-the-converted-metadata-land">Where does the converted metadata land?</a></li>
+  <li><a href="#architecture-three-pieces-and-an-internal-model" id="markdown-toc-architecture-three-pieces-and-an-internal-model">Architecture: three pieces and an internal model</a></li>
+  <li><a href="#what-ships-in-040" id="markdown-toc-what-ships-in-040">What ships in 0.4.0?</a></li>
+  <li><a href="#how-do-i-build-it" id="markdown-toc-how-do-i-build-it">How do I build it?</a></li>
+  <li><a href="#quick-start-a-hudi-table-read-as-iceberg-and-delta" id="markdown-toc-quick-start-a-hudi-table-read-as-iceberg-and-delta">Quick start: a Hudi table read as Iceberg and Delta</a></li>
+  <li><a href="#every-runsync-flag" id="markdown-toc-every-runsync-flag">Every RunSync flag</a></li>
+  <li><a href="#how-do-i-register-the-result-in-a-catalog" id="markdown-toc-how-do-i-register-the-result-in-a-catalog">How do I register the result in a catalog?</a>    <ul>
+      <li><a href="#doing-it-for-many-tables-with-runcatalogsync" id="markdown-toc-doing-it-for-many-tables-with-runcatalogsync">Doing it for many tables with RunCatalogSync</a></li>
+    </ul>
+  </li>
+  <li><a href="#is-there-an-api-instead-of-a-cli" id="markdown-toc-is-there-an-api-instead-of-a-cli">Is there an API instead of a CLI?</a></li>
+  <li><a href="#what-does-the-sync-not-cover" id="markdown-toc-what-does-the-sync-not-cover">What does the sync not cover?</a></li>
+  <li><a href="#which-engines-can-read-the-result" id="markdown-toc-which-engines-can-read-the-result">Which engines can read the result?</a></li>
+  <li><a href="#trying-it-without-installing-anything" id="markdown-toc-trying-it-without-installing-anything">Trying it without installing anything</a></li>
+  <li><a href="#production-tips" id="markdown-toc-production-tips">Production tips</a></li>
+  <li><a href="#frequently-asked-questions" id="markdown-toc-frequently-asked-questions">Frequently asked questions</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+  <li><a href="#trademarks" id="markdown-toc-trademarks">Trademarks</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>XTable writes metadata, never data. One directory of Parquet files ends up carrying <code class="language-plaintext highlighter-rouge">.hoodie/</code>, <code class="language-plaintext highlighter-rouge">metadata/</code> and <code class="language-plaintext highlighter-rouge">_delta_log/</code> side by side, and no record is copied.</li>
+    <li>The authoritative format list is one file, <code class="language-plaintext highlighter-rouge">xtable-conversion-defaults.yaml</code>. Hudi, Iceberg and Delta convert in both directions; Paimon is source only; Parquet has a source provider but is not in the defaults, so it needs an explicit converters config.</li>
+    <li>The bundled jar is runnable again, so <code class="language-plaintext highlighter-rouge">java -jar</code> works and the old <code class="language-plaintext highlighter-rouge">jol-core</code> classpath workaround is gone.</li>
+    <li><code class="language-plaintext highlighter-rouge">xtable-utilities</code> is not published to Maven Central. You build it. <code class="language-plaintext highlighter-rouge">xtable-core</code>, <code class="language-plaintext highlighter-rouge">xtable-api</code>, <code class="language-plaintext highlighter-rouge">xtable-service</code> and the new <code class="language-plaintext highlighter-rouge">xtable-spark-runtime</code> are published.</li>
+    <li>Only Copy-on-Write or read-optimized views convert. Hudi log files and Delta or Iceberg deletion vectors are not captured, so on a Merge-on-Read source the converted formats are as fresh as the last compaction.</li>
+  </ul>
+</blockquote>
+
+<p>There is a particular kind of meeting where someone says the data is in Hudi and
+someone else says their warehouse only reads Iceberg, and the next forty minutes
+go on who is going to maintain the copy. XTable removes the meeting. The Parquet
+files stay exactly where they are, and a second set of metadata appears beside
+the first describing the same files in another format.</p>
+
+<p>This is the reference page for doing that: what converts to what, where the
+output lands, how to build the tool, every flag it takes, and how to register
+the result so an engine can find it by name. It is written to be kept open in a
+tab rather than read once.</p>
+
+<p>Assumed knowledge: you have at least one lakehouse table already. For how XTable
+decides between a full and an incremental pass, see
+<a href="/XTableIncrementalSync/">Apache XTable incremental sync</a>.</p>
+
+<h2 id="what-does-xtable-actually-do">What does XTable actually do?</h2>
+
+<p>It reads the metadata of a table you already have, builds a format-neutral
+description of it in memory, and writes that description out in the metadata
+language of another format. The Parquet files are never opened for their
+contents and never rewritten.</p>
+
+<pre><code class="language-mermaid">flowchart LR
+  P[("Parquet data files&lt;br/&gt;written once")] --- H["&lt;b&gt;.hoodie/&lt;/b&gt;&lt;br/&gt;Hudi timeline"]
+  P --- I["&lt;b&gt;metadata/&lt;/b&gt;&lt;br/&gt;Iceberg snapshots"]
+  P --- D["&lt;b&gt;_delta_log/&lt;/b&gt;&lt;br/&gt;Delta log"]
+  H --&gt; E1["Spark, Flink, Trino"]
+  I --&gt; E2["Snowflake, BigQuery, Athena"]
+  D --&gt; E3["Databricks, Fabric"]
+</code></pre>
+
+<p>Three consequences follow, and they are the whole value proposition:</p>
+
+<ul>
+  <li><strong>A conversion costs metadata time, not data time.</strong> The work scales with how many commits and files the table has, not with how many rows.</li>
+  <li><strong>There is one copy of the truth.</strong> Nothing can drift, because there is nothing to drift from. The formats disagree only about how they describe the same files.</li>
+  <li><strong>It is not a runtime.</strong> XTable is a tool you invoke, on a schedule or after an ingest job. It does not sit in the query path, and it is not a new storage format to adopt.</li>
+</ul>
+
+<h2 id="which-formats-convert-to-which">Which formats convert to which?</h2>
+
+<p>The honest answer is one file in the repository, <code class="language-plaintext highlighter-rouge">xtable-conversion-defaults.yaml</code>,
+which maps each format name to the provider classes that can read and write it.
+Read it as the matrix rather than trusting a diagram:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Format</th>
+      <th style="text-align: left">Can be a source</th>
+      <th style="text-align: left">Can be a target</th>
+      <th style="text-align: left">Provider</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Hudi</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">HudiConversionSourceProvider</code>, <code class="language-plaintext highlighter-rouge">HudiConversionTarget</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Iceberg</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">IcebergConversionSourceProvider</code>, <code class="language-plaintext highlighter-rouge">IcebergConversionTarget</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">DeltaConversionSourceProvider</code>, <code class="language-plaintext highlighter-rouge">DeltaConversionTarget</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Paimon</td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">PaimonConversionSourceProvider</code>, added in 0.4.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Parquet</td>
+      <td style="text-align: left">Yes, with configuration</td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">ParquetConversionSourceProvider</code>, added in 0.4.0</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Two entries need a note, because both are new and neither behaves like the
+first three.</p>
+
+<p><strong>Paimon is a source only.</strong> A Paimon table can be exposed as Hudi, Iceberg or
+Delta. Nothing converts back into Paimon, because no Paimon target is
+registered.</p>
+
+<p><strong>Parquet is a source that the defaults do not list.</strong> The provider class
+exists and the release notes describe partition extraction and incremental sync
+for it, but <code class="language-plaintext highlighter-rouge">xtable-conversion-defaults.yaml</code> has no <code class="language-plaintext highlighter-rouge">PARQUET</code> entry, so
+<code class="language-plaintext highlighter-rouge">RunSync</code> will reject it with “Source format PARQUET is not supported” unless
+you pass your own converters config with <code class="language-plaintext highlighter-rouge">--convertersConfig</code>. The constant
+class tells the same story from the other side: <code class="language-plaintext highlighter-rouge">TableFormat</code> declares five
+names, and its <code class="language-plaintext highlighter-rouge">values()</code> helper returns four, leaving <code class="language-plaintext highlighter-rouge">PARQUET</code> out.</p>
+
+<p>There is also a second implementation of the Delta target. <code class="language-plaintext highlighter-rouge">DeltaKernelConversionTarget</code>
+is registered alongside the original and its <code class="language-plaintext highlighter-rouge">getTableFormat()</code> returns
+<code class="language-plaintext highlighter-rouge">TableFormat.DELTA</code>, so it is not a new format but an alternative writer built
+on Delta Kernel <code class="language-plaintext highlighter-rouge">4.0.0</code>. You select it by overriding <code class="language-plaintext highlighter-rouge">conversionTargetProviderClass</code>
+for <code class="language-plaintext highlighter-rouge">DELTA</code> in a converters config.</p>
+
+<h2 id="where-does-the-converted-metadata-land">Where does the converted metadata land?</h2>
+
+<p>In the place each format expects, inside the table directory. Nothing moves.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>s3a://lakehouse-prod/warehouse/trips/
+├── city_id=sf/
+│   └── 8f3a1c92-...-0_0-24-1893_20260916090000123.parquet
+├── city_id=nyc/
+│   └── b2e7d410-...-0_0-25-1894_20260916090000123.parquet
+├── .hoodie/          &lt;- the source, written by your Hudi pipeline
+├── metadata/         &lt;- written by XTable, Iceberg reads this
+└── _delta_log/       &lt;- written by XTable, Delta reads this
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Format</th>
+      <th style="text-align: left">Metadata directory</th>
+      <th style="text-align: left">What is inside</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Hudi</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">.hoodie/</code></td>
+      <td style="text-align: left">The instant timeline and <code class="language-plaintext highlighter-rouge">hoodie.properties</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Iceberg</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">metadata/</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">v&lt;N&gt;.metadata.json</code>, manifest lists, manifests</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">_delta_log/</code></td>
+      <td style="text-align: left">Numbered JSON commits and checkpoints</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The practical consequence is that a table which has been converted looks, to any
+engine you point at it, like a native table of that format. There is no shim to
+install on the read side and no XTable process running when the query runs.</p>
+
+<h2 id="architecture-three-pieces-and-an-internal-model">Architecture: three pieces and an internal model</h2>
+
+<p>XTable’s design is a hub and spoke, and the hub is what makes it N formats
+rather than N times N converters.</p>
+
+<pre><code class="language-mermaid">flowchart TB
+  SRC["&lt;b&gt;ConversionSource&lt;/b&gt;&lt;br/&gt;org.apache.xtable.spi.extractor&lt;br/&gt;one reader per source format"]
+  MODEL["&lt;b&gt;InternalTable, InternalSchema&lt;/b&gt;&lt;br/&gt;format-neutral description:&lt;br/&gt;schema, partitioning, data files, commits"]
+  CTRL["&lt;b&gt;ConversionController&lt;/b&gt;&lt;br/&gt;org.apache.xtable.conversion&lt;br/&gt;picks FULL or INCREMENTAL, commits each target"]
+  TGT["&lt;b&gt;ConversionTarget&lt;/b&gt;&lt;br/&gt;org.apache.xtable.spi.sync&lt;br/&gt;one writer per target format"]
+  SRC --&gt; MODEL --&gt; CTRL --&gt; TGT
+</code></pre>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Piece</th>
+      <th style="text-align: left">Interface</th>
+      <th style="text-align: left">Responsibility</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Source</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">org.apache.xtable.spi.extractor.ConversionSource</code></td>
+      <td style="text-align: left">Read the source table’s schema, partitioning and commit history into the internal model</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Model</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">org.apache.xtable.model.InternalTable</code>, <code class="language-plaintext highlighter-rouge">InternalSchema</code></td>
+      <td style="text-align: left">Describe a table without reference to any format</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Controller</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">org.apache.xtable.conversion.ConversionController</code></td>
+      <td style="text-align: left">Decide the sync mode per target, drive the conversion, commit each target</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Target</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">org.apache.xtable.spi.sync.ConversionTarget</code></td>
+      <td style="text-align: left">Write the model out as that format’s metadata</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Adding a format means writing one source or one target against the model, not a
+converter for every other format. That is why Paimon arriving in 0.4.0 made it
+readable as three formats at once rather than as one.</p>
+
+<h2 id="what-ships-in-040">What ships in 0.4.0?</h2>
+
+<p>XTable does the conversion using its own bundled copies of the format libraries,
+so these versions are not trivia. They are the compatibility contract for your
+source table.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Dependency</th>
+      <th style="text-align: left">Version in 0.4.0</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Apache Spark</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">3.4.2</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Apache Hudi</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">0.14.0</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Apache Iceberg</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">1.9.2</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta Lake</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">2.4.0</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta Kernel</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">4.0.0</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Apache Avro</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">1.12.0</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Apache Parquet</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">1.15.2</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Scala</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">2.12.20</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Check your source table against the matching row before assuming a conversion
+will work, particularly for Hudi, where table versions move between releases.</p>
+
+<p>What is new in this release, in the order it will matter to you:</p>
+
+<ul>
+  <li><strong>The bundled jar is runnable again.</strong> The shade plugin sets <code class="language-plaintext highlighter-rouge">org.apache.xtable.utilities.RunSync</code> as the main class, so <code class="language-plaintext highlighter-rouge">java -jar</code> works without naming the class.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">jol-core</code> is now inside the jar.</strong> Hudi’s <code class="language-plaintext highlighter-rouge">ObjectSizeCalculator</code> loads it at runtime, and its absence used to surface as <code class="language-plaintext highlighter-rouge">NoClassDefFoundError: org/openjdk/jol/info/GraphLayout</code>. The pom now pulls it into the shaded artifact deliberately, with a comment saying why.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">xtable-spark-runtime</code> is a new module</strong>, published as <code class="language-plaintext highlighter-rouge">xtable-spark-runtime_2.12</code>, described in the release notes as a thin drop-in Spark bundle for Spark 3.4 and 3.5.</li>
+  <li><strong>Paimon and Parquet sources</strong>, as covered above.</li>
+  <li><strong>A Maven wrapper.</strong> Build with <code class="language-plaintext highlighter-rouge">./mvnw</code> and you get the version the project expects.</li>
+</ul>
+
+<h2 id="how-do-i-build-it">How do I build it?</h2>
+
+<p>There is no published <code class="language-plaintext highlighter-rouge">xtable-utilities</code> artifact on Maven Central, so the CLI
+is something you build. Java 11 is what the project asks for.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git clone https://github.com/apache/incubator-xtable.git
+<span class="nb">cd </span>incubator-xtable
+./mvnw clean package <span class="nt">-DskipTests</span>
+</code></pre></div></div>
+
+<p>The shaded artifact carries the <code class="language-plaintext highlighter-rouge">bundled</code> classifier, so glob for it rather than
+typing a version that will be stale next release:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">XTABLE_JAR</span><span class="o">=</span><span class="si">$(</span><span class="nb">ls </span>xtable-utilities/target/xtable-utilities_<span class="k">*</span><span class="nt">-bundled</span>.jar<span class="si">)</span>
+java <span class="nt">-jar</span> <span class="s2">"</span><span class="nv">$XTABLE_JAR</span><span class="s2">"</span> <span class="nt">--help</span>
+</code></pre></div></div>
+
+<p>If you are embedding XTable in your own job instead of shelling out to the CLI,
+these are on Maven Central at <code class="language-plaintext highlighter-rouge">0.4.0-incubating</code>:</p>
+
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">&lt;dependency&gt;</span>
+  <span class="nt">&lt;groupId&gt;</span>org.apache.xtable<span class="nt">&lt;/groupId&gt;</span>
+  <span class="nt">&lt;artifactId&gt;</span>xtable-core_2.12<span class="nt">&lt;/artifactId&gt;</span>
+  <span class="nt">&lt;version&gt;</span>0.4.0-incubating<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">xtable-api</code>, <code class="language-plaintext highlighter-rouge">xtable-service</code> and <code class="language-plaintext highlighter-rouge">xtable-spark-runtime_2.12</code> are published at
+the same version. Only the Scala 2.12 build is published, so there is no 2.13
+artifact to pick.</p>
+
+<h2 id="quick-start-a-hudi-table-read-as-iceberg-and-delta">Quick start: a Hudi table read as Iceberg and Delta</h2>
+
+<p>Versions below match what XTable 0.4.0 bundles, which is the combination least
+likely to surprise you.</p>
+
+<p><strong>1. Write a Hudi table.</strong></p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pyspark <span class="se">\</span>
+  <span class="nt">--packages</span> org.apache.hudi:hudi-spark3.4-bundle_2.12:0.14.0 <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.serializer=org.apache.spark.serializer.KryoSerializer"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog"</span>
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">table_path</span> <span class="o">=</span> <span class="s">"file:///tmp/lakehouse/trips"</span>
+
+<span class="n">trips</span> <span class="o">=</span> <span class="n">spark</span><span class="p">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="s">"trip-1001"</span><span class="p">,</span> <span class="s">"rider-88"</span><span class="p">,</span> <span class="mf">24.50</span><span class="p">,</span> <span class="mi">1758000000</span><span class="p">,</span> <span class="s">"sf"</span><span class="p">),</span>
+     <span class="p">(</span><span class="s">"trip-1002"</span><span class="p">,</span> <span class="s">"rider-12"</span><span class="p">,</span> <span class="mf">61.75</span><span class="p">,</span> <span class="mi">1758000060</span><span class="p">,</span> <span class="s">"nyc"</span><span class="p">),</span>
+     <span class="p">(</span><span class="s">"trip-1003"</span><span class="p">,</span> <span class="s">"rider-88"</span><span class="p">,</span> <span class="mf">18.20</span><span class="p">,</span> <span class="mi">1758000120</span><span class="p">,</span> <span class="s">"sf"</span><span class="p">)],</span>
+    <span class="p">[</span><span class="s">"trip_id"</span><span class="p">,</span> <span class="s">"rider_id"</span><span class="p">,</span> <span class="s">"fare_amount"</span><span class="p">,</span> <span class="s">"updated_at"</span><span class="p">,</span> <span class="s">"city_id"</span><span class="p">])</span>
+
+<span class="p">(</span><span class="n">trips</span><span class="p">.</span><span class="n">write</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.table.name"</span><span class="p">,</span> <span class="s">"trips"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.write.recordkey.field"</span><span class="p">,</span> <span class="s">"trip_id"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.write.precombine.field"</span><span class="p">,</span> <span class="s">"updated_at"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.write.partitionpath.field"</span><span class="p">,</span> <span class="s">"city_id"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">option</span><span class="p">(</span><span class="s">"hoodie.datasource.write.hive_style_partitioning"</span><span class="p">,</span> <span class="s">"true"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">mode</span><span class="p">(</span><span class="s">"overwrite"</span><span class="p">)</span>
+    <span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">table_path</span><span class="p">))</span>
+
+<span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"hudi"</span><span class="p">).</span><span class="n">load</span><span class="p">(</span><span class="n">table_path</span><span class="p">).</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Leave this shell with <code class="language-plaintext highlighter-rouge">exit()</code> before the next step. Each format wants its own
+runtime on the classpath.</p>
+
+<p><strong>2. Describe the conversion.</strong> Save as <code class="language-plaintext highlighter-rouge">trips_sync.yaml</code>:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">sourceFormat</span><span class="pi">:</span> <span class="s">HUDI</span>
+<span class="na">targetFormats</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="s">ICEBERG</span>
+  <span class="pi">-</span> <span class="s">DELTA</span>
+<span class="na">datasets</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">tableBasePath</span><span class="pi">:</span> <span class="s">file:///tmp/lakehouse/trips</span>
+    <span class="na">tableName</span><span class="pi">:</span> <span class="s">trips</span>
+    <span class="na">partitionSpec</span><span class="pi">:</span> <span class="s">city_id:VALUE</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">sourceFormat</code> can be auto-detected, but the javadoc recommends setting it
+explicitly, because a directory that has already been converted contains
+metadata for several formats and the guess becomes ambiguous. <code class="language-plaintext highlighter-rouge">partitionSpec</code> is
+only needed when the source table is partitioned.</p>
+
+<p><strong>3. Run it.</strong></p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">XTABLE_JAR</span><span class="o">=</span><span class="si">$(</span><span class="nb">ls </span>xtable-utilities/target/xtable-utilities_<span class="k">*</span><span class="nt">-bundled</span>.jar<span class="si">)</span>
+java <span class="nt">-jar</span> <span class="s2">"</span><span class="nv">$XTABLE_JAR</span><span class="s2">"</span> <span class="nt">--datasetConfig</span> trips_sync.yaml
+</code></pre></div></div>
+
+<p>The line to grep for comes from <code class="language-plaintext highlighter-rouge">ConversionController</code>:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>INFO org.apache.xtable.conversion.ConversionController - Sync is successful for the following formats [ICEBERG, DELTA]
+</code></pre></div></div>
+
+<p>There is a matching failure line, <code class="language-plaintext highlighter-rouge">Sync failed for the following formats</code>, and
+a run can produce both when one target succeeds and another does not. Check for
+the failure line rather than only for the success one.</p>
+
+<p><strong>4. Read the same directory as Iceberg.</strong></p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pyspark <span class="se">\</span>
+  <span class="nt">--packages</span> org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog"</span>
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"iceberg"</span><span class="p">).</span><span class="n">load</span><span class="p">(</span><span class="s">"file:///tmp/lakehouse/trips"</span><span class="p">).</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p><strong>5. Read the same directory as Delta.</strong></p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pyspark <span class="se">\</span>
+  <span class="nt">--packages</span> io.delta:delta-core_2.12:2.4.0 <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"</span>
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="s">"delta"</span><span class="p">).</span><span class="n">load</span><span class="p">(</span><span class="s">"file:///tmp/lakehouse/trips"</span><span class="p">).</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Same three rows, same Parquet files, three formats.</p>
+
+<h2 id="every-runsync-flag">Every RunSync flag</h2>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>java <span class="nt">-jar</span> <span class="s2">"</span><span class="nv">$XTABLE_JAR</span><span class="s2">"</span> <span class="se">\</span>
+  <span class="nt">--datasetConfig</span> trips_sync.yaml <span class="se">\</span>
+  <span class="nt">--hadoopConfig</span> core-site.xml <span class="se">\</span>
+  <span class="nt">--convertersConfig</span> my_converters.yaml <span class="se">\</span>
+  <span class="nt">--icebergCatalogConfig</span> iceberg_catalog.yaml <span class="se">\</span>
+  <span class="nt">--continuousMode</span> <span class="se">\</span>
+  <span class="nt">--continuousModeInterval</span> 60
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Flag</th>
+      <th style="text-align: left">Short</th>
+      <th style="text-align: left">Required</th>
+      <th style="text-align: left">What it does</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--datasetConfig</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-d</code></td>
+      <td style="text-align: left">Yes</td>
+      <td style="text-align: left">The YAML describing source format, targets and datasets</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--hadoopConfig</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-p</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Hadoop XML with filesystem credentials, overriding the defaults</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--convertersConfig</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-c</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Override the provider classes per format. This is how you reach Parquet or the Delta Kernel target</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--icebergCatalogConfig</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-i</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Iceberg catalog configuration, used for any Iceberg source or target</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--continuousMode</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-m</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Run on a loop instead of once, reloading the config file each pass</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--continuousModeInterval</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-t</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Loop interval in seconds. Defaults to 5</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">--help</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">-h</code></td>
+      <td style="text-align: left">No</td>
+      <td style="text-align: left">Print the usage</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">--continuousMode</code> is the one worth a second look. Because it re-reads the
+dataset config on every pass, you add or remove tables by editing a file rather
+than by restarting the job, which makes it a small service instead of a cron
+entry.</p>
+
+<p>And the dataset config has more fields than most examples show:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Field</th>
+      <th style="text-align: left">Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">tableBasePath</code></td>
+      <td style="text-align: left">The table root, where metadata is read and written</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">tableDataPath</code></td>
+      <td style="text-align: left">The data location, when it differs from the base path</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">tableName</code></td>
+      <td style="text-align: left">The name given to the converted table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">partitionSpec</code></td>
+      <td style="text-align: left">Required only when the source is partitioned, for example <code class="language-plaintext highlighter-rouge">city_id:VALUE</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">namespace</code></td>
+      <td style="text-align: left">The namespace to place the table in</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="how-do-i-register-the-result-in-a-catalog">How do I register the result in a catalog?</h2>
+
+<p>Conversion makes the metadata. Registration makes an engine able to find it by
+name. They are separate steps, and you need both.</p>
+
+<p>For Iceberg, XTable writes through Iceberg’s <code class="language-plaintext highlighter-rouge">HadoopTables</code> API, so
+<code class="language-plaintext highlighter-rouge">version-hint.text</code> holds the current metadata version and the file to register
+is the matching <code class="language-plaintext highlighter-rouge">v&lt;N&gt;.metadata.json</code>:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> /tmp/lakehouse/trips/metadata/version-hint.text
+</code></pre></div></div>
+
+<p>Then register it from a session that defines the catalog you are registering
+into:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>spark-sql <span class="se">\</span>
+  <span class="nt">--packages</span> org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.9.2 <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.hive_prod=org.apache.iceberg.spark.SparkCatalog"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.hive_prod.type=hive"</span> <span class="se">\</span>
+  <span class="nt">--conf</span> <span class="s2">"spark.sql.catalog.hive_prod.uri=thrift://metastore.internal:9083"</span>
+</code></pre></div></div>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">SCHEMA</span> <span class="n">IF</span> <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="n">hive_prod</span><span class="p">.</span><span class="n">iceberg_db</span><span class="p">;</span>
+
+<span class="c1">-- version-hint.text printed the N to use here</span>
+<span class="k">CALL</span> <span class="n">hive_prod</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">register_table</span><span class="p">(</span>
+  <span class="k">table</span>         <span class="o">=&gt;</span> <span class="s1">'hive_prod.iceberg_db.trips'</span><span class="p">,</span>
+  <span class="n">metadata_file</span> <span class="o">=&gt;</span> <span class="s1">'file:///tmp/lakehouse/trips/metadata/v3.metadata.json'</span>
+<span class="p">);</span>
+
+<span class="k">SELECT</span> <span class="n">city_id</span><span class="p">,</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">hive_prod</span><span class="p">.</span><span class="n">iceberg_db</span><span class="p">.</span><span class="n">trips</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">city_id</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Delta is simpler, because a location is enough:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">SCHEMA</span> <span class="n">IF</span> <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="n">delta_db</span><span class="p">;</span>
+
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">IF</span> <span class="k">NOT</span> <span class="k">EXISTS</span> <span class="n">delta_db</span><span class="p">.</span><span class="n">trips</span>
+<span class="k">USING</span> <span class="n">DELTA</span> <span class="k">LOCATION</span> <span class="s1">'file:///tmp/lakehouse/trips'</span><span class="p">;</span>
+
+<span class="k">SELECT</span> <span class="n">city_id</span><span class="p">,</span> <span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">delta_db</span><span class="p">.</span><span class="n">trips</span> <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">city_id</span><span class="p">;</span>
+</code></pre></div></div>
+
+<h3 id="doing-it-for-many-tables-with-runcatalogsync">Doing it for many tables with RunCatalogSync</h3>
+
+<p><code class="language-plaintext highlighter-rouge">RunCatalogSync</code> registers converted tables into external catalogs in one run,
+so nobody runs DDL by hand. Two catalog clients are registered through the
+service loader in 0.4.0: <code class="language-plaintext highlighter-rouge">HMSCatalogSyncClient</code> for Hive Metastore and
+<code class="language-plaintext highlighter-rouge">GlueCatalogSyncClient</code> for AWS Glue. The docs describe those two as the current
+support, with Unity Catalog, Apache Polaris, Apache Gravitino and DataHub listed
+as coming.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">sourceCatalog</span><span class="pi">:</span>
+  <span class="na">catalogId</span><span class="pi">:</span> <span class="s2">"</span><span class="s">hms-source"</span>
+  <span class="na">catalogType</span><span class="pi">:</span> <span class="s2">"</span><span class="s">HMS"</span>
+  <span class="na">catalogProperties</span><span class="pi">:</span>
+    <span class="s">externalCatalog.hms.serverUrl</span><span class="pi">:</span> <span class="s2">"</span><span class="s">thrift://metastore.internal:9083"</span>
+<span class="na">targetCatalogs</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">catalogId</span><span class="pi">:</span> <span class="s2">"</span><span class="s">glue-target"</span>
+    <span class="na">catalogSyncClientImpl</span><span class="pi">:</span> <span class="s2">"</span><span class="s">org.apache.xtable.glue.GlueCatalogSyncClient"</span>
+    <span class="na">catalogProperties</span><span class="pi">:</span>
+      <span class="s">externalCatalog.glue.region</span><span class="pi">:</span> <span class="s2">"</span><span class="s">us-west-2"</span>
+<span class="na">datasets</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">sourceCatalogTableIdentifier</span><span class="pi">:</span>
+      <span class="na">tableIdentifier</span><span class="pi">:</span>
+        <span class="na">hierarchicalId</span><span class="pi">:</span> <span class="s2">"</span><span class="s">hudi_db.trips"</span>
+        <span class="na">partitionSpec</span><span class="pi">:</span> <span class="s2">"</span><span class="s">city_id:VALUE"</span>
+    <span class="na">targetCatalogTableIdentifiers</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">catalogId</span><span class="pi">:</span> <span class="s2">"</span><span class="s">glue-target"</span>
+        <span class="na">tableFormat</span><span class="pi">:</span> <span class="s2">"</span><span class="s">ICEBERG"</span>
+        <span class="na">tableIdentifier</span><span class="pi">:</span>
+          <span class="na">hierarchicalId</span><span class="pi">:</span> <span class="s2">"</span><span class="s">iceberg_db.trips"</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>java <span class="nt">-cp</span> <span class="s2">"</span><span class="nv">$XTABLE_JAR</span><span class="s2">"</span> <span class="se">\</span>
+  org.apache.xtable.utilities.RunCatalogSync <span class="se">\</span>
+  <span class="nt">--catalogSyncConfig</span> trips_catalog.yaml
+</code></pre></div></div>
+
+<p>Note the <code class="language-plaintext highlighter-rouge">-cp</code> and explicit class: only <code class="language-plaintext highlighter-rouge">RunSync</code> is the jar’s main class, so
+<code class="language-plaintext highlighter-rouge">RunCatalogSync</code> is named. Its flags are <code class="language-plaintext highlighter-rouge">--catalogSyncConfig</code> (required),
+<code class="language-plaintext highlighter-rouge">--hadoopConfig</code> and <code class="language-plaintext highlighter-rouge">--convertersConfig</code>. Every <code class="language-plaintext highlighter-rouge">catalogId</code> under <code class="language-plaintext highlighter-rouge">datasets</code>
+must match one declared in <code class="language-plaintext highlighter-rouge">sourceCatalog</code> or <code class="language-plaintext highlighter-rouge">targetCatalogs</code>, or the config is rejected.</p>
+
+<h2 id="is-there-an-api-instead-of-a-cli">Is there an API instead of a CLI?</h2>
+
+<p>Yes, and it is the part of the project moving fastest. <code class="language-plaintext highlighter-rouge">xtable-service</code> is
+published on Maven Central at <code class="language-plaintext highlighter-rouge">0.4.0-incubating</code>, and the repository carries an
+OpenAPI description at <code class="language-plaintext highlighter-rouge">spec/rest-service-open-api.yaml</code> defining two
+operations:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Operation</th>
+      <th style="text-align: left">Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">POST /v1/conversion/table</code></td>
+      <td style="text-align: left">Start a conversion, the same work <code class="language-plaintext highlighter-rouge">RunSync</code> does</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">GET /v1/conversion/table/{conversion-id}</code></td>
+      <td style="text-align: left">Poll that conversion for completion</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The shape tells you it is asynchronous: you submit and then poll, rather than
+holding a connection open for the length of a sync. The spec is versioned
+<code class="language-plaintext highlighter-rouge">0.0.1</code>, so treat it as early and pin what you build against it.</p>
+
+<h2 id="what-does-the-sync-not-cover">What does the sync not cover?</h2>
+
+<p>This is the section to read before anything else, because one line in the
+project’s own limitations page decides whether XTable fits your table at all:</p>
+
+<blockquote>
+  <p>Only Copy-on-Write or Read-Optimized views of tables are currently supported.
+This means that only the underlying parquet files are synced but log files
+from Hudi and delete vectors from Delta and Iceberg are not captured by the
+sync.</p>
+</blockquote>
+
+<p><strong>A Merge-on-Read Hudi table converts as its read-optimized view.</strong> Everything
+sitting in log files since the last compaction is not in the Iceberg or Delta
+metadata XTable writes. The conversion is not wrong, it is as of the last
+compaction, and a reader on the converted side sees exactly what a
+<code class="language-plaintext highlighter-rouge">read_optimized</code> query would see. The same applies to Delta and Iceberg deletion
+vectors on the source side.</p>
+
+<p>If your Hudi table is Copy-on-Write, this costs you nothing. If it is
+Merge-on-Read, compaction frequency becomes the freshness bound on every
+converted format, which is a scheduling decision rather than a configuration
+one.</p>
+
+<p>The other documented caveats, all of which are cheap to satisfy once you know:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Source</th>
+      <th style="text-align: left">Requirement</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Hudi</td>
+      <td style="text-align: left">Reading a Hudi target needs Hudi <code class="language-plaintext highlighter-rouge">0.14.0</code>, with <code class="language-plaintext highlighter-rouge">hoodie.metadata.enable=true</code> and <code class="language-plaintext highlighter-rouge">hoodie.datasource.write.hive_style_partitioning=true</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Hudi to Iceberg</td>
+      <td style="text-align: left">Set <code class="language-plaintext highlighter-rouge">parquet.avro.write-old-list-structure=false</code> so list types survive, and field IDs may be needed in the Parquet schema</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta to Iceberg</td>
+      <td style="text-align: left">Field IDs may be needed, which on the Delta side means enabling column mapping</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Delta</td>
+      <td style="text-align: left">Generated columns are not synced to the target schema, and partitioning on them is only partly supported</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>XTable also does target-side housekeeping rather than leaving it to you: Hudi
+targets get unreferenced files marked for cleaning, Iceberg targets get
+snapshots expired after a configured age, and Delta targets get log retention.</p>
+
+<h2 id="which-engines-can-read-the-result">Which engines can read the result?</h2>
+
+<p>Once the metadata is written, this stops being an XTable question. A converted
+table is an ordinary table of that format, and the project says so plainly:
+synced tables “behave the similarly to native tables which means you do not need
+any additional configurations on query engines’ side”.</p>
+
+<p>So the useful list is not a support matrix but the set of engines the project
+documents, and which formats each page actually covers:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Engine</th>
+      <th style="text-align: left">Formats covered by its page</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Apache Spark</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Trino</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Presto</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Amazon Athena</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Amazon Redshift</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Google BigQuery</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Microsoft Fabric</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">StarRocks</td>
+      <td style="text-align: left">Hudi, Iceberg, Delta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Snowflake</td>
+      <td style="text-align: left">Iceberg only</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Snowflake being the one Iceberg-only page is the shape of the whole argument for
+this tool: the warehouse dictates the format, your ingestion pipeline does not
+have to change to satisfy it, and the gap between the two is metadata XTable can
+write. Check the <a href="https://xtable.apache.org/docs/query-engines-index/">engine docs</a>
+for current, engine-specific instructions before you commit to one.</p>
+
+<h2 id="trying-it-without-installing-anything">Trying it without installing anything</h2>
+
+<p>The repository ships a Docker demo with Spark on Jupyter, a Hive Metastore,
+Trino and Presto already wired together:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git clone https://github.com/apache/incubator-xtable.git
+<span class="nb">cd </span>incubator-xtable/demo
+./start_demo.sh
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Service</th>
+      <th style="text-align: left">How to reach it</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Jupyter</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">http://127.0.0.1:8888/</code>, notebook at <code class="language-plaintext highlighter-rouge">work/demo.ipynb</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Trino</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">docker exec -it trino trino</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Presto</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">docker exec -it presto presto-cli --server localhost:8082</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Querying the same table from Trino as Iceberg and from Presto as Delta, in two
+terminals, makes the point faster than any diagram.</p>
+
+<h2 id="production-tips">Production tips</h2>
+
+<ul>
+  <li><strong>Check your source table type first.</strong> A Merge-on-Read Hudi source converts as its read-optimized view, so compaction frequency, not sync frequency, bounds freshness on every target format.</li>
+  <li><strong>Pin the XTable version and the format libraries together.</strong> The conversion uses XTable’s bundled Hudi, Iceberg and Delta, not yours.</li>
+  <li><strong>Run the sync as the last step of ingestion,</strong> not on an independent timer, so a converted table is never newer or older than the commit it claims to describe.</li>
+  <li><strong>Grep for the failure line, not just the success line.</strong> A partially successful run logs both.</li>
+  <li><strong>Prefer <code class="language-plaintext highlighter-rouge">--continuousMode</code> over cron</strong> when you have more than a handful of tables, since it reloads its config without a restart.</li>
+  <li><strong>Set <code class="language-plaintext highlighter-rouge">sourceFormat</code> explicitly.</strong> After the first conversion the directory holds several formats and auto-detection has more than one right answer.</li>
+  <li><strong>Treat catalog registration as a separate job</strong> with its own alerting. A converted table nobody registered is invisible, and it fails silently.</li>
+  <li><strong>Remember XTable is incubating.</strong> The disclaimer in the repository is not a formality: config shapes and module names have moved between releases, and the REST spec is at <code class="language-plaintext highlighter-rouge">0.0.1</code>.</li>
+</ul>
+
+<h2 id="frequently-asked-questions">Frequently asked questions</h2>
+
+<p><strong>Does converting cost me a rewrite of the data?</strong>
+No. Only metadata is written. The cost scales with commits and file counts, not
+with rows, so a large table costs about what a small one does.</p>
+
+<p><strong>Can I write through both formats at once?</strong>
+Treat one format as the writer and the others as read-only projections of it.
+Two writers committing to the same files through different metadata trees have
+no shared concurrency control, and nothing coordinates them.</p>
+
+<p><strong>Why does my Parquet source fail with “not supported”?</strong>
+<code class="language-plaintext highlighter-rouge">xtable-conversion-defaults.yaml</code> has no <code class="language-plaintext highlighter-rouge">PARQUET</code> entry even though
+<code class="language-plaintext highlighter-rouge">ParquetConversionSourceProvider</code> exists. Supply a converters config with
+<code class="language-plaintext highlighter-rouge">--convertersConfig</code> naming that provider class.</p>
+
+<p><strong>Can I convert to Paimon?</strong>
+Not in 0.4.0. Paimon is a source only, since no Paimon target is registered.</p>
+
+<p><strong>What happened to OneTable?</strong>
+Same project, renamed on entering the Apache Incubator. Artifacts and packages
+are <code class="language-plaintext highlighter-rouge">org.apache.xtable</code>; anything naming OneTable predates the donation.</p>
+
+<p><strong>How do I know a run was incremental rather than full?</strong>
+The controller logs its fallback, including “No previous InternalTable sync for
+target. Falling back to snapshot sync.” The
+<a href="/XTableIncrementalSync/">incremental sync post</a> goes
+through the decision in detail.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>The idea underneath all of this is smaller than the tooling around it. A table
+format is a description of a set of files, the files are ordinary Parquet, and
+nothing stops one set of files from carrying several descriptions at once. Once
+you accept that, the copy everyone was arguing about in the meeting turns out to
+be metadata, and metadata is cheap to produce twice.</p>
+
+<p>What 0.4.0 adds is mostly the unglamorous kind of progress that makes a tool
+usable: a jar that runs with <code class="language-plaintext highlighter-rouge">java -jar</code>, a dependency that no longer has to be
+bolted onto the classpath by hand, a Maven wrapper, a Spark runtime bundle. The
+new sources matter too, because a Paimon or Parquet table becoming readable as
+three formats is the clearest demonstration that the hub-and-spoke model was
+worth building.</p>
+
+<p>Where it does not fit: if you only ever use one engine, you are adding a moving
+part for a problem you do not have. XTable earns its keep when the write side
+and the read side want different formats and neither is willing to move. That is
+a common situation, and paying for it in metadata rather than in storage and a
+sync pipeline is a good trade.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://xtable.apache.org/docs/how-to">Apache XTable documentation</a> for the quickstart and catalog guides</li>
+  <li><a href="https://github.com/apache/incubator-xtable/releases">XTable release notes</a> for the full change list behind this page</li>
+  <li><a href="https://github.com/apache/incubator-xtable/blob/main/xtable-utilities/src/main/resources/xtable-conversion-defaults.yaml"><code class="language-plaintext highlighter-rouge">xtable-conversion-defaults.yaml</code></a>, the authoritative source and target matrix</li>
+  <li><a href="https://github.com/apache/incubator-xtable/blob/main/xtable-utilities/src/main/java/org/apache/xtable/utilities/RunSync.java"><code class="language-plaintext highlighter-rouge">RunSync.java</code></a> for every flag and config field</li>
+  <li><a href="/XTableIncrementalSync/">Apache XTable incremental sync</a> for how the sync mode is chosen</li>
+</ul>
+
+<h2 id="trademarks">Trademarks</h2>
+
+<p>Apache XTable (incubating), Apache Hudi, Apache Iceberg, Apache Paimon, Apache
+Parquet, Apache Spark, Apache Flink, Apache Avro, Apache Hive and Apache are
+either registered trademarks or trademarks of The Apache Software Foundation in
+the United States and other countries. Delta Lake is a trademark of the Linux
+Foundation. All other marks are the property of their respective owners.</p>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/DatalakeDockerDemos/">
+          <span class="card--mini__date">Sep 19, 2026</span>
+          <span class="card--mini__title">Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta</span>
+        </a><a class="card card--mini" href="/IcebergProductionGuide/">
+          <span class="card--mini__date">Sep 17, 2026</span>
+          <span class="card--mini__title">Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule</span>
+        </a><a class="card card--mini" href="/IcebergHiveMigration/">
+          <span class="card--mini__date">Sep 15, 2026</span>
+          <span class="card--mini__title">Migrating Hive tables to Iceberg: snapshot first, migrate second</span>
+        </a><a class="card card--mini" href="/IcebergInteroperability/">
+          <span class="card--mini__date">Sep 13, 2026</span>
+          <span class="card--mini__title">One table, three formats: Iceberg, Delta and Hudi interoperability</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/ApacheIcebergArchitecture/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">Apache Iceberg architecture: what actually happens when you commit</span>
+  </a>
+  <a class="post-nav__link post-nav__link--next" href="/SparkHudiCustomLogging/" rel="next">
+    <span class="post-nav__label">Next<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <span class="post-nav__title">Spark and Hudi logging: making a write explain itself</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Apache%20XTable%20cheat%20sheet:%20one%20table,%20every%20format&url=https://rangareddy.github.io/ApacheXTableCheatSheet/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/ApacheXTableCheatSheet/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/ApacheXTableCheatSheet/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/DatalakeDockerDemos/" hidden>
+      <a href="/DatalakeDockerDemos/">Datalake Docker Demos</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergProductionGuide/" hidden>
+      <a href="/IcebergProductionGuide/">Iceberg In Production</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergHiveMigration/" hidden>
+      <a href="/IcebergHiveMigration/">Hive To Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergInteroperability/" hidden>
+      <a href="/IcebergInteroperability/">Lakehouse Interoperability</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCdcPipelines/" hidden>
+      <a href="/IcebergCdcPipelines/">CDC Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergTimeTravel/" hidden>
+      <a href="/IcebergTimeTravel/">Iceberg Time Travel</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCopyOnWriteMergeOnRead/" hidden>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">Copy-on-Write vs Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergStreamingIngestion/" hidden>
+      <a href="/IcebergStreamingIngestion/">Streaming Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergIngestion/" hidden>
+      <a href="/IcebergIngestion/">Iceberg Ingestion</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergPartitioning/" hidden>
+      <a href="/IcebergPartitioning/">Iceberg Partitioning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSchemaEvolution/" hidden>
+      <a href="/IcebergSchemaEvolution/">Iceberg Schema Evolution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergFormatVersions/" hidden>
+      <a href="/IcebergFormatVersions/">Iceberg Format Versions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCatalogs/" hidden>
+      <a href="/IcebergCatalogs/">Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergWritePath/" hidden>
+      <a href="/IcebergWritePath/">Iceberg Write Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergReadPath/" hidden>
+      <a href="/IcebergReadPath/">Iceberg Read Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergThreeTierArchitecture/" hidden>
+      <a href="/IcebergThreeTierArchitecture/">Iceberg Three Tiers</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergLocalPlayground/" hidden>
+      <a href="/IcebergLocalPlayground/">Iceberg Playground</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/WhyIcebergExists/" hidden>
+      <a href="/WhyIcebergExists/">Why Iceberg Exists</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/TableMaintenance/" hidden>
+      <a href="/TableMaintenance/">Table Maintenance</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/StructuredStreamingInternals/" hidden>
+      <a href="/StructuredStreamingInternals/">Structured Streaming</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkPerformanceOptimization/" hidden>
+      <a href="/SparkPerformanceOptimization/">Spark Performance Tuning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShuffleInternals/" hidden>
+      <a href="/SparkShuffleInternals/">Spark Shuffle Internals</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataFusionComet/" hidden>
+      <a href="/SparkDataFusionComet/">DataFusion Comet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergPolaris/" hidden>
+      <a href="/SparkIcebergPolaris/">Iceberg on Polaris</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Spark Submit for Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShufflePartitionGenerator/" hidden>
+      <a href="/SparkShufflePartitionGenerator/">Shuffle Partition Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkStreamingCustomLogging/" hidden>
+      <a href="/SparkStreamingCustomLogging/">Streaming Query Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Spark Release History</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Fixing Data Skew</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiMergeOnRead/" hidden>
+      <a href="/HudiMergeOnRead/">Hudi Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Inside Apache Spark Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIndexTypes/" hidden>
+      <a href="/HudiIndexTypes/">Hudi Index Types</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/DatalakeDockerDemos/">
+        Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta
+        <time datetime="2026-09-19T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergProductionGuide/">
+        Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule
+        <time datetime="2026-09-17T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergHiveMigration/">
+        Migrating Hive tables to Iceberg: snapshot first, migrate second
+        <time datetime="2026-09-15T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergInteroperability/">
+        One table, three formats: Iceberg, Delta and Hudi interoperability
+        <time datetime="2026-09-13T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCdcPipelines/">
+        CDC into Iceberg: the delete files nobody counted
+        <time datetime="2026-09-09T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergTimeTravel/">
+        Time travel and rollback in Iceberg: undoing a bad write in one statement
+        <time datetime="2026-09-07T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">
+        Copy-on-write or merge-on-read: choosing how an Iceberg table pays for a delete
+        <time datetime="2026-09-05T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergStreamingIngestion/">
+        Streaming into Iceberg: availableNow, checkpoints, and the snapshot count nobody watches
+        <time datetime="2026-09-03T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">19</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">21</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Spark shuffle internals: the three writers, and which one your job gets · Ranga Reddy</title>
+  <meta name="description" content="Spark has three shuffle writers and chooses one per shuffle without ever naming the choice. Here is that decision tree read from the source and confirmed by running it, what lands on disk, what the reduce side does with it, who serves the files when an executor dies, and how to avoid the shuffle altogether.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/SparkShuffleInternals/">
+  <meta name="google-site-verification" content="p3-xmuuDZGnVmE6SSwGmQ2JXJDhDsZPAh79ydnDlQA4">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Spark shuffle internals: the three writers, and which one your job gets">
+  <meta property="og:description" content="Spark has three shuffle writers and chooses one per shuffle without ever naming the choice. Here is that decision tree read from the source and confirmed by running it, what lands on disk, what the reduce side does with it, who serves the files when an executor dies, and how to avoid the shuffle altogether.">
+  <meta property="og:url" content="https://rangareddy.github.io/SparkShuffleInternals/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/SparkShuffleInternals.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Spark shuffle internals: the three writers, and which one your job gets">
+  <meta name="twitter:description" content="Spark has three shuffle writers and chooses one per shuffle without ever naming the choice. Here is that decision tree read from the source and confirmed by running it, what lands on disk, what the reduce side does with it, who serves the files when an executor dies, and how to avoid the shuffle altogether.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/SparkShuffleInternals.png">
+  <meta property="article:published_time" content="2026-08-04T10:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Spark shuffle internals: the three writers, and which one your job gets",
+    "description": "Spark has three shuffle writers and chooses one per shuffle without ever naming the choice. Here is that decision tree read from the source and confirmed by running it, what lands on disk, what the reduce side does with it, who serves the files when an executor dies, and how to avoid the shuffle altogether.",
+    "url": "https://rangareddy.github.io/SparkShuffleInternals/",
+    "datePublished": "2026-08-04T10:00:00+05:30",
+    "dateModified": "2026-08-04T10:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/SparkShuffleInternals.png",
+    "keywords": "Spark, Shuffle, Serialization, Internals",
+    "articleSection": "Spark",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/SparkShuffleInternals/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Spark", "item": "https://rangareddy.github.io/category/#spark" },
+      { "@type": "ListItem", "position": 3, "name": "Spark shuffle internals: the three writers, and which one your job gets", "item": "https://rangareddy.github.io/SparkShuffleInternals/" }
+    ]
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/SparkShuffleInternals.png"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Spark shuffle internals: the three writers, and which one your job gets</h1>
+      <p class="post-head__lede">Spark has three shuffle writers and chooses one per shuffle without ever naming the choice. Here is that decision tree read from the source and confirmed by running it, what lands on disk, what the reduce side does with it, who serves the files when an executor dies, and how to avoid the shuffle altogether.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-08-04T10:00:00+05:30">Aug 4, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>31 min read</span>
+  <span class="meta__item meta__views" data-views-for="/SparkShuffleInternals/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#spark">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Spark
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#spark">#Spark</a></li>
+  <li><a class="chip" href="/tag/#shuffle">#Shuffle</a></li>
+  <li><a class="chip" href="/tag/#serialization">#Serialization</a></li>
+  <li><a class="chip" href="/tag/#internals">#Internals</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#why-does-a-shuffle-exist" id="markdown-toc-why-does-a-shuffle-exist">Why does a shuffle exist?</a></li>
+  <li><a href="#which-operations-shuffle" id="markdown-toc-which-operations-shuffle">Which operations shuffle, and what does it cost?</a>    <ul>
+      <li><a href="#where-the-cost-actually-goes" id="markdown-toc-where-the-cost-actually-goes">Where the cost actually goes</a></li>
+    </ul>
+  </li>
+  <li><a href="#what-should-you-know-already" id="markdown-toc-what-should-you-know-already">What should you know already?</a></li>
+  <li><a href="#how-the-shuffle-subsystem-is-put-together" id="markdown-toc-how-the-shuffle-subsystem-is-put-together">How is the shuffle subsystem put together?</a></li>
+  <li><a href="#what-decides-which-writer-you-get" id="markdown-toc-what-decides-which-writer-you-get">What decides which writer you get?</a>    <ul>
+      <li><a href="#the-serializer-is-picked-by-your-record-types" id="markdown-toc-the-serializer-is-picked-by-your-record-types">The serializer is picked by your record types</a></li>
+    </ul>
+  </li>
+  <li><a href="#what-lands-on-disk" id="markdown-toc-what-lands-on-disk">What lands on disk?</a></li>
+  <li><a href="#how-the-three-writers-differ" id="markdown-toc-how-the-three-writers-differ">How do the three writers differ?</a></li>
+  <li><a href="#what-does-spilling-actually-cost" id="markdown-toc-what-does-spilling-actually-cost">What does spilling actually cost?</a></li>
+  <li><a href="#what-the-reduce-side-does" id="markdown-toc-what-the-reduce-side-does">What does the reduce side actually do?</a></li>
+  <li><a href="#what-happens-when-a-fetch-fails" id="markdown-toc-what-happens-when-a-fetch-fails">What happens when a fetch fails?</a></li>
+  <li><a href="#who-serves-the-files" id="markdown-toc-who-serves-the-files">Who serves the files when the executor is gone?</a></li>
+  <li><a href="#which-numbers-actually-tell-you-something" id="markdown-toc-which-numbers-actually-tell-you-something">Which numbers actually tell you something?</a></li>
+  <li><a href="#what-aqe-changes" id="markdown-toc-what-aqe-changes">What does adaptive execution change about a shuffle?</a></li>
+  <li><a href="#how-to-avoid-the-shuffle" id="markdown-toc-how-to-avoid-the-shuffle">How do you avoid the shuffle entirely?</a></li>
+  <li><a href="#what-should-you-actually-configure" id="markdown-toc-what-should-you-actually-configure">What should you actually configure?</a></li>
+  <li><a href="#symptoms-causes-and-fixes" id="markdown-toc-symptoms-causes-and-fixes">Symptoms, causes and fixes</a></li>
+  <li><a href="#why-hash-shuffle-lost" id="markdown-toc-why-hash-shuffle-lost">Why did hash shuffle lose, and what does push-based change?</a></li>
+  <li><a href="#when-the-shuffle-is-not-your-problem" id="markdown-toc-when-the-shuffle-is-not-your-problem">When is the shuffle not your problem?</a></li>
+  <li><a href="#common-misconceptions" id="markdown-toc-common-misconceptions">Common misconceptions</a></li>
+  <li><a href="#a-model-worth-keeping" id="markdown-toc-a-model-worth-keeping">A model worth keeping</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+  <li><a href="#trademarks" id="markdown-toc-trademarks">Trademarks</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>Sort-based shuffle writes <strong>one data file per map task</strong>, not one per map-and-reduce pair, alongside an index of partition offsets and a checksum file. Collapsing that file count is what let the shuffle scale.</li>
+    <li>Three writers exist: <code class="language-plaintext highlighter-rouge">BypassMergeSortShuffleWriter</code>, <code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code> and <code class="language-plaintext highlighter-rouge">SortShuffleWriter</code>. <code class="language-plaintext highlighter-rouge">SortShuffleManager.registerShuffle</code> picks one per shuffle, and nothing in the UI tells you which.</li>
+    <li>The bypass path requires no map-side aggregation and at most <code class="language-plaintext highlighter-rouge">spark.shuffle.sort.bypassMergeThreshold</code> partitions, default 200. The comparison is <code class="language-plaintext highlighter-rouge">&lt;=</code>: 200 partitions bypass, 201 do not.</li>
+    <li><strong>The serializer is chosen by your record types, not only by <code class="language-plaintext highlighter-rouge">spark.serializer</code>.</strong> Kryo is selected automatically when both key and value are primitives, primitive arrays or <code class="language-plaintext highlighter-rouge">String</code>; anything else falls back to the configured default.</li>
+    <li>That makes the writer type-dependent. Changing a value from <code class="language-plaintext highlighter-rouge">Int</code> to <code class="language-plaintext highlighter-rouge">(Int, Int)</code> moves the same job off <code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code> and onto <code class="language-plaintext highlighter-rouge">SortShuffleWriter</code>, which pays to deserialize and re-serialize records when it merges spills.</li>
+  </ul>
+</blockquote>
+
+<h2 id="why-does-a-shuffle-exist">Why does a shuffle exist?</h2>
+
+<p>A <code class="language-plaintext highlighter-rouge">groupByKey</code> has to put every record sharing a key in one place, and those
+records are spread across every executor that read the input. Nothing in the
+upstream stage arranged them that way, and no amount of local computation can
+fix it: the data has to move.</p>
+
+<p>That movement is the shuffle, and it is the only mechanism Spark has for
+relocating records between partitions. Everything else in the execution model is
+local. A <code class="language-plaintext highlighter-rouge">map</code>, a <code class="language-plaintext highlighter-rouge">filter</code> or a <code class="language-plaintext highlighter-rouge">mapPartitions</code> transforms a partition in place,
+so the task reads one parent partition and writes one child partition. Spark
+calls that a narrow dependency and fuses the whole chain into a single stage.</p>
+
+<p>A wide dependency breaks the chain, because a child partition draws from every
+parent partition. Spark cannot fuse across that boundary, so it cuts the plan
+there and the cut becomes a stage boundary. The stages either side are not two
+halves of one computation running together; the first one runs to completion and
+writes its output to local disk, and only then does the second start reading.</p>
+
+<p>This is worth stating plainly, because it explains most of what follows. <strong>The
+shuffle is a disk barrier, not a network transfer.</strong> Map tasks write files.
+Reduce tasks fetch from those files afterwards. Nothing streams directly from
+one task to another. That design buys the thing Spark needs most at scale: a
+reduce task that dies can be retried by re-fetching the same bytes, without
+re-running the stage that produced them.</p>
+
+<p>It also sets up the cost. Every shuffle writes the full intermediate result to
+disk, serializes it on the way out, and deserializes it on the way back in. When
+a job is slow, the shuffle is usually where the time went.</p>
+
+<p>The earlier design made that cost worse in a way that did not survive contact
+with large clusters. Hash-based shuffle gave each map task one open file per
+reduce partition, so a stage of <code class="language-plaintext highlighter-rouge">M</code> map tasks feeding <code class="language-plaintext highlighter-rouge">R</code> reduce partitions
+produced <code class="language-plaintext highlighter-rouge">M × R</code> files. At a thousand map tasks and a thousand reduce
+partitions, that is a million files and a million write buffers, and the job
+died on file descriptors or drowned in random I/O long before it ran out of
+compute. Sort-based shuffle replaced it by having each map task write a single
+file with its records sorted by partition id, plus a small index recording where
+each partition starts. <code class="language-plaintext highlighter-rouge">M</code> files, not <code class="language-plaintext highlighter-rouge">M × R</code>.</p>
+
+<p>That is the design every current Spark job uses, and it comes in three
+implementations. They differ in whether records are sorted as objects or as
+serialized bytes, whether a merge step happens at all, and what they cost in
+memory and CPU. Which one a given shuffle gets is decided once, when the shuffle
+is registered, from properties of the dependency rather than anything you set
+directly, and the choice is never reported. The rest of this post is that
+decision and its consequences.</p>
+
+<h2 id="which-operations-shuffle">Which operations shuffle, and what does it cost?</h2>
+
+<p>Not every wide operation announces itself. These all introduce a shuffle:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Operation</th>
+      <th style="text-align: left">Why it shuffles</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">groupByKey</code>, <code class="language-plaintext highlighter-rouge">reduceByKey</code>, <code class="language-plaintext highlighter-rouge">aggregateByKey</code></td>
+      <td style="text-align: left">every value for a key must meet in one place</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">join</code>, <code class="language-plaintext highlighter-rouge">cogroup</code></td>
+      <td style="text-align: left">matching keys from both sides must meet</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">distinct</code></td>
+      <td style="text-align: left">duplicates can live in any partition</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">repartition</code>, <code class="language-plaintext highlighter-rouge">repartitionByRange</code></td>
+      <td style="text-align: left">redistribution is the whole point</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">sortBy</code>, <code class="language-plaintext highlighter-rouge">orderBy</code></td>
+      <td style="text-align: left">a global order needs a range partitioning pass</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">groupBy(...).agg(...)</code> in SQL</td>
+      <td style="text-align: left">the <code class="language-plaintext highlighter-rouge">Exchange</code> node in the plan is the shuffle</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">coalesce</code> is the exception worth remembering: it merges existing partitions
+without redistributing rows, so it narrows without a shuffle.</p>
+
+<p>The cut itself is made by the <code class="language-plaintext highlighter-rouge">DAGScheduler</code>, which walks the RDD lineage and
+breaks it at every wide dependency. The stage that writes shuffle output is a
+<strong><code class="language-plaintext highlighter-rouge">ShuffleMapStage</code></strong>, whose tasks are <code class="language-plaintext highlighter-rouge">ShuffleMapTask</code>s; the final stage that
+produces the job’s result is a <strong><code class="language-plaintext highlighter-rouge">ResultStage</code></strong>. A job is therefore some number
+of <code class="language-plaintext highlighter-rouge">ShuffleMapStage</code>s feeding one <code class="language-plaintext highlighter-rouge">ResultStage</code>, and the count of shuffles in a
+job is exactly the count of <code class="language-plaintext highlighter-rouge">ShuffleMapStage</code>s.</p>
+
+<h3 id="where-the-cost-actually-goes">Where the cost actually goes</h3>
+
+<p>“Shuffles are expensive” is true and useless. The expense has four distinct
+components, and different symptoms point at different ones.</p>
+
+<p><strong>Disk I/O.</strong> Every map task writes its entire output to local disk, and every
+reduce task reads it back. This is not a cache or an overflow; it is the normal
+path. A stage shuffling 100 GB writes 100 GB and reads 100 GB, before any spill.</p>
+
+<p><strong>Network I/O.</strong> Reduce tasks fetch from every map task, so a shuffle is an
+all-to-all exchange. With <code class="language-plaintext highlighter-rouge">M</code> map tasks and <code class="language-plaintext highlighter-rouge">R</code> reduce tasks there are up to
+<code class="language-plaintext highlighter-rouge">M × R</code> block transfers, which is why block <em>count</em> matters independently of
+byte volume, and why push-based shuffle exists.</p>
+
+<p><strong>Memory and GC.</strong> Records are serialized on the way out and deserialized on the
+way in, and sorters hold buffers that grow until they spill. The 10× gap between
+<code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code> and <code class="language-plaintext highlighter-rouge">diskBytesSpilled</code> measured later in this post is
+exactly this cost made visible.</p>
+
+<p><strong>CPU.</strong> Serialization, compression (<code class="language-plaintext highlighter-rouge">spark.shuffle.compress</code> is on by default)
+and sorting all consume CPU that is doing no analytical work. This is the
+component people forget, and it is why a shuffle can be slow on a cluster whose
+disks and network are both idle.</p>
+
+<h2 id="what-should-you-know-already">What should you know already?</h2>
+
+<p>This post assumes you have written Spark jobs and read a stage graph, but not
+that you have opened the shuffle source. You should be comfortable with RDDs and
+DataFrames, partitions, the driver and executor split, and the idea that a job
+is cut into stages.</p>
+
+<p>Three terms are used throughout in their precise sense. A <strong>map task</strong> is a task
+in the stage that writes shuffle output; a <strong>reduce task</strong> is one in the stage
+that reads it. Spark names them by position, not by operator, so a single stage
+is a reduce stage for the shuffle below it and a map stage for the shuffle above
+it. A <strong>partition id</strong> is the number the partitioner assigns to a record, which
+decides which reduce task eventually reads it. And <strong>map-side aggregation</strong>, or
+map-side combine, is the optimisation where <code class="language-plaintext highlighter-rouge">reduceByKey</code> folds records for the
+same key together before they are written, so less data crosses the boundary.</p>
+
+<p>Everything below was read at the <code class="language-plaintext highlighter-rouge">v4.1.3</code> tag and run on Spark 4.1.3 with
+Scala 2.13.17 on JDK 21, in <code class="language-plaintext highlighter-rouge">local</code> mode. Where the mode matters, it is called
+out.</p>
+
+<h2 id="how-the-shuffle-subsystem-is-put-together">How is the shuffle subsystem put together?</h2>
+
+<p>Five components cooperate, and each one has a single job. Knowing which is which
+turns most shuffle configuration from arbitrary into obvious.</p>
+
+<pre><code class="language-mermaid">flowchart TB
+    subgraph DRIVER["Driver"]
+        DAG[DAGScheduler] --&gt;|registers| SM[SortShuffleManager]
+        SM --&gt; H{ShuffleHandle}
+        MOT[MapOutputTrackerMaster]
+    end
+    subgraph MAP["Executor, map task"]
+        W[ShuffleWriter] --&gt; RES[IndexShuffleBlockResolver]
+        RES --&gt; D[(data + index&lt;br/&gt;+ checksum)]
+    end
+    subgraph RED["Executor, reduce task"]
+        R[BlockStoreShuffleReader] --&gt; FI[ShuffleBlockFetcherIterator]
+    end
+    H --&gt;|"chooses the writer"| W
+    W --&gt;|"MapStatus: sizes per partition"| MOT
+    MOT --&gt;|"where each block lives"| FI
+    D --&gt;|"fetched by offset"| FI
+</code></pre>
+
+<p><strong><code class="language-plaintext highlighter-rouge">SortShuffleManager</code></strong> is the entry point, and it exists once per application.
+It is asked to register a shuffle when the dependency is created, and asked for
+a writer when each map task starts. Registration is where the decision this post
+is about gets made.</p>
+
+<p><strong>The <code class="language-plaintext highlighter-rouge">ShuffleHandle</code></strong> is how the decision travels. It is a small object created
+at registration time and carried to every map task, and its <em>type</em> is the
+decision: <code class="language-plaintext highlighter-rouge">BypassMergeSortShuffleHandle</code>, <code class="language-plaintext highlighter-rouge">SerializedShuffleHandle</code> or
+<code class="language-plaintext highlighter-rouge">BaseShuffleHandle</code>.</p>
+
+<p><strong>The <code class="language-plaintext highlighter-rouge">ShuffleWriter</code></strong> does the work in the map task. There are three
+implementations, one per handle type, and they are the subject of most of this
+post.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">IndexShuffleBlockResolver</code></strong> owns the files. It decides their names, writes
+the index of partition offsets, and performs the atomic rename that makes a map
+task’s output visible. Every writer goes through it, which is why the on-disk
+layout is identical whichever writer ran.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">MapOutputTracker</code></strong> is the directory. Map tasks report a <code class="language-plaintext highlighter-rouge">MapStatus</code> holding
+the size of each partition they wrote; the reduce side asks the tracker where
+the blocks for its partition live, and fetches them. The tracker living on the
+driver is what makes a shuffle recoverable: the files can be found again after a
+task dies, and it is also why losing an executor is expensive, since its map
+output goes with it.</p>
+
+<h2 id="what-decides-which-writer-you-get">What decides which writer you get?</h2>
+
+<p><code class="language-plaintext highlighter-rouge">SortShuffleManager.registerShuffle</code> runs one <code class="language-plaintext highlighter-rouge">if</code>/<code class="language-plaintext highlighter-rouge">else if</code>/<code class="language-plaintext highlighter-rouge">else</code>, once per
+shuffle, and the branch taken is fixed for the life of that shuffle.</p>
+
+<pre><code class="language-mermaid">flowchart TB
+    S[registerShuffle] --&gt; B{"map-side combine?&lt;br/&gt;partitions &amp;le; bypassMergeThreshold?"}
+    B --&gt;|"no combine, few partitions"| BH["BypassMergeSortShuffleHandle&lt;br/&gt;→ BypassMergeSortShuffleWriter"]
+    B --&gt;|otherwise| C{"serializer relocatable?&lt;br/&gt;no combine?&lt;br/&gt;partitions &amp;le; 16777216?"}
+    C --&gt;|yes| SH["SerializedShuffleHandle&lt;br/&gt;→ UnsafeShuffleWriter"]
+    C --&gt;|no| BS["BaseShuffleHandle&lt;br/&gt;→ SortShuffleWriter"]
+</code></pre>
+
+<p>The two predicates are small enough to read in full. <code class="language-plaintext highlighter-rouge">shouldBypassMergeSort</code>
+refuses when there is map-side aggregation, and otherwise compares the partition
+count against <code class="language-plaintext highlighter-rouge">spark.shuffle.sort.bypassMergeThreshold</code>, which defaults to 200:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">shouldBypassMergeSort</span><span class="o">(</span><span class="n">conf</span><span class="k">:</span> <span class="kt">SparkConf</span><span class="o">,</span> <span class="n">dep</span><span class="k">:</span> <span class="kt">ShuffleDependency</span><span class="o">[</span><span class="k">_</span>, <span class="k">_</span>, <span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Boolean</span> <span class="o">=</span> <span class="o">{</span>
+  <span class="c1">// We cannot bypass sorting if we need to do map-side aggregation.</span>
+  <span class="nf">if</span> <span class="o">(</span><span class="nv">dep</span><span class="o">.</span><span class="py">mapSideCombine</span><span class="o">)</span> <span class="o">{</span>
+    <span class="kc">false</span>
+  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+    <span class="k">val</span> <span class="nv">bypassMergeThreshold</span><span class="k">:</span> <span class="kt">Int</span> <span class="o">=</span> <span class="nv">conf</span><span class="o">.</span><span class="py">get</span><span class="o">(</span><span class="nv">config</span><span class="o">.</span><span class="py">SHUFFLE_SORT_BYPASS_MERGE_THRESHOLD</span><span class="o">)</span>
+    <span class="nv">dep</span><span class="o">.</span><span class="py">partitioner</span><span class="o">.</span><span class="py">numPartitions</span> <span class="o">&lt;=</span> <span class="n">bypassMergeThreshold</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>The comparison is <code class="language-plaintext highlighter-rouge">&lt;=</code>, and that boundary is exact rather than approximate. A
+shuffle with 200 partitions takes the bypass path; the same shuffle with 201
+does not.</p>
+
+<p><code class="language-plaintext highlighter-rouge">canUseSerializedShuffle</code> asks three questions, and the first is the one that
+surprises people:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">if</span> <span class="o">(!</span><span class="nv">dependency</span><span class="o">.</span><span class="py">serializer</span><span class="o">.</span><span class="py">supportsRelocationOfSerializedObjects</span><span class="o">)</span> <span class="o">{</span>
+  <span class="kc">false</span>          <span class="c1">// the serializer cannot be trusted to move serialized bytes</span>
+<span class="o">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="o">(</span><span class="nv">dependency</span><span class="o">.</span><span class="py">mapSideCombine</span><span class="o">)</span> <span class="o">{</span>
+  <span class="kc">false</span>          <span class="c1">// combining needs the objects, not their bytes</span>
+<span class="o">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="o">(</span><span class="n">numPartitions</span> <span class="o">&gt;</span> <span class="nc">MAX_SHUFFLE_OUTPUT_PARTITIONS_FOR_SERIALIZED_MODE</span><span class="o">)</span> <span class="o">{</span>
+  <span class="kc">false</span>          <span class="c1">// 16777216, from the 24 bits the packed pointer gives the partition id</span>
+<span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+  <span class="kc">true</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p><strong>Relocation is the crux.</strong> The serialized path sorts records without
+deserializing them, which means moving an already-serialized record from one
+position in a buffer to another and expecting it to still be readable. A
+serializer that writes stream-level state, such as a back-reference table, breaks
+under that treatment. <code class="language-plaintext highlighter-rouge">JavaSerializer</code> writes exactly that kind of state and
+reports <code class="language-plaintext highlighter-rouge">false</code>; <code class="language-plaintext highlighter-rouge">KryoSerializer</code> reports <code class="language-plaintext highlighter-rouge">true</code>.</p>
+
+<p>The partition ceiling of 16777216 comes from <code class="language-plaintext highlighter-rouge">PackedRecordPointer</code>, which encodes
+a partition id and a memory address in a single 64-bit long, giving the partition
+id 24 bits.</p>
+
+<h3 id="the-serializer-is-picked-by-your-record-types">The serializer is picked by your record types</h3>
+
+<p>The part that is easy to get wrong: <code class="language-plaintext highlighter-rouge">spark.serializer</code> is not the whole answer.
+<code class="language-plaintext highlighter-rouge">ShuffledRDD</code> asks <code class="language-plaintext highlighter-rouge">SerializerManager</code> for a serializer, and it auto-selects Kryo
+when <em>both</em> the key and value class tags are primitives, primitive arrays or
+<code class="language-plaintext highlighter-rouge">String</code>:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">getSerializer</span><span class="o">(</span><span class="n">keyClassTag</span><span class="k">:</span> <span class="kt">ClassTag</span><span class="o">[</span><span class="k">_</span><span class="o">],</span> <span class="n">valueClassTag</span><span class="k">:</span> <span class="kt">ClassTag</span><span class="o">[</span><span class="k">_</span><span class="o">])</span><span class="k">:</span> <span class="kt">Serializer</span> <span class="o">=</span> <span class="o">{</span>
+  <span class="nf">if</span> <span class="o">(</span><span class="nf">canUseKryo</span><span class="o">(</span><span class="n">keyClassTag</span><span class="o">)</span> <span class="o">&amp;&amp;</span> <span class="nf">canUseKryo</span><span class="o">(</span><span class="n">valueClassTag</span><span class="o">))</span> <span class="o">{</span>
+    <span class="n">kryoSerializer</span>
+  <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+    <span class="n">defaultSerializer</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">spark.serializer</code> sets <code class="language-plaintext highlighter-rouge">defaultSerializer</code>, which still defaults to
+<code class="language-plaintext highlighter-rouge">org.apache.spark.serializer.JavaSerializer</code>. So the configured default only
+applies to the records the auto-pick rejects.</p>
+
+<p>Running the real decision functions over six record types, all at 300 partitions
+so only the type varies, gives:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Record type</th>
+      <th style="text-align: left">Serializer chosen</th>
+      <th style="text-align: left">Relocatable</th>
+      <th style="text-align: left">Writer</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(Int, Int)</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">KryoSerializer</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(Int, String)</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">KryoSerializer</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(String, Long)</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">KryoSerializer</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(Int, Array[Byte])</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">KryoSerializer</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(Int, (Int, Int))</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">JavaSerializer</code></td>
+      <td style="text-align: left"><strong>false</strong></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">SortShuffleWriter</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(String, Trade)</code></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">JavaSerializer</code></td>
+      <td style="text-align: left"><strong>false</strong></td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">SortShuffleWriter</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>A tuple is not a primitive, so <code class="language-plaintext highlighter-rouge">(Int, (Int, Int))</code> falls off the fast path
+although every leaf in it is an <code class="language-plaintext highlighter-rouge">Int</code>. Wrapping two counters in a case class does
+the same. Nothing in the plan, the UI or the logs reports that the writer
+changed.</p>
+
+<p><strong>This matters more for RDD code than for SQL.</strong> Spark SQL shuffles
+<code class="language-plaintext highlighter-rouge">UnsafeRow</code> through <code class="language-plaintext highlighter-rouge">UnsafeRowSerializer</code>, which supports relocation by
+construction, so DataFrame and Dataset jobs reach the serialized path regardless
+of the column types. The type sensitivity above is an RDD-level concern.</p>
+
+<h2 id="what-lands-on-disk">What lands on disk?</h2>
+
+<p>Whichever writer ran, the output is the same shape: <strong>one data file per map
+task</strong>, an index of offsets, and a checksum file.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;spark.local.dir&gt;/blockmgr-&lt;uuid&gt;/
+└── &lt;hash prefix&gt;/
+    ├── shuffle_0_0_0.data              # every partition's bytes, concatenated
+    ├── shuffle_0_0_0.index             # numPartitions + 1 offsets, as longs
+    ├── shuffle_0_0_0.checksum.ADLER32  # one checksum per partition
+    ├── shuffle_0_1_0.data
+    ├── shuffle_0_1_0.index
+    └── ...
+</code></pre></div></div>
+
+<p>The name is <code class="language-plaintext highlighter-rouge">shuffle_{shuffleId}_{mapId}_{reduceId}</code>, and the trailing component
+is always <code class="language-plaintext highlighter-rouge">0</code>. It is <code class="language-plaintext highlighter-rouge">IndexShuffleBlockResolver.NOOP_REDUCE_ID</code>, a placeholder
+kept so the block id format still has three parts. Its constancy is the whole
+point of sort-based shuffle: there is no per-reducer file.</p>
+
+<p>A shuffle of 8 map tasks into 4 partitions produced 24 files, and the sizes are
+worth checking rather than trusting:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">File</th>
+      <th style="text-align: left">Size</th>
+      <th style="text-align: left">Why</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffle_0_0_0.data</code></td>
+      <td style="text-align: left">178348 bytes</td>
+      <td style="text-align: left">the records themselves</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffle_0_0_0.index</code></td>
+      <td style="text-align: left">40 bytes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">(4 partitions + 1) × 8</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffle_0_0_0.checksum.ADLER32</code></td>
+      <td style="text-align: left">32 bytes</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">4 partitions × 8</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The index holds one offset per partition plus a final end-of-file offset, as
+8-byte longs, which is why a reduce task can seek straight to its own bytes
+with two reads of the index. The checksum file exists because
+<code class="language-plaintext highlighter-rouge">spark.shuffle.checksum.enabled</code> defaults to <code class="language-plaintext highlighter-rouge">true</code> with
+<code class="language-plaintext highlighter-rouge">spark.shuffle.checksum.algorithm</code> set to <code class="language-plaintext highlighter-rouge">ADLER32</code>; it lets Spark tell a genuine
+network corruption from a bug when a fetched block will not decompress.</p>
+
+<p>A map task writes its data and index to temporary files and then calls
+<code class="language-plaintext highlighter-rouge">IndexShuffleBlockResolver.writeMetadataFileAndCommit</code>, which renames them into
+place under a lock. <strong>That rename is the commit.</strong> It is also what makes
+speculative execution safe: two attempts at the same map task can both write, and
+whichever commits first wins, with the loser’s temporary files discarded.</p>
+
+<h2 id="how-the-three-writers-differ">How do the three writers differ?</h2>
+
+<p>All three produce that identical layout. What differs is the path taken to it.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">BypassMergeSortShuffleWriter</code> does not sort at all.</strong> It opens one
+<code class="language-plaintext highlighter-rouge">DiskBlockObjectWriter</code> per reduce partition, writes each record straight to the
+file for its partition, then concatenates those files in partition order into the
+single data file and records the lengths as the index. The name is precise: it
+bypasses the merge sort by never producing anything that needs merging.</p>
+
+<p>The cost is in the first sentence. It holds <code class="language-plaintext highlighter-rouge">numPartitions</code> files open at once,
+each with its own buffer of <code class="language-plaintext highlighter-rouge">spark.shuffle.file.buffer</code>, which defaults to 32k.
+At 200 partitions that is 200 open handles and roughly 6 MiB of buffer per task,
+which is exactly why the threshold that guards it defaults to 200 rather than
+something larger.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code> sorts serialized bytes.</strong> Records are serialized on
+arrival and appended to memory pages; what gets sorted is an array of
+<code class="language-plaintext highlighter-rouge">PackedRecordPointer</code> longs, each packing the partition id into 24 bits and the
+record’s address into the rest. Sorting moves those 8-byte longs, never the
+records.</p>
+
+<p>That buys two things. Sorting touches a compact array rather than a graph of
+objects, so it is cache-friendly and produces no garbage per record. And because
+the spilled files are already serialized and sorted by partition, merging them
+can be done on bytes: <code class="language-plaintext highlighter-rouge">mergeSpills</code> picks <code class="language-plaintext highlighter-rouge">mergeSpillsWithTransferTo</code> when
+<code class="language-plaintext highlighter-rouge">spark.file.transferTo</code> allows it and encryption is off, so the merge runs
+as <code class="language-plaintext highlighter-rouge">transferTo</code> calls between file channels and the records never re-enter the
+JVM heap. When that is not available it falls back to
+<code class="language-plaintext highlighter-rouge">mergeSpillsWithFileStream</code>.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">SortShuffleWriter</code> sorts objects.</strong> It is the general path, used whenever the
+other two are refused, and it is the only one that can do map-side aggregation,
+because combining values for a key requires the values as objects. It inserts
+records into an <code class="language-plaintext highlighter-rouge">ExternalSorter</code>, which spills sorted runs to disk under memory
+pressure and merges them at the end.</p>
+
+<p>Which structure the sorter fills depends on whether it is combining:</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aggregating (reduceByKey)     -&gt; PartitionedAppendOnlyMap
+not aggregating (partitionBy) -&gt; PartitionedPairBuffer
+</code></pre></div></div>
+
+<p>The map can update a key’s value in place, which is what map-side combine needs.
+The buffer only appends, which is cheaper when there is nothing to combine. Both
+are partition-aware, so the sort key is <code class="language-plaintext highlighter-rouge">(partition id, key)</code> rather than the key
+alone.</p>
+
+<p>The merge is where its cost lives. Every spilled run has to be deserialized to
+be merged and re-serialized on the way out, so the records make two extra trips
+through the serializer that neither other writer pays.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left"> </th>
+      <th style="text-align: left"><code class="language-plaintext highlighter-rouge">BypassMergeSort</code></th>
+      <th style="text-align: left"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></th>
+      <th style="text-align: left"><code class="language-plaintext highlighter-rouge">SortShuffleWriter</code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Sorts</td>
+      <td style="text-align: left">nothing</td>
+      <td style="text-align: left">serialized bytes</td>
+      <td style="text-align: left">objects</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Map-side combine</td>
+      <td style="text-align: left">no</td>
+      <td style="text-align: left">no</td>
+      <td style="text-align: left"><strong>yes</strong></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Open files per task</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">numPartitions</code></td>
+      <td style="text-align: left">a few</td>
+      <td style="text-align: left">a few</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Merge cost</td>
+      <td style="text-align: left">concatenation</td>
+      <td style="text-align: left">byte-level, often <code class="language-plaintext highlighter-rouge">transferTo</code></td>
+      <td style="text-align: left">deserialize and re-serialize</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Chosen when</td>
+      <td style="text-align: left">few partitions, no combine</td>
+      <td style="text-align: left">relocatable serializer, no combine</td>
+      <td style="text-align: left">everything else</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="what-does-spilling-actually-cost">What does spilling actually cost?</h2>
+
+<p>A sorter spills when it cannot get more execution memory. The records written so
+far are sorted, written to a temporary file, and the in-memory structure is
+emptied; at the end, the runs are merged. Spilling is not a failure, and a job
+that spills a little is usually fine. What it costs is worth measuring rather
+than guessing.</p>
+
+<p>Running a <code class="language-plaintext highlighter-rouge">reduceByKey</code> over 12,000,000 records with 6,000,000 distinct keys, in
+four map tasks with <code class="language-plaintext highlighter-rouge">spark.memory.fraction</code> cut to <code class="language-plaintext highlighter-rouge">0.1</code> to force the issue, the
+map stage reported:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Metric</th>
+      <th style="text-align: left">Bytes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code></td>
+      <td style="text-align: left">928,818,550</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">diskBytesSpilled</code></td>
+      <td style="text-align: left">91,436,113</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffleWriteBytes</code></td>
+      <td style="text-align: left">114,541,417</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">recordsWritten</code></td>
+      <td style="text-align: left">12,000,000</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>The two spill metrics differ by a factor of ten, and they are not measuring the
+same thing.</strong> <code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code> is the estimated size of the records as live
+JVM objects; <code class="language-plaintext highlighter-rouge">diskBytesSpilled</code> is what those records occupied once serialized
+and compressed, since <code class="language-plaintext highlighter-rouge">spark.shuffle.spill.compress</code> defaults to <code class="language-plaintext highlighter-rouge">true</code>. The gap
+between them is the cost of representing a <code class="language-plaintext highlighter-rouge">(Int, Long)</code> pair as boxed objects
+with headers and references rather than as sixteen bytes.</p>
+
+<p>Two practical consequences follow. A stage reporting hundreds of megabytes of
+memory spill has not necessarily written hundreds of megabytes to disk, so
+reading <code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code> as disk traffic overstates the I/O. And the ratio
+is a direct measure of how much your record representation is costing you, which
+is the strongest argument for pushing RDD work with rich object types into
+DataFrames, where the same data lives in <code class="language-plaintext highlighter-rouge">UnsafeRow</code> and never inflates like
+this.</p>
+
+<p>Note also that the shuffle wrote 12,000,000 records although <code class="language-plaintext highlighter-rouge">reduceByKey</code>
+performs map-side aggregation over 6,000,000 distinct keys. No combining
+happened, because each input partition held a contiguous range of <code class="language-plaintext highlighter-rouge">i</code> and every
+key within a partition was therefore distinct. Map-side combine reduces nothing
+when keys do not repeat <em>within a partition</em>, which is a useful reminder that its
+benefit depends on how the data was partitioned upstream, not on the global
+cardinality.</p>
+
+<h2 id="what-the-reduce-side-does">What does the reduce side actually do?</h2>
+
+<p>The write side gets most of the attention; the read side is where a reduce task
+spends its memory.</p>
+
+<p><strong>Locations come from the driver.</strong> <code class="language-plaintext highlighter-rouge">MapOutputTracker</code> is asked which blocks hold
+this partition and where they live. The answer includes sizes, which is what lets
+the reader skip empty blocks entirely rather than opening them.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">ShuffleBlockFetcherIterator</code> does the fetching</strong>, and it is deliberately not a
+simple loop. It separates local blocks, read straight from disk with no network
+involved, from remote ones, and it issues remote requests concurrently while
+bounding how much data is in flight at once. That bound is
+<code class="language-plaintext highlighter-rouge">spark.reducer.maxSizeInFlight</code>, default 48 MiB, and it exists because a reduce
+task fetching from a thousand executors would otherwise try to hold a thousand
+responses at once.</p>
+
+<p><strong>Then the records are combined or sorted, by two different mechanisms.</strong> This
+distinction is worth getting right, because both classes get called “the external
+map” loosely:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">What the query needs</th>
+      <th style="text-align: left">What runs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">aggregation (<code class="language-plaintext highlighter-rouge">reduceByKey</code>, <code class="language-plaintext highlighter-rouge">groupBy.agg</code>)</td>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">Aggregator</code> → <strong><code class="language-plaintext highlighter-rouge">ExternalAppendOnlyMap</code></strong></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">a key ordering (<code class="language-plaintext highlighter-rouge">sortByKey</code>)</td>
+      <td style="text-align: left"><strong><code class="language-plaintext highlighter-rouge">ExternalSorter</code></strong></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">neither</td>
+      <td style="text-align: left">the fetched iterator, untouched</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">ExternalAppendOnlyMap</code> is the read-side twin of the write-side structures: an
+in-memory map that spills to disk when execution memory runs out and merges the
+spills on read. If map-side combine already ran, the reader merges partial
+results with <code class="language-plaintext highlighter-rouge">combineCombinersByKey</code>; if it did not, it combines raw values with
+<code class="language-plaintext highlighter-rouge">combineValuesByKey</code>.</p>
+
+<p>The practical consequence: <strong>a reduce task can spill even when the map side did
+not.</strong> Aggregating a billion distinct keys builds a large map in the reduce task
+regardless of how tidily the map side wrote its output.</p>
+
+<h2 id="what-happens-when-a-fetch-fails">What happens when a fetch fails?</h2>
+
+<p>Reduce tasks fetch blocks over the network, and the failure handling is layered.</p>
+
+<p><strong>Transient network errors are retried inside the fetcher.</strong> The transport layer
+retries a failed fetch up to <code class="language-plaintext highlighter-rouge">spark.shuffle.io.maxRetries</code> times, which defaults
+to 3, waiting <code class="language-plaintext highlighter-rouge">spark.shuffle.io.retryWait</code> between attempts. The task never sees
+these; they are invisible in the UI except as time.</p>
+
+<p><strong>Corruption is detected and treated separately.</strong> With
+<code class="language-plaintext highlighter-rouge">spark.shuffle.detectCorrupt</code> on by default, a block that fails to decompress is
+retried, and the checksum file is what lets Spark distinguish a block corrupted
+in flight from one that was written wrong.</p>
+
+<p><strong>A missing block becomes a <code class="language-plaintext highlighter-rouge">FetchFailedException</code>,</strong> and this is the one that
+changes the shape of the job. The reduce task fails, the <code class="language-plaintext highlighter-rouge">DAGScheduler</code> marks the
+map output for that executor as lost, and it <strong>re-runs the map stage</strong> to
+regenerate the missing files before retrying the reduce stage. This is why losing
+one executor late in a long job can cost far more than the work that executor was
+doing: its map output went with it, and every shuffle that depended on it has to
+be partially recomputed.</p>
+
+<p>The string to grep for is <code class="language-plaintext highlighter-rouge">FetchFailedException</code>, and the line in the driver log
+that precedes the re-run names the executor and the shuffle id.</p>
+
+<h2 id="who-serves-the-files">Who serves the files when the executor is gone?</h2>
+
+<p>Shuffle files live on the local disk of the executor that wrote them, and they
+are served by that executor’s own process. That couples two things which have no
+business being coupled: <strong>the lifetime of a compute process and the availability
+of data other tasks still need.</strong></p>
+
+<p>It has two consequences. An executor that dies takes its map output with it, so
+the <code class="language-plaintext highlighter-rouge">FetchFailedException</code> path above re-runs the map stage. And an idle executor
+cannot be reclaimed, because something may still need to fetch from it.</p>
+
+<p><strong>The External Shuffle Service</strong> breaks the coupling. It is a separate long-lived
+process on each node, serving shuffle files from local disk independently of the
+executors that produced them. Turn it on with
+<code class="language-plaintext highlighter-rouge">spark.shuffle.service.enabled</code>, which defaults to <code class="language-plaintext highlighter-rouge">false</code>, and it listens on
+<code class="language-plaintext highlighter-rouge">spark.shuffle.service.port</code>, default <code class="language-plaintext highlighter-rouge">7337</code>. It is a cluster-level deployment
+decision, not something a single job enables: the service has to be running on
+the nodes.</p>
+
+<p>With it, an executor can exit while its shuffle output stays fetchable, which is
+what makes <strong>dynamic allocation</strong> safe. <code class="language-plaintext highlighter-rouge">spark.dynamicAllocation.enabled</code>
+defaults to <code class="language-plaintext highlighter-rouge">false</code>; when on, Spark adds executors under load and removes idle
+ones.</p>
+
+<p><strong>The part that is commonly out of date:</strong> dynamic allocation no longer strictly
+requires the shuffle service. <code class="language-plaintext highlighter-rouge">spark.dynamicAllocation.shuffleTracking.enabled</code>
+defaults to <strong><code class="language-plaintext highlighter-rouge">true</code></strong>, and it makes the driver track which executors hold shuffle
+data still referenced by an active job, keeping exactly those alive and releasing
+the rest. That is what allows dynamic allocation on Kubernetes, where running a
+node-level shuffle service is awkward.</p>
+
+<p>The trade between them is real. Shuffle tracking needs no extra infrastructure
+but keeps executors alive while their output is referenced, so reclamation is
+slower. The shuffle service reclaims aggressively but is another process to
+deploy, monitor and upgrade in lockstep.</p>
+
+<h2 id="which-numbers-actually-tell-you-something">Which numbers actually tell you something?</h2>
+
+<p>The stage detail page and the <code class="language-plaintext highlighter-rouge">TaskMetrics</code> behind it carry more than most people
+read. These are the ones that answer a question:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Metric</th>
+      <th style="text-align: left">What it tells you</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffleWriteMetrics.bytesWritten</code></td>
+      <td style="text-align: left">the real size of the boundary, after compression</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffleWriteMetrics.recordsWritten</code></td>
+      <td style="text-align: left">whether map-side combine did anything</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffleReadMetrics.recordsRead</code></td>
+      <td style="text-align: left">should match records written, across the whole stage</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code></td>
+      <td style="text-align: left">object-size pressure, not disk traffic</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">diskBytesSpilled</code></td>
+      <td style="text-align: left">actual extra bytes written and read back</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">shuffleReadMetrics.remoteBytesRead</code> vs <code class="language-plaintext highlighter-rouge">localBytesRead</code></td>
+      <td style="text-align: left">how much of the fetch avoided the network</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Compare records written to records read</strong> before anything else. They should
+agree for the whole shuffle, and the per-task distribution of records read is
+where skew shows up: a stage where the maximum task reads twenty times the median
+is skewed, and no amount of memory tuning will fix it. That belongs to
+<a href="/SparkDataSkew/">data skew</a> rather than here.</p>
+
+<p><strong>A large <code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code> with a small <code class="language-plaintext highlighter-rouge">diskBytesSpilled</code></strong> is the signature
+of expensive record types, as the arithmetic above shows.</p>
+
+<h2 id="what-aqe-changes">What does adaptive execution change about a shuffle?</h2>
+
+<p>Everything so far describes a shuffle that is going to happen. Adaptive query
+execution re-plans <em>after</em> the map side has written, using sizes it has measured
+rather than estimated, and three of its behaviours act directly on shuffles. All
+three are on by default.</p>
+
+<p><strong>Coalescing partitions.</strong> <code class="language-plaintext highlighter-rouge">spark.sql.adaptive.coalescePartitions.enabled</code> merges
+small post-shuffle partitions into fewer, larger reduce tasks, targeting
+<code class="language-plaintext highlighter-rouge">spark.sql.adaptive.advisoryPartitionSizeInBytes</code>, default <strong>64 MiB</strong>, and never
+going below <code class="language-plaintext highlighter-rouge">coalescePartitions.minPartitionSize</code>, default 1 MiB. This is why
+<code class="language-plaintext highlighter-rouge">spark.sql.shuffle.partitions</code> matters less than it used to: the configured number
+is what gets written, not what gets read. It shows in a plan as
+<code class="language-plaintext highlighter-rouge">AQEShuffleRead coalesced</code>.</p>
+
+<p><strong>Splitting skewed partitions.</strong> <code class="language-plaintext highlighter-rouge">spark.sql.adaptive.skewJoin.enabled</code> detects a
+partition that is both larger than
+<code class="language-plaintext highlighter-rouge">skewedPartitionThresholdInBytes</code>, default <strong>256 MiB</strong>, and more than
+<code class="language-plaintext highlighter-rouge">skewedPartitionFactor</code>, default <strong>5.0</strong>, times the median partition size. Both
+conditions must hold, which is why a skewed job with partitions under 256 MiB
+gets no help from it. The fix splits the oversized partition into sub-partitions
+and replicates the matching side.</p>
+
+<p><strong>Switching the join strategy.</strong> Once the real post-shuffle sizes are known, a
+sort-merge join whose build side turned out to be small can be replanned as a
+broadcast hash join, and <code class="language-plaintext highlighter-rouge">localShuffleReader.enabled</code> then lets it read shuffle
+blocks locally rather than re-fetching them across the network.</p>
+
+<p>The wider behaviour of AQE, including what it declines to touch, is in
+<a href="/SparkAQE/">adaptive query execution</a>.</p>
+
+<h2 id="how-to-avoid-the-shuffle">How do you avoid the shuffle entirely?</h2>
+
+<p>The fastest shuffle is the one that does not run. Three ways out, in order of how
+often they apply.</p>
+
+<p><strong>Broadcast the small side.</strong> A join whose smaller side fits in
+<code class="language-plaintext highlighter-rouge">spark.sql.autoBroadcastJoinThreshold</code>, default 10 MiB, is planned as a broadcast
+hash join with no shuffle on either side. This converts a wide dependency into a
+narrow one, and it is the single highest-value change available on a join.</p>
+
+<p><strong>Combine before the exchange.</strong> <code class="language-plaintext highlighter-rouge">reduceByKey</code> and <code class="language-plaintext highlighter-rouge">aggregateByKey</code> aggregate on
+the map side, so the shuffle carries one partial result per key per partition
+instead of every value. <code class="language-plaintext highlighter-rouge">groupByKey</code> carries everything. In DataFrame code the
+planner inserts the partial aggregate for you, which is one more reason to prefer
+it over RDD code.</p>
+
+<p><strong>Bucket the tables.</strong> Writing both sides bucketed on the join column by the same
+bucket count removes the exchange permanently, because matching rows are already
+co-located on disk. It is a decision about the table rather than the query, and
+changing the bucket count means rewriting the data.</p>
+
+<p>The measured plan evidence for all three is in
+<a href="/SparkPerformanceOptimization/">Spark performance tuning</a>.</p>
+
+<h2 id="what-should-you-actually-configure">What should you actually configure?</h2>
+
+<p>Most shuffle tuning is one number, and it is not a shuffle setting.</p>
+
+<p><strong>Partition count dominates everything.</strong> It decides which writer you get, how
+many files are produced, how big each partition is, and whether reduce tasks
+spill. For SQL, that is <code class="language-plaintext highlighter-rouge">spark.sql.shuffle.partitions</code> and, more usefully,
+whatever <a href="/SparkAQE/">adaptive query execution</a>
+coalesces it to at runtime. Aim for reduce partitions in the range of a hundred
+megabytes or so, and prefer letting AQE settle it over pinning a number.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">spark.shuffle.sort.bypassMergeThreshold</code></strong> is worth understanding before
+changing. Raising it pushes more shuffles onto the bypass path, which avoids
+sorting entirely but opens one file and one 32k buffer per partition per task.
+Raising it to 2000 on a job with 2000 partitions asks each map task for 2000 open
+files and around 62 MiB of buffers. The default of 200 is the point where that
+trade stops paying.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">spark.shuffle.file.buffer</code></strong> at 32k is the write buffer per output file.
+Raising it reduces syscalls on large shuffles, and multiplies by the open file
+count on the bypass path, which is the same trap as above seen from the other
+side.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">spark.reducer.maxSizeInFlight</code></strong> at 48m bounds how much fetched data a reduce
+task holds at once. Raising it can help a network-bound fetch and costs memory in
+every reduce task simultaneously.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">spark.memory.fraction</code></strong> at 0.6 and <strong><code class="language-plaintext highlighter-rouge">spark.memory.storageFraction</code></strong> at 0.5
+set the pool a sorter allocates from and how much of it caching may hold onto.
+Spilling is a symptom of this pool being too small for the partition, so raising
+the partition count and lowering what you cache are usually better first moves
+than raising the fraction. The arithmetic is in
+<a href="/SparkMemoryManagement/">Spark memory management</a>.</p>
+
+<p><strong>Leave the compression and checksum settings alone</strong> unless you are measuring
+them. <code class="language-plaintext highlighter-rouge">spark.shuffle.compress</code> and <code class="language-plaintext highlighter-rouge">spark.shuffle.spill.compress</code> both default to
+<code class="language-plaintext highlighter-rouge">true</code> and both earn it on any realistic record. The codec itself is
+<code class="language-plaintext highlighter-rouge">spark.io.compression.codec</code>, default <strong><code class="language-plaintext highlighter-rouge">lz4</code></strong>, shared with every other block
+Spark compresses. <code class="language-plaintext highlighter-rouge">zstd</code> trades CPU for a smaller footprint, which pays when the
+shuffle is network-bound and costs when it is CPU-bound.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">spark.shuffle.io.maxRetries</code></strong> at 3 and <strong><code class="language-plaintext highlighter-rouge">spark.shuffle.io.retryWait</code></strong> govern
+how hard a fetch tries before it becomes a <code class="language-plaintext highlighter-rouge">FetchFailedException</code> and a stage
+re-run. On a busy or flaky cluster, raising these converts expensive stage
+recomputation into cheap waiting.</p>
+
+<p>A summary of every knob named in this post, with what it actually controls:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Setting</th>
+      <th style="text-align: left">Default</th>
+      <th style="text-align: left">Controls</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.sort.bypassMergeThreshold</code></td>
+      <td style="text-align: left">200</td>
+      <td style="text-align: left">which writer, and open files per task</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.file.buffer</code></td>
+      <td style="text-align: left">32k</td>
+      <td style="text-align: left">write buffer per output file</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.reducer.maxSizeInFlight</code></td>
+      <td style="text-align: left">48m</td>
+      <td style="text-align: left">fetched data held per reduce task</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.compress</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left">compress shuffle output</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.spill.compress</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left">compress spilled runs</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.io.compression.codec</code></td>
+      <td style="text-align: left">lz4</td>
+      <td style="text-align: left">the codec both use</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.checksum.enabled</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left">per-partition checksums</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.memory.fraction</code></td>
+      <td style="text-align: left">0.6</td>
+      <td style="text-align: left">execution and storage pool size</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.memory.storageFraction</code></td>
+      <td style="text-align: left">0.5</td>
+      <td style="text-align: left">how much of it caching may hold</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.io.maxRetries</code></td>
+      <td style="text-align: left">3</td>
+      <td style="text-align: left">fetch attempts before failure</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.service.enabled</code></td>
+      <td style="text-align: left">false</td>
+      <td style="text-align: left">serve files outside the executor</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.dynamicAllocation.shuffleTracking.enabled</code></td>
+      <td style="text-align: left">true</td>
+      <td style="text-align: left">keep executors holding referenced output</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><code class="language-plaintext highlighter-rouge">spark.shuffle.push.enabled</code></td>
+      <td style="text-align: left">false</td>
+      <td style="text-align: left">push-based shuffle</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="symptoms-causes-and-fixes">Symptoms, causes and fixes</h2>
+
+<p><strong>Stage is slow and <code class="language-plaintext highlighter-rouge">diskBytesSpilled</code> is large.</strong> Reduce partitions are too big
+for the memory each task gets. Raise the partition count so each task holds less,
+before touching memory fractions.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">FetchFailedException</code>, then the previous stage runs again.</strong> An executor
+holding map output was lost, or the shuffle service could not serve it. Look for
+the executor’s own failure first; the fetch failure is a symptom, and an OOM or a
+container kill upstream is usually the cause.</p>
+
+<p><strong>Too many small files downstream, or a slow final write.</strong> The reduce partition
+count is too high for the volume. This is AQE’s coalescing problem and the reason
+to leave it enabled.</p>
+
+<p><strong>One task in the stage takes as long as the rest combined.</strong> Skew, not shuffle
+configuration. Check the per-task records read distribution.</p>
+
+<p><strong>Memory spill is enormous but the shuffle write is small.</strong> Record
+representation, as above. Move the work to DataFrames, or flatten the types so
+the auto-picked Kryo path applies.</p>
+
+<h2 id="why-hash-shuffle-lost">Why did hash shuffle lose, and what does push-based change?</h2>
+
+<p>Hash-based shuffle is gone, not deprecated: there is no <code class="language-plaintext highlighter-rouge">HashShuffleManager</code> in
+the tree, and <code class="language-plaintext highlighter-rouge">spark.shuffle.manager</code> accepts <code class="language-plaintext highlighter-rouge">sort</code> as its default. The reason
+is the file count. One file per map task per reduce partition means <code class="language-plaintext highlighter-rouge">M × R</code>
+files, and <code class="language-plaintext highlighter-rouge">M × R</code> open buffers during the write, which stops working at exactly
+the scale where Spark is interesting.</p>
+
+<p>There was an intermediate design worth knowing about, because it shows what the
+real constraint was. <strong>Consolidated hash shuffle</strong> had the tasks running
+concurrently on one executor share a set of files, called a file group: instead
+of every task creating its own <code class="language-plaintext highlighter-rouge">R</code> files, each core’s worth of concurrent tasks
+appended into the same <code class="language-plaintext highlighter-rouge">R</code> files. That cut the file count from <code class="language-plaintext highlighter-rouge">M × R</code> to roughly
+<code class="language-plaintext highlighter-rouge">cores × R</code>, which helped, and it did not solve the problem, because the count
+still scaled with the number of reduce partitions.</p>
+
+<p>Sort-based shuffle changed the exponent rather than the constant: one file per
+map task, with partitions as byte ranges inside it and an index to find them. A
+file count of <code class="language-plaintext highlighter-rouge">M</code>, whatever <code class="language-plaintext highlighter-rouge">R</code> is. That trade has never stopped being worth it.</p>
+
+<p><strong>Push-based shuffle</strong> is the current direction, not a replacement of the writer.
+With <code class="language-plaintext highlighter-rouge">spark.shuffle.push.enabled</code>, map tasks additionally push their blocks to
+remote shuffle services, which merge the fragments belonging to each reduce
+partition into larger, sequential files. The reduce side then reads a few large
+blocks instead of thousands of small ones. It needs a server-side
+<code class="language-plaintext highlighter-rouge">MergedShuffleFileManager</code> implementation configured through
+<code class="language-plaintext highlighter-rouge">spark.shuffle.push.server.mergedShuffleFileManagerImpl</code>, so it is a
+deployment-level feature rather than something to switch on in a local job.</p>
+
+<p>The pluggable layer underneath is worth knowing about: <code class="language-plaintext highlighter-rouge">spark.shuffle.sort.io.plugin.class</code>
+defaults to <code class="language-plaintext highlighter-rouge">LocalDiskShuffleDataIO</code>, and that interface is how remote shuffle
+services replace local disk entirely.</p>
+
+<h2 id="when-the-shuffle-is-not-your-problem">When is the shuffle not your problem?</h2>
+
+<p>Not every slow stage with a shuffle in it is a shuffle problem.</p>
+
+<p>If one task is slow and the rest are fast, that is skew, and the fix is in how
+keys distribute. If the stage reads far more data than it needs, the fix is
+pushdown and pruning at the scan, before a byte reaches the shuffle. If a join
+shuffles at all when one side is small, the real fix is a broadcast, which
+removes the shuffle rather than tuning it, and
+<a href="/SparkJoinsInDepth/">join strategy selection</a>
+decides that.</p>
+
+<p>And if your shuffle is small and the job is slow, the shuffle is not where the
+time went. Read the stage timeline before tuning anything.</p>
+
+<h2 id="common-misconceptions">Common misconceptions</h2>
+
+<p><strong>“Spark uses Java serialization by default, so RDD shuffles cannot use the fast
+writer.”</strong> The configured default is <code class="language-plaintext highlighter-rouge">JavaSerializer</code>, but <code class="language-plaintext highlighter-rouge">SerializerManager</code>
+auto-picks Kryo when both key and value are primitives, primitive arrays or
+<code class="language-plaintext highlighter-rouge">String</code>, and those shuffles do reach <code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code>.</p>
+
+<p><strong>“Setting <code class="language-plaintext highlighter-rouge">spark.serializer</code> to Kryo guarantees the serialized path.”</strong> It sets
+the fallback for types the auto-pick rejects. It does not help if the shuffle has
+map-side aggregation, and it does not apply where the auto-pick already chose.</p>
+
+<p><strong>“Sort-based shuffle sorts your data.”</strong> It sorts records by <em>partition id</em>, so
+the data file’s partitions are contiguous. Records inside a partition are not
+ordered by key unless a key ordering was requested.</p>
+
+<p><strong>“<code class="language-plaintext highlighter-rouge">memoryBytesSpilled</code> tells you how much was written to disk.”</strong> It is the
+in-memory object size of what spilled. The measured run above wrote about a tenth
+of it.</p>
+
+<p><strong>“More partitions always reduces spill.”</strong> It reduces the size of each reduce
+partition, which helps, but it also increases the number of blocks in the
+shuffle, and past the bypass threshold it changes which writer runs.</p>
+
+<h2 id="a-model-worth-keeping">A model worth keeping</h2>
+
+<p>A shuffle is a disk barrier between two stages. Map tasks each write one data
+file with the records sorted by partition id and an index of where each
+partition starts; reduce tasks look up locations from the map output tracker and
+fetch the byte ranges belonging to them.</p>
+
+<p>Which writer produced that file is decided once, at registration, from three
+properties of the dependency: whether there is map-side aggregation, how many
+partitions there are, and whether the serializer can relocate serialized records.
+The first two you control directly. The third is chosen for you from your record
+types, and it is the one worth checking when a shuffle costs more than it should.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://spark.apache.org/docs/latest/configuration.html#shuffle-behavior">Spark shuffle configuration</a> for every <code class="language-plaintext highlighter-rouge">spark.shuffle.*</code> setting and its default</li>
+  <li><a href="https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/shuffle/sort/SortShuffleManager.scala"><code class="language-plaintext highlighter-rouge">SortShuffleManager</code></a>, where <code class="language-plaintext highlighter-rouge">registerShuffle</code> makes the choice this post is about</li>
+  <li><a href="https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/serializer/SerializerManager.scala"><code class="language-plaintext highlighter-rouge">SerializerManager</code></a>, which auto-picks Kryo from the key and value class tags</li>
+  <li><a href="https://github.com/apache/spark/blob/master/core/src/main/java/org/apache/spark/shuffle/sort/UnsafeShuffleWriter.java"><code class="language-plaintext highlighter-rouge">UnsafeShuffleWriter</code></a> for the serialized sort and the <code class="language-plaintext highlighter-rouge">transferTo</code> merge</li>
+  <li><a href="/SparkMemoryManagement/">Spark memory management</a> for the execution pool a sorter spills against</li>
+  <li><a href="/SparkDataSkew/">Data skew in Apache Spark</a> for the failure mode that looks like a shuffle problem and is not</li>
+</ul>
+
+<h2 id="trademarks">Trademarks</h2>
+
+<p>Apache Spark, Apache and the Apache feather logo are either registered trademarks
+or trademarks of The Apache Software Foundation in the United States and other
+countries.</p>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/StructuredStreamingInternals/">
+          <span class="card--mini__date">Aug 8, 2026</span>
+          <span class="card--mini__title">Structured Streaming internals: the checkpoint, the state store, and what a restart cannot change</span>
+        </a><a class="card card--mini" href="/SparkPerformanceOptimization/">
+          <span class="card--mini__date">Aug 6, 2026</span>
+          <span class="card--mini__title">Spark performance tuning: seventeen techniques, and how to prove each one worked</span>
+        </a><a class="card card--mini" href="/SparkDataFusionComet/">
+          <span class="card--mini__date">Aug 2, 2026</span>
+          <span class="card--mini__title">Accelerating Spark queries with Apache DataFusion Comet</span>
+        </a><a class="card card--mini" href="/SparkIcebergPolaris/">
+          <span class="card--mini__date">Jul 31, 2026</span>
+          <span class="card--mini__title">Running Iceberg on Apache Polaris: one compose file, two storage backends</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/SparkDataFusionComet/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">Accelerating Spark queries with Apache DataFusion Comet</span>
+  </a>
+  <a class="post-nav__link post-nav__link--next" href="/SparkPerformanceOptimization/" rel="next">
+    <span class="post-nav__label">Next<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <span class="post-nav__title">Spark performance tuning: seventeen techniques, and how to prove each one worked</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Spark%20shuffle%20internals:%20the%20three%20writers,%20and%20which%20one%20your%20job%20gets&url=https://rangareddy.github.io/SparkShuffleInternals/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/SparkShuffleInternals/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/SparkShuffleInternals/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/DatalakeDockerDemos/" hidden>
+      <a href="/DatalakeDockerDemos/">Datalake Docker Demos</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergProductionGuide/" hidden>
+      <a href="/IcebergProductionGuide/">Iceberg In Production</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergHiveMigration/" hidden>
+      <a href="/IcebergHiveMigration/">Hive To Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergInteroperability/" hidden>
+      <a href="/IcebergInteroperability/">Lakehouse Interoperability</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCdcPipelines/" hidden>
+      <a href="/IcebergCdcPipelines/">CDC Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergTimeTravel/" hidden>
+      <a href="/IcebergTimeTravel/">Iceberg Time Travel</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCopyOnWriteMergeOnRead/" hidden>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">Copy-on-Write vs Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergStreamingIngestion/" hidden>
+      <a href="/IcebergStreamingIngestion/">Streaming Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergIngestion/" hidden>
+      <a href="/IcebergIngestion/">Iceberg Ingestion</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergPartitioning/" hidden>
+      <a href="/IcebergPartitioning/">Iceberg Partitioning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSchemaEvolution/" hidden>
+      <a href="/IcebergSchemaEvolution/">Iceberg Schema Evolution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergFormatVersions/" hidden>
+      <a href="/IcebergFormatVersions/">Iceberg Format Versions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCatalogs/" hidden>
+      <a href="/IcebergCatalogs/">Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergWritePath/" hidden>
+      <a href="/IcebergWritePath/">Iceberg Write Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergReadPath/" hidden>
+      <a href="/IcebergReadPath/">Iceberg Read Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergThreeTierArchitecture/" hidden>
+      <a href="/IcebergThreeTierArchitecture/">Iceberg Three Tiers</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergLocalPlayground/" hidden>
+      <a href="/IcebergLocalPlayground/">Iceberg Playground</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/WhyIcebergExists/" hidden>
+      <a href="/WhyIcebergExists/">Why Iceberg Exists</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/TableMaintenance/" hidden>
+      <a href="/TableMaintenance/">Table Maintenance</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/StructuredStreamingInternals/" hidden>
+      <a href="/StructuredStreamingInternals/">Structured Streaming</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkPerformanceOptimization/" hidden>
+      <a href="/SparkPerformanceOptimization/">Spark Performance Tuning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShuffleInternals/" hidden>
+      <a href="/SparkShuffleInternals/">Spark Shuffle Internals</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataFusionComet/" hidden>
+      <a href="/SparkDataFusionComet/">DataFusion Comet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergPolaris/" hidden>
+      <a href="/SparkIcebergPolaris/">Iceberg on Polaris</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Spark Submit for Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShufflePartitionGenerator/" hidden>
+      <a href="/SparkShufflePartitionGenerator/">Shuffle Partition Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkStreamingCustomLogging/" hidden>
+      <a href="/SparkStreamingCustomLogging/">Streaming Query Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Spark Release History</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Fixing Data Skew</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiMergeOnRead/" hidden>
+      <a href="/HudiMergeOnRead/">Hudi Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Inside Apache Spark Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIndexTypes/" hidden>
+      <a href="/HudiIndexTypes/">Hudi Index Types</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Latest posts</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/DatalakeDockerDemos/">
+        Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta
+        <time datetime="2026-09-19T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergProductionGuide/">
+        Running Iceberg in production: file sizes, object-storage paths, and the jobs you must schedule
+        <time datetime="2026-09-17T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergHiveMigration/">
+        Migrating Hive tables to Iceberg: snapshot first, migrate second
+        <time datetime="2026-09-15T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergInteroperability/">
+        One table, three formats: Iceberg, Delta and Hudi interoperability
+        <time datetime="2026-09-13T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCdcPipelines/">
+        CDC into Iceberg: the delete files nobody counted
+        <time datetime="2026-09-09T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergTimeTravel/">
+        Time travel and rollback in Iceberg: undoing a bad write in one statement
+        <time datetime="2026-09-07T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">
+        Copy-on-write or merge-on-read: choosing how an Iceberg table pays for a delete
+        <time datetime="2026-09-05T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/IcebergStreamingIngestion/">
+        Streaming into Iceberg: availableNow, checkpoints, and the snapshot count nobody watches
+        <time datetime="2026-09-03T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">19</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">21</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Hands-on notes, production troubleshooting and interactive tools for Apache Hudi, Iceberg, Spark, Kafka and the lakehouse stack underneath them.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>
