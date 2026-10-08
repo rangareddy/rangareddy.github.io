@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><title>Apache Iceberg 1.12.0: what&#39;s new, breaking changes, and upgrade guide · Ranga Reddy</title>
+  <meta name="description" content="Apache Iceberg 1.12.0 ships geospatial types, Hilbert clustering, Flink equality-delete conversion, and format v4 groundwork. It also removes Spark 3.4 and position deletes with row data. Here is what changed and how to plan the upgrade.">
+  <meta name="author" content="Ranga Reddy">
+  <link rel="canonical" href="https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/">
+  <meta name="google-site-verification" content="p3-xmuuDZGnVmE6SSwGmQ2JXJDhDsZPAh79ydnDlQA4">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:site_name" content="Ranga Reddy">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Apache Iceberg 1.12.0: what&#39;s new, breaking changes, and upgrade guide">
+  <meta property="og:description" content="Apache Iceberg 1.12.0 ships geospatial types, Hilbert clustering, Flink equality-delete conversion, and format v4 groundwork. It also removes Spark 3.4 and position deletes with row data. Here is what changed and how to plan the upgrade.">
+  <meta property="og:url" content="https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/">
+  <meta property="og:image" content="https://rangareddy.github.io/assets/images/covers/ApacheIceberg1120UpgradeGuide.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@avula_ranga">
+  <meta name="twitter:title" content="Apache Iceberg 1.12.0: what&#39;s new, breaking changes, and upgrade guide">
+  <meta name="twitter:description" content="Apache Iceberg 1.12.0 ships geospatial types, Hilbert clustering, Flink equality-delete conversion, and format v4 groundwork. It also removes Spark 3.4 and position deletes with row data. Here is what changed and how to plan the upgrade.">
+  <meta name="twitter:image" content="https://rangareddy.github.io/assets/images/covers/ApacheIceberg1120UpgradeGuide.svg">
+  <meta property="article:published_time" content="2026-10-07T10:00:00+05:30">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)"><link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16.png?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/images/icons/icon-48.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/icon-180.png?v=2">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+  <link rel="stylesheet" href="/css/main.css">
+
+  <link rel="alternate" type="application/atom+xml" title="Ranga Reddy"
+    href="https://rangareddy.github.io/feed.xml">
+
+  <script>
+    /* Apply the saved colour scheme before first paint so the page never flashes. */
+    (function () {
+      // Marks that JS is available. Rules that depend on site.js (relocating the
+      // kramdown table of contents, for one) are scoped to .js so a no-script
+      // visitor still gets the inline version.
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('theme');
+        var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Apache Iceberg 1.12.0: what's new, breaking changes, and upgrade guide",
+    "description": "Apache Iceberg 1.12.0 ships geospatial types, Hilbert clustering, Flink equality-delete conversion, and format v4 groundwork. It also removes Spark 3.4 and position deletes with row data. Here is what changed and how to plan the upgrade.",
+    "url": "https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/",
+    "datePublished": "2026-10-07T10:00:00+05:30",
+    "dateModified": "2026-10-07T10:00:00+05:30",
+    "inLanguage": "en",
+    "image": "https://rangareddy.github.io/assets/images/covers/ApacheIceberg1120UpgradeGuide.svg",
+    "keywords": "Iceberg, Lakehouse, Spark, Flink, KafkaConnect, Release, Upgrade",
+    "articleSection": "Iceberg",
+    "author": { "@type": "Person", "name": "Ranga Reddy" },
+    "publisher": { "@type": "Person", "name": "Ranga Reddy" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/" }
+  }
+  </script><script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Ranga Reddy", "item": "https://rangareddy.github.io/" },
+      { "@type": "ListItem", "position": 2, "name": "Iceberg", "item": "https://rangareddy.github.io/category/#iceberg" },
+      { "@type": "ListItem", "position": 3, "name": "Apache Iceberg 1.12.0: what's new, breaking changes, and upgrade guide", "item": "https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/" }
+    ]
+  }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+</head>
+
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="top">
+  <div class="shell site-header__inner">
+    <a href="/" class="brand">
+      <span class="brand__mark" aria-hidden="true">RR</span>
+      <span class="brand__text">
+        <span class="brand__name">Ranga Reddy</span>
+        <span class="brand__role">Senior Data Engineer/Architect</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" id="siteNav" aria-label="Main navigation">
+      <ul class="site-nav__list">
+        <li>
+          <a class="site-nav__link" href="/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a class="site-nav__link"
+             href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="icon-btn" href="/search/" title="Search posts" aria-label="Search posts">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Switch colour theme"
+              title="Switch between light and dark">
+        <span class="icon-btn__sun"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg></span>
+        <span class="icon-btn__moon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></span>
+      </button>
+      <button class="icon-btn icon-btn--menu" id="navToggle" type="button" aria-controls="siteNav"
+              aria-expanded="false" aria-label="Toggle navigation">
+        <span class="icon-btn__open"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+        <span class="icon-btn__close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+      </button>
+    </div>
+  </div>
+  <div class="read-progress" id="readProgress" aria-hidden="true"><span></span></div>
+</header>
+
+
+  <main id="main">
+    <div class="shell layout layout--with-rail">
+  <article class="layout__main">
+    <header class="post-head">
+      <a class="crumb" href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>All posts</a>
+      <img class="post-head__cover" src="/assets/images/covers/ApacheIceberg1120UpgradeGuide.svg"
+           alt="" width="1200" height="525" decoding="async" />
+      <h1 class="post-head__title">Apache Iceberg 1.12.0: what's new, breaking changes, and upgrade guide</h1>
+      <p class="post-head__lede">Apache Iceberg 1.12.0 ships geospatial types, Hilbert clustering, Flink equality-delete conversion, and format v4 groundwork. It also removes Spark 3.4 and position deletes with row data. Here is what changed and how to plan the upgrade.</p>
+      <div class="meta">
+  <span class="meta__item">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
+    <time datetime="2026-10-07T10:00:00+05:30">Oct 7, 2026</time>
+  </span><span class="meta__item"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>17 min read</span>
+  <span class="meta__item meta__views" data-views-for="/ApacheIceberg1120UpgradeGuide/" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span class="meta__views-n"></span>
+  </span>
+  <a class="chip chip--cat" href="/category/#iceberg">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h3.4l1.8 2.3h7.8a2 2 0 0 1 2 2v8.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>Iceberg
+  </a>
+</div>
+
+      
+<ul class="tag-list">
+  <li><a class="chip" href="/tag/#iceberg">#Iceberg</a></li>
+  <li><a class="chip" href="/tag/#lakehouse">#Lakehouse</a></li>
+  <li><a class="chip" href="/tag/#spark">#Spark</a></li>
+  <li><a class="chip" href="/tag/#flink">#Flink</a></li>
+  <li><a class="chip" href="/tag/#kafkaconnect">#KafkaConnect</a></li>
+  <li><a class="chip" href="/tag/#release">#Release</a></li>
+  <li><a class="chip" href="/tag/#upgrade">#Upgrade</a></li>
+</ul>
+
+    </header>
+
+    <div class="prose" id="postBody" itemscope itemtype="https://schema.org/BlogPosting">
+      <ul id="markdown-toc">
+  <li><a href="#1-whats-new-in-1120" id="markdown-toc-1-whats-new-in-1120">1. What’s new in 1.12.0</a>    <ul>
+      <li><a href="#11-geospatial-types-arrive" id="markdown-toc-11-geospatial-types-arrive">1.1 Geospatial types arrive</a></li>
+      <li><a href="#12-hilbert-clustering-alongside-z-order" id="markdown-toc-12-hilbert-clustering-alongside-z-order">1.2 Hilbert clustering alongside Z-order</a></li>
+      <li><a href="#13-flink-equality-deletes-become-deletion-vectors" id="markdown-toc-13-flink-equality-deletes-become-deletion-vectors">1.3 Flink: equality deletes become deletion vectors</a></li>
+      <li><a href="#14-format-v4-groundwork" id="markdown-toc-14-format-v4-groundwork">1.4 Format v4 groundwork</a></li>
+      <li><a href="#15-variant-v3-interoperability-and-encryption" id="markdown-toc-15-variant-v3-interoperability-and-encryption">1.5 Variant, v3 interoperability, and encryption</a></li>
+      <li><a href="#16-scan-planning-metrics-and-maintenance" id="markdown-toc-16-scan-planning-metrics-and-maintenance">1.6 Scan planning, metrics, and maintenance</a></li>
+      <li><a href="#17-kafka-connect-stops-hiding-failures" id="markdown-toc-17-kafka-connect-stops-hiding-failures">1.7 Kafka Connect stops hiding failures</a></li>
+      <li><a href="#18-rest-catalog-protocol-and-operational-changes" id="markdown-toc-18-rest-catalog-protocol-and-operational-changes">1.8 REST catalog: protocol and operational changes</a></li>
+      <li><a href="#19-security-and-supply-chain-work" id="markdown-toc-19-security-and-supply-chain-work">1.9 Security and supply-chain work</a></li>
+    </ul>
+  </li>
+  <li><a href="#2-apache-iceberg-1120-for-java-and-iceberg-rust-0110" id="markdown-toc-2-apache-iceberg-1120-for-java-and-iceberg-rust-0110">2. Apache Iceberg 1.12.0 for Java and Iceberg Rust 0.11.0</a></li>
+  <li><a href="#3-breaking-changes" id="markdown-toc-3-breaking-changes">3. Breaking changes</a>    <ul>
+      <li><a href="#31-spark-34-and-flink-20-support-removed" id="markdown-toc-31-spark-34-and-flink-20-support-removed">3.1 Spark 3.4 and Flink 2.0 support removed</a></li>
+      <li><a href="#32-position-deletes-with-row-data-pdwr-cannot-be-written" id="markdown-toc-32-position-deletes-with-row-data-pdwr-cannot-be-written">3.2 Position deletes with row data (PDWR) cannot be written</a></li>
+      <li><a href="#33-deprecated-methods-removed" id="markdown-toc-33-deprecated-methods-removed">3.3 Deprecated methods removed</a></li>
+      <li><a href="#34-old-s3-signer-classes-removed" id="markdown-toc-34-old-s3-signer-classes-removed">3.4 Old S3 signer classes removed</a></li>
+    </ul>
+  </li>
+  <li><a href="#4-migrating-from-111-to-112" id="markdown-toc-4-migrating-from-111-to-112">4. Migrating from 1.11 to 1.12</a>    <ul>
+      <li><a href="#41-pre-upgrade-inventory" id="markdown-toc-41-pre-upgrade-inventory">4.1 Pre-upgrade inventory</a></li>
+      <li><a href="#42-position-deletes-with-row-data-pdwr" id="markdown-toc-42-position-deletes-with-row-data-pdwr">4.2 Position deletes with row data (PDWR)</a></li>
+      <li><a href="#43-spark-34-and-flink-20-migration" id="markdown-toc-43-spark-34-and-flink-20-migration">4.3 Spark 3.4 and Flink 2.0 migration</a></li>
+      <li><a href="#44-deprecated-api-removals" id="markdown-toc-44-deprecated-api-removals">4.4 Deprecated API removals</a></li>
+      <li><a href="#45-testing-checklist" id="markdown-toc-45-testing-checklist">4.5 Testing checklist</a></li>
+    </ul>
+  </li>
+  <li><a href="#5-upgrade-sequence-in-one-page" id="markdown-toc-5-upgrade-sequence-in-one-page">5. Upgrade sequence in one page</a></li>
+  <li><a href="#6-quick-reference" id="markdown-toc-6-quick-reference">6. Quick reference</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#references" id="markdown-toc-references">References</a></li>
+  <li><a href="#trademarks" id="markdown-toc-trademarks">Trademarks</a></li>
+</ul>
+
+<blockquote>
+  <p><strong>TL;DR</strong></p>
+
+  <ul>
+    <li>Apache Iceberg 1.12.0 is a substantial release: 777 commits from 142 contributors.</li>
+    <li>Geospatial types (<code class="language-plaintext highlighter-rouge">geometry</code> and <code class="language-plaintext highlighter-rouge">geography</code>) arrive as first-class types, stored as WKB, with Spark 4.1 supporting them end to end.</li>
+    <li>Hilbert-curve clustering joins Z-order as a <code class="language-plaintext highlighter-rouge">rewrite_data_files</code> sort strategy; benchmark before adopting.</li>
+    <li>Flink gains a maintenance task that converts equality deletes to deletion vectors, cutting read cost for upsert pipelines.</li>
+    <li>Format version 4 plumbing is everywhere in the code, but V4 is not production-ready. Do not set <code class="language-plaintext highlighter-rouge">format-version=4</code> on real tables.</li>
+    <li><strong>Breaking:</strong> Spark 3.4 and Flink 2.0 support are removed; PDWR can no longer be written, and old S3 signer classes are gone.</li>
+    <li>Apache Iceberg 1.12.0 for Java and Iceberg Rust 0.11.0 are separate releases. Validate Rust encryption, Variant, v3 scans, and REST API changes independently.</li>
+    <li>Upgrade by table behavior, not by dependency file. The PDWR and Spark 3.4 changes need a plan before you bump.</li>
+  </ul>
+</blockquote>
+
+<h2 id="1-whats-new-in-1120">1. What’s new in 1.12.0</h2>
+
+<h3 id="11-geospatial-types-arrive">1.1 Geospatial types arrive</h3>
+
+<p><img src="/assets/images/iceberg-112/geospatial-types.svg" alt="Geospatial types" /></p>
+
+<p>Iceberg now has first-class <code class="language-plaintext highlighter-rouge">geometry</code> and <code class="language-plaintext highlighter-rouge">geography</code> types, stored as WKB (Well-Known Binary). Both Avro and Parquet support reading and writing them with self-describing logical types. Spark 4.1 supports them end to end, including row-level <code class="language-plaintext highlighter-rouge">DELETE</code>, <code class="language-plaintext highlighter-rouge">UPDATE</code>, and <code class="language-plaintext highlighter-rouge">MERGE</code>.</p>
+
+<p>Until now, spatial data in Iceberg meant a binary or string column plus a convention your team had to remember. Native types let engines and catalogs know what the column actually holds. This is a meaningful step for teams working with location data, mapping, or any spatial analytics workload.</p>
+
+<p><strong>Behavior change to watch:</strong> <code class="language-plaintext highlighter-rouge">GeometryType</code> and <code class="language-plaintext highlighter-rouge">GeographyType</code> now include the resolved CRS (Coordinate Reference System) and edge algorithm in their <code class="language-plaintext highlighter-rouge">toString()</code> output. A plain geometry now prints as <code class="language-plaintext highlighter-rouge">geometry(OGC:CRS84)</code>, and geography prints as <code class="language-plaintext highlighter-rouge">geography(OGC:CRS84, spherical)</code>. If you have tests or tooling that compare type strings, they may need updating. The community decided to keep this change because equal types printing differently looked like a bug, and function definition IDs built from parameter type strings would otherwise treat them as different overloads.</p>
+
+<h3 id="12-hilbert-clustering-alongside-z-order">1.2 Hilbert clustering alongside Z-order</h3>
+
+<p><img src="/assets/images/iceberg-112/hilbert-vs-zorder.svg" alt="Hilbert vs Z-order" /></p>
+
+<p><code class="language-plaintext highlighter-rouge">rewrite_data_files</code> gains a second space-filling curve. Z-order is still there, and now you can also cluster on a Hilbert curve. Hilbert curves usually keep nearby values closer together than Z-order does, which can mean tighter file-level min/max statistics when you filter on several columns at once.</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Existing: Z-order clustering</span>
+<span class="k">CALL</span> <span class="n">my_catalog</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span>
+  <span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.events'</span><span class="p">,</span>
+  <span class="n">strategy</span> <span class="o">=&gt;</span> <span class="s1">'sort'</span><span class="p">,</span>
+  <span class="n">sort_order</span> <span class="o">=&gt;</span> <span class="s1">'zorder(device_id, event_ts)'</span>
+<span class="p">);</span>
+
+<span class="c1">-- New in 1.12: Hilbert curve clustering</span>
+<span class="k">CALL</span> <span class="n">my_catalog</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span>
+  <span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.events'</span><span class="p">,</span>
+  <span class="n">strategy</span> <span class="o">=&gt;</span> <span class="s1">'sort'</span><span class="p">,</span>
+  <span class="n">sort_order</span> <span class="o">=&gt;</span> <span class="s1">'hilbert(device_id, event_ts)'</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<p>Important details:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">hilbert()</code> has no options of its own. Each column contributes its full 8-byte primitive width to the index, so Z-order knobs like <code class="language-plaintext highlighter-rouge">var-length-contribution</code> and <code class="language-plaintext highlighter-rouge">max-output-size</code> do not apply.</li>
+  <li>You <strong>cannot</strong> combine <code class="language-plaintext highlighter-rouge">hilbert()</code> with <code class="language-plaintext highlighter-rouge">zorder()</code> in the same sort order.</li>
+  <li>Do not assume Hilbert always wins. Benchmark it on your real query patterns before switching.</li>
+</ul>
+
+<h3 id="13-flink-equality-deletes-become-deletion-vectors">1.3 Flink: equality deletes become deletion vectors</h3>
+
+<p><img src="/assets/images/iceberg-112/flink-delete-conversion.svg" alt="Flink deletion vectors" /></p>
+
+<p>This may be the most useful change for streaming teams. Flink upsert pipelines typically write equality deletes, which are cheap to write but expensive to read because every reader must join them against data files. The new <code class="language-plaintext highlighter-rouge">ConvertEqualityDeletes</code> maintenance task turns those into row-position deletion vectors (DVs), which readers can apply cheaply.</p>
+
+<p><strong>How it works:</strong> the Flink <code class="language-plaintext highlighter-rouge">IcebergSink</code> writes data files and equality deletes to a staging branch. The converter then resolves the deletes and commits the data files plus DVs to the target branch (usually <code class="language-plaintext highlighter-rouge">main</code>).</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Flink TableMaintenance, Iceberg 1.12</span>
+<span class="o">.</span><span class="na">add</span><span class="o">(</span><span class="nc">ConvertEqualityDeletes</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>
+    <span class="o">.</span><span class="na">stagingBranch</span><span class="o">(</span><span class="s">"staging"</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">equalityFieldColumns</span><span class="o">(</span><span class="nc">ImmutableList</span><span class="o">.</span><span class="na">of</span><span class="o">(</span><span class="s">"id"</span><span class="o">))</span>
+    <span class="o">.</span><span class="na">scheduleOnEqDeleteFileCount</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">parallelism</span><span class="o">(</span><span class="mi">4</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>Requirements and caveats:</p>
+
+<ul>
+  <li>Requires table format version 3 or higher.</li>
+  <li>Does <strong>not</strong> support row lineage yet.</li>
+  <li><code class="language-plaintext highlighter-rouge">equalityFieldColumns</code> must match the columns your writer uses.</li>
+  <li>The task keeps a primary-key index in Flink state; RocksDB is recommended.</li>
+  <li>Avoid running other continuous writers against the target branch, or conversion cycles can keep losing the commit race.</li>
+</ul>
+
+<h3 id="14-format-v4-groundwork">1.4 Format v4 groundwork</h3>
+
+<p><img src="/assets/images/iceberg-112/format-versions.svg" alt="Format versions" /></p>
+
+<p>Iceberg 1.12 contains a lot of code labeled v4, but <strong>format version 4 is not ready for production tables</strong>. This is implementation groundwork that shows where the format is heading.</p>
+
+<p>What is present in the code:</p>
+
+<ul>
+  <li>Relative paths in the evolving specification, and utilities for converting absolute locations to relative ones. This can make table metadata less tied to one bucket or storage prefix.</li>
+  <li>Parquet or Avro manifests (instead of Avro-only), which can bring richer types and reader tooling to manifest data.</li>
+  <li>Content-statistics structures and filters, carrying structured index and average-size information alongside tracked files.</li>
+  <li>Tracked-file builders and adapters, plus a v4 manifest reader.</li>
+  <li>A draft Mumbling Bitmap specification and a read-only implementation.</li>
+  <li><code class="language-plaintext highlighter-rouge">EntryStatus.MODIFIED</code> and <code class="language-plaintext highlighter-rouge">TrackingBuilder</code> status derivation, expressing changes that do not fit the older added/existing/deleted model cleanly.</li>
+</ul>
+
+<p>What you should not do:</p>
+
+<ul>
+  <li>Do not set <code class="language-plaintext highlighter-rouge">format-version=4</code> on production tables.</li>
+  <li>Do not build application code that parses V4 structures.</li>
+  <li>Do not build a roadmap around draft field names.</li>
+</ul>
+
+<p>The useful action today is to keep table movement and metadata assumptions out of application code, and follow the specification through later releases.</p>
+
+<h3 id="15-variant-v3-interoperability-and-encryption">1.5 Variant, v3 interoperability, and encryption</h3>
+
+<p>Iceberg 1.12 fills in several engine paths for v3 features. Spark adds vectorized Parquet reads for Variant; Flink, Kafka Connect, and generic record writers gain Variant shredding paths. Java also strengthens v3 support for geometry and geography, row lineage, deletion vectors, and encrypted metadata. These features are useful only when every client that touches a table can interpret them. A table opening successfully is not proof that each engine supports every feature in it.</p>
+
+<p>Before enabling a v3 feature, test the actual writer-reader combinations in your stack. Include schema evolution, nulls, decimal edge cases, and failure recovery. Keep the table format upgrade separate from the library upgrade so a compatibility failure has a clear cause.</p>
+
+<h3 id="16-scan-planning-metrics-and-maintenance">1.6 Scan planning, metrics, and maintenance</h3>
+
+<p>The less visible changes in 1.12 may save more time than the headline features.</p>
+
+<ul>
+  <li><strong>Partition-statistics scans</strong> can now project columns and apply filters, reducing the amount of metadata an optimizer must read.</li>
+  <li><strong>Snapshot expiration</strong> correctly reads delete manifests in cases that previously went wrong.</li>
+  <li>A <strong>scan-based action</strong> removes dangling delete files.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">RESTMetricsReporter.report()</code></strong> no longer blocks the calling thread, so emitting metrics cannot stall the work they describe. Still monitor queue size, delivery failures, and dropped reports.</li>
+  <li><strong>Adaptive split-sizing options</strong> are documented, making it easier to balance planning overhead against parallelism.</li>
+</ul>
+
+<p>Reader and file-format fixes cover Arrow integer-to-long promotion, dictionary-encoded INT96 timestamps with offsets, large decimals, decimal default values, end-of-file handling in object-store streams, Parquet row-group size tracking, and faster decimal handling that avoids unnecessary <code class="language-plaintext highlighter-rouge">BigInteger</code> conversions.</p>
+
+<h3 id="17-kafka-connect-stops-hiding-failures">1.7 Kafka Connect stops hiding failures</h3>
+
+<p>Kafka Connect’s most important change is simple: <strong>commit failures are surfaced instead of silently swallowed</strong>.</p>
+
+<ul>
+  <li>Adds a metric for partial commit failures.</li>
+  <li>Bounded retries for transient commit exceptions.</li>
+  <li>Fixes rebalance scenarios that could commit files from a prior attempt.</li>
+  <li>Tracks control-topic offsets as a high-water mark.</li>
+</ul>
+
+<p>Schema and conversion fixes cover null-valued records after a schema change, UUID conversion from Avro, decimal inference, MongoDB timestamp and date arrays, and Variant shredding. Removed deprecated members in <code class="language-plaintext highlighter-rouge">TableReference</code> and <code class="language-plaintext highlighter-rouge">IcebergWriterResult</code> may affect custom transforms or extensions at compile time.</p>
+
+<h3 id="18-rest-catalog-protocol-and-operational-changes">1.8 REST catalog: protocol and operational changes</h3>
+
+<p>Iceberg 1.12 expands the REST catalog contract. The OpenAPI model adds table-unregister and function list/load endpoints, Variant types, catalog object identifiers, labels, and remote-signing configuration. Path segments now use RFC 3986 percent-encoding, fixing interoperability for namespaces and object names with reserved characters. Spark can delegate <code class="language-plaintext highlighter-rouge">DROP TABLE PURGE</code> to the REST catalog so the server can enforce storage-deletion policy.</p>
+
+<p>The changes affect both compatibility and operations:</p>
+
+<ul>
+  <li><strong>Check capability negotiation.</strong> Confirm that the deployed catalog server and any proxy implement the endpoints and request/response shapes your Java or Rust client needs. Do not infer support from a product name or version string alone.</li>
+  <li><strong>Test names end to end.</strong> Exercise reserved characters through client, proxy, and server. Inconsistent decoding can address the wrong object or make it unreachable.</li>
+  <li><strong>Review authorization.</strong> Test permissions for unregister, function metadata operations, remote signing, and purge delegation.</li>
+  <li><strong>Define deletion ownership.</strong> Unregister removes the catalog registration but leaves files behind; purge requests file deletion. Record the table metadata location and recovery procedure before either operation.</li>
+  <li><strong>Drill purge failures.</strong> Verify behavior when storage deletion is denied, partially succeeds, or times out. Establish whether the table remains registered, whether cleanup can be retried, and where the action is audited.</li>
+  <li><strong>Check authentication refresh.</strong> Exercise OAuth token refresh, SigV4/assumed-role signing, and retries against the actual catalog implementation.</li>
+</ul>
+
+<p>Test Java 1.12.0 and Rust 0.11.0 clients against the same catalog where both are deployed. Their independent release versions do not guarantee identical REST feature support.</p>
+
+<h3 id="19-security-and-supply-chain-work">1.9 Security and supply-chain work</h3>
+
+<ul>
+  <li>The project published an <strong>Iceberg security model</strong> describing trust boundaries across catalogs, clients, storage, credentials, and metadata.</li>
+  <li>CI now makes <strong>vulnerability scanning blocking</strong> on relevant pull requests.</li>
+  <li>Jackson versions were aligned and updated to address reported vulnerabilities.</li>
+  <li><strong>OAuth token refresh</strong> keeps optional parameters during non-exchange refreshes.</li>
+  <li><strong>AWS REST signing</strong> can use assumed-role credentials.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">RemoteSigningConfig</code></strong> implements the formalized remote signing spec, and old S3 signer classes are removed.</li>
+</ul>
+
+<p>A library upgrade does not secure an Iceberg deployment by itself. Use the security model to review who can alter catalog metadata, who can request temporary storage credentials, who can delete files, where tokens are cached, and how audit events connect catalog actions to object-store actions.</p>
+
+<h2 id="2-apache-iceberg-1120-for-java-and-iceberg-rust-0110">2. Apache Iceberg 1.12.0 for Java and Iceberg Rust 0.11.0</h2>
+
+<p>These are companion releases in the Iceberg ecosystem, not matching version numbers for the same library. Java Iceberg 1.12.0 and Iceberg Rust 0.11.0 have independent release artifacts, APIs, and feature coverage. Upgrade the implementations separately, then validate their interaction wherever they share a catalog or table. The linked release coverage highlights end-to-end table encryption, stronger v3 reads, Variant support, row-lineage metadata, and REST catalog changes. For teams with Rust readers or writers, these can close important cross-engine gaps, but validate the final release artifacts and changelog before adopting them.</p>
+
+<p>The Rust changes to review include:</p>
+
+<ul>
+  <li><strong>Encryption:</strong> Rust reads and writes encrypted data, manifests, manifest lists, and Puffin files, with AES-256 support and a KMS factory integration. Test encrypted files written by Rust with Java readers, and vice versa, including key rotation and missing-key failures.</li>
+  <li><strong>V3 scans:</strong> Rust adds deletion-vector decoding/application, Variant support, row-lineage metadata columns, and additional metadata columns. Test tables containing each feature with your actual catalog, storage, and other engines.</li>
+  <li><strong>REST authentication:</strong> the <code class="language-plaintext highlighter-rouge">AuthManager</code> / <code class="language-plaintext highlighter-rouge">AuthSession</code> API changes authentication setup. Review OAuth2 and SigV4 configuration and confirm the client respects endpoints advertised by <code class="language-plaintext highlighter-rouge">GET /v1/config</code>.</li>
+  <li><strong>API and behavior changes:</strong> review lazy table-property parsing, validated <code class="language-plaintext highlighter-rouge">FileScanTask</code> construction, <code class="language-plaintext highlighter-rouge">write.metadata.path</code>, and the GCS host property change. Rebuild downstream Rust applications and integration crates.</li>
+  <li><strong>DataFusion:</strong> check the DataFusion version line required by the selected Rust release and track the integration’s separate release lifecycle.</li>
+</ul>
+
+<p>The key upgrade rule is cross-engine testing. A file accepted by the Rust writer must also be readable by every Java, Spark, Flink, and query-engine client that shares the table. Test both directions before enabling new table features in production.</p>
+
+<h2 id="3-breaking-changes">3. Breaking changes</h2>
+
+<p>This is the section to share with whoever owns your Spark and Flink jobs. Several removals land in 1.12.0, and they break code, not just deprecate it.</p>
+
+<p><img src="/assets/images/iceberg-112/breaking-changes.svg" alt="Breaking changes" /></p>
+
+<h3 id="31-spark-34-and-flink-20-support-removed">3.1 Spark 3.4 and Flink 2.0 support removed</h3>
+
+<p>PR #14122 removes the Spark 3.4 runtime entirely. The 1.12.0 Java artifacts support Spark 3.5, 4.0, and 4.1, with version bumps to Spark 3.5.9, 4.0.4, and 4.1.3. Spark 4.2 is excluded from the source and binary artifacts, even though its module is present on the project main branch.</p>
+
+<p>Flink 2.0 support is also removed. Iceberg 1.12 adds Flink 2.2 and 2.3 while retaining Flink 1.20 and 2.1. Inventory both batch and streaming jobs, then test the exact Flink/Iceberg pair. For stateful jobs, include savepoint restore, checkpoint recovery, serializers, and commit behavior—not only compilation.</p>
+
+<h3 id="32-position-deletes-with-row-data-pdwr-cannot-be-written">3.2 Position deletes with row data (PDWR) cannot be written</h3>
+
+<p>PR #17706 removes the feature the community deprecated in 1.11. The <code class="language-plaintext highlighter-rouge">rewrite_position_delete_files</code> and <code class="language-plaintext highlighter-rouge">rewrite_table_path</code> actions now <strong>fail with an explicit exception</strong> on files that still carry row data.</p>
+
+<p>This was a deliberate community decision. At the August 26 sync, the group agreed that table owners should make explicit decisions about existing PDWR rather than having maintenance actions silently drop the row column.</p>
+
+<h3 id="33-deprecated-methods-removed">3.3 Deprecated methods removed</h3>
+
+<ul>
+  <li>Deprecated <code class="language-plaintext highlighter-rouge">SparkTableUtil</code> methods in Spark 4.0 and 4.1 are removed.</li>
+  <li><code class="language-plaintext highlighter-rouge">SparkFilters</code> is deprecated in favor of <code class="language-plaintext highlighter-rouge">SparkV2Filters</code>.</li>
+</ul>
+
+<h3 id="34-old-s3-signer-classes-removed">3.4 Old S3 signer classes removed</h3>
+
+<p>PR #17627 drops deprecated AWS signer classes and properties. The new <code class="language-plaintext highlighter-rouge">RemoteSigningConfig</code> implementation follows the formalized remote signing spec.</p>
+
+<h2 id="4-migrating-from-111-to-112">4. Migrating from 1.11 to 1.12</h2>
+
+<p>Upgrade by <strong>table behavior</strong>, not by dependency file. The following sequence catches the failures most likely to escape a basic smoke test.</p>
+
+<h3 id="41-pre-upgrade-inventory">4.1 Pre-upgrade inventory</h3>
+
+<p>Build an engine and feature inventory before touching anything:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Item</th>
+      <th style="text-align: left">What to record</th>
+      <th> </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Engine clients</td>
+      <td>Every Spark, Flink, Kafka Connect, Python, Rust, query-engine, and maintenance client that touches each catalog</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Runtime versions</td>
+      <td>Spark, Flink, and other engine versions in use; flag Spark 3.4 and Flink 2.0</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Iceberg library versions</td>
+      <td>Current version on each client; track Java and Rust release tracks independently</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Client feature support</td>
+      <td>Which readers/writers support Variant, deletion vectors, row lineage, geo types, and encryption</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Catalog client</td>
+      <td>REST, Hive, Glue, JDBC, Nessie, or other</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Authentication method</td>
+      <td>OAuth2, SigV4, assumed-role, or other</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">REST catalog behavior</td>
+      <td>Supported endpoints, path encoding, unregister/purge semantics, and server/client versions</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">File I/O implementation</td>
+      <td>S3, GCS, ADLS, HDFS, or other</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Table format versions</td>
+      <td>V1, V2, V3 for each table</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"> </td>
+      <td style="text-align: left">Delete-file strategies</td>
+      <td>Copy-on-write vs merge-on-read; position vs equality deletes</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>This inventory tells you which breaking changes affect you and which do not.</p>
+
+<h3 id="42-position-deletes-with-row-data-pdwr">4.2 Position deletes with row data (PDWR)</h3>
+
+<p>If you still run V2 tables with position deletes that include row data, your maintenance jobs will start failing after the upgrade. You have two ways out.</p>
+
+<p><strong>Option A: upgrade to V3 and rewrite as deletion vectors.</strong></p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Upgrade table format version</span>
+<span class="k">ALTER</span> <span class="k">TABLE</span> <span class="n">prod</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">trips</span> <span class="k">SET</span> <span class="n">TBLPROPERTIES</span> <span class="p">(</span><span class="s1">'format-version'</span> <span class="o">=</span> <span class="s1">'3'</span><span class="p">);</span>
+
+<span class="c1">-- Then rewrite position delete files (now allowed on V3)</span>
+<span class="k">CALL</span> <span class="n">prod</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_position_delete_files</span><span class="p">(</span><span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.trips'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p><strong>Option B: stay on V2 and let data compaction fold those deletes into data files.</strong></p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Run data compaction to rewrite position deletes into data files</span>
+<span class="k">CALL</span> <span class="n">prod</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span>
+  <span class="k">table</span> <span class="o">=&gt;</span> <span class="s1">'db.trips'</span><span class="p">,</span>
+  <span class="n">strategy</span> <span class="o">=&gt;</span> <span class="s1">'sort'</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<p>Pick one before you upgrade, not after the first failed job.</p>
+
+<p><strong>How to find affected tables:</strong></p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">-- Query position deletes across tables to find PDWR</span>
+<span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">prod</span><span class="p">.</span><span class="n">db</span><span class="p">.</span><span class="n">trips</span><span class="p">.</span><span class="n">position_deletes</span> <span class="k">LIMIT</span> <span class="mi">10</span><span class="p">;</span>
+<span class="c1">-- If the row column is populated, this table has PDWR</span>
+</code></pre></div></div>
+
+<h3 id="43-spark-34-and-flink-20-migration">4.3 Spark 3.4 and Flink 2.0 migration</h3>
+
+<p>If any job runs Spark 3.4 or Flink 2.0, move it to a supported runtime before upgrading that integration to Iceberg 1.12.0. For Flink, the supported lines are 1.20, 2.1, 2.2, and 2.3.</p>
+
+<p>Recommended path:</p>
+
+<ol>
+  <li>Upgrade Spark 3.4 jobs to Spark 3.5.x first (3.5.9 is the 1.12.0 baseline). Upgrade Flink 2.0 jobs to a supported Flink line.</li>
+  <li>Run engine and state-recovery tests on the new runtime.</li>
+  <li>Then upgrade the Iceberg integration to 1.12.0.</li>
+</ol>
+
+<p>Spark 4.2 users should stay on Iceberg 1.11.x until a later Iceberg release adds official 4.2 artifacts. Do not treat Flink 2.0 as supported by substituting a neighboring runtime artifact.</p>
+
+<h3 id="44-deprecated-api-removals">4.4 Deprecated API removals</h3>
+
+<p>Search your codebase for:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">SparkTableUtil</code> method calls (in Spark 4.0/4.1 projects)</li>
+  <li><code class="language-plaintext highlighter-rouge">SparkFilters</code> usage (replace with <code class="language-plaintext highlighter-rouge">SparkV2Filters</code>)</li>
+  <li>Any code referencing removed S3 signer classes or properties</li>
+</ul>
+
+<p>These fail at compile time, not runtime, so a full build catches them.</p>
+
+<h3 id="45-testing-checklist">4.5 Testing checklist</h3>
+
+<p>After upgrading in staging, run these targeted tests:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Test area</th>
+      <th style="text-align: left">Why it matters</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Arrow integer-to-long promotion</td>
+      <td style="text-align: left">Fixed in 1.12; verify with affected types</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Dictionary-encoded INT96 timestamps with offsets</td>
+      <td style="text-align: left">Fixed in 1.12</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Large decimals</td>
+      <td style="text-align: left">Fixed in 1.12</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Decimal default values</td>
+      <td style="text-align: left">Fixed in 1.12</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">End-of-file handling in object-store streams</td>
+      <td style="text-align: left">Fixed in 1.12</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Parquet row-group size tracking</td>
+      <td style="text-align: left">Fixed in 1.12</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Kafka Connect commit failures</td>
+      <td style="text-align: left">Force a catalog commit failure and confirm it is reported</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Kafka Connect rebalance</td>
+      <td style="text-align: left">Trigger a task rebalance during a pending commit</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Kafka Connect restart</td>
+      <td style="text-align: left">Restart from a known control-topic offset</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Geospatial types (if used)</td>
+      <td style="text-align: left">Verify <code class="language-plaintext highlighter-rouge">toString()</code> behavior change does not break tests</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>For Rust clients, compile against the target release and test REST authentication, metadata paths, GCS configuration, encrypted file interoperability, and v3 scans. For every shared table, verify that each active client can read all features written by the others.</p>
+
+<p>For Kafka Connect specifically, the release notes recommend three forced-failure drills: make a catalog commit fail, trigger a task rebalance during a pending commit, and restart from a known control-topic offset. Confirm the connector reports the failure, avoids duplicate table data, and resumes from the expected point.</p>
+
+<h2 id="5-upgrade-sequence-in-one-page">5. Upgrade sequence in one page</h2>
+
+<p>The order that catches the failures most likely to escape a smoke test:</p>
+
+<ol>
+  <li><strong>Build an engine and feature inventory.</strong> List every Spark, Flink, Kafka Connect, Python, Rust, query-engine, and maintenance client that touches each catalog. Record its runtime version, Iceberg library version, catalog client, authentication method, and file I/O implementation.</li>
+  <li><strong>Inventory table format versions and delete-file strategies.</strong> Any V2 table writing PDWR needs a plan before upgrade.</li>
+  <li><strong>Test the specific changes that matter to your tables.</strong> Arrow integer-to-long promotion, dictionary-encoded INT96 timestamps with offsets, large decimals, decimal default values, end-of-file handling in object-store streams, Parquet row-group size tracking.</li>
+  <li><strong>Force failure drills on Kafka Connect.</strong> Make a catalog commit fail, trigger a task rebalance during a pending commit, restart from a known control-topic offset. Confirm the connector reports the failure, avoids duplicate table data, and resumes from the expected point.</li>
+</ol>
+
+<h2 id="6-quick-reference">6. Quick reference</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Feature</th>
+      <th style="text-align: left">Status in 1.12.0</th>
+      <th style="text-align: left">Action required</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left">Geospatial types</td>
+      <td style="text-align: left">Available</td>
+      <td style="text-align: left">None unless using spatial data</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Hilbert clustering</td>
+      <td style="text-align: left">Available</td>
+      <td style="text-align: left">Benchmark before adopting</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Flink equality-delete conversion</td>
+      <td style="text-align: left">Available</td>
+      <td style="text-align: left">Requires V3 table; read docs first</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Format V4</td>
+      <td style="text-align: left">Not production-ready</td>
+      <td style="text-align: left">Do not use <code class="language-plaintext highlighter-rouge">format-version=4</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">PDWR</td>
+      <td style="text-align: left">Removed</td>
+      <td style="text-align: left">Migrate V2 tables or compact</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Spark 3.4</td>
+      <td style="text-align: left">Removed</td>
+      <td style="text-align: left">Upgrade to Spark 3.5+</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Flink 2.0</td>
+      <td style="text-align: left">Removed</td>
+      <td style="text-align: left">Upgrade to Flink 1.20, 2.1, 2.2, or 2.3</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Spark 4.2</td>
+      <td style="text-align: left">Excluded from release</td>
+      <td style="text-align: left">Stay on Iceberg 1.11.x</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Old S3 signers</td>
+      <td style="text-align: left">Removed</td>
+      <td style="text-align: left">Update to <code class="language-plaintext highlighter-rouge">RemoteSigningConfig</code></td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Kafka Connect commit failures</td>
+      <td style="text-align: left">Now surfaced</td>
+      <td style="text-align: left">Force failure drills after upgrade</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">Iceberg Rust 0.11</td>
+      <td style="text-align: left">Separate client release; encryption and v3 support expanded</td>
+      <td style="text-align: left">Rebuild Rust apps and run cross-engine compatibility tests</td>
+    </tr>
+    <tr>
+      <td style="text-align: left">REST catalog additions</td>
+      <td style="text-align: left">New endpoints, path encoding, and optional server-side purge</td>
+      <td style="text-align: left">Test authorization, names with reserved characters, and failure recovery</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Apache Iceberg 1.12.0 for Java and Iceberg Rust 0.11.0 are separate releases that reward coordinated planning. Upgrade each client deliberately, and validate shared tables and REST catalog behavior across both implementations. Geospatial types and Hilbert clustering are worth testing; Flink equality-delete conversion is worth evaluating for streaming CDC pipelines. Plan for the Spark 3.4 and Flink 2.0 removals, along with the PDWR maintenance boundary, before upgrading.</p>
+
+<p>The V4 code is worth watching, not using. The specification work on relative paths, Parquet manifests, and content statistics shows where the format is heading, but setting <code class="language-plaintext highlighter-rouge">format-version=4</code> on production tables today is not a supported path.</p>
+
+<p>When you move off this release, re-check the format version range first, then the defaults in the properties table, then whether <code class="language-plaintext highlighter-rouge">SparkProcedures</code> has grown: procedures are the part of the surface that changes most between releases.</p>
+
+<h2 id="references">References</h2>
+
+<ul>
+  <li><a href="https://iceberg.apache.org/releases/">Apache Iceberg 1.12.0 release notes</a></li>
+  <li><a href="https://github.com/apache/iceberg/releases/tag/apache-iceberg-1.12.0">Apache Iceberg 1.12.0 GitHub release</a></li>
+  <li><a href="https://www.dremio.com/blog/apache-iceberg-1-12-0-whats-new-breaking-changes-and-upgrade-guide/">Dremio: Apache Iceberg 1.12.0 what’s new, breaking changes, and upgrade guide</a></li>
+  <li><a href="https://www.dremio.com/blog/preview-of-upcoming-apache-iceberg-1-12-and-iceberg-rust-0-11-new-features-and-breaking-changes/">Dremio: preview of upcoming Apache Iceberg 1.12 and Iceberg Rust 0.11</a></li>
+  <li><a href="https://lists.apache.org/thread/thhp43zm6c6xmlkvvvkvj8mzkdg5yvgf">Apache Mail Archives: PDWR handling discussion</a></li>
+  <li><a href="https://www.linkedin.com/posts/apacheiceberg_apache-iceberg-1120-is-here-the-activity-7512557579949162496-tbEy">Apache Iceberg on LinkedIn: 1.12.0 announcement</a></li>
+  <li><a href="/ApacheHudiCheatSheet/">Apache Hudi on Spark: the complete cheat sheet</a></li>
+  <li><a href="/ApacheIcebergCheatSheet/">Apache Iceberg on Spark: the complete cheat sheet</a></li>
+</ul>
+
+<h2 id="trademarks">Trademarks</h2>
+
+<p>Apache Iceberg, Apache Spark, Apache Flink, Apache Hive, Apache Parquet, Apache Avro, Apache Hudi, Apache Polaris (incubating) and Apache are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries. Delta Lake is a trademark of the Linux Foundation.</p>
+
+    </div>
+    <section class="related" id="similar_posts">
+      <h2 class="section-title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Related reading</h2>
+      <div class="related__grid"><a class="card card--mini" href="/DataModelingForDataEngineers/">
+          <span class="card--mini__date">Oct 1, 2026</span>
+          <span class="card--mini__title">Data Modeling for Data Engineers: From Foundations to Lakehouse Design</span>
+        </a><a class="card card--mini" href="/SparkOnKubernetes/">
+          <span class="card--mini__date">Sep 30, 2026</span>
+          <span class="card--mini__title">Spark on Kubernetes on your Mac: kind, spark-submit, the Spark Operator and Iceberg</span>
+        </a><a class="card card--mini" href="/ApacheSparkArchitecture/">
+          <span class="card--mini__date">Sep 27, 2026</span>
+          <span class="card--mini__title">Apache Spark architecture: what actually happens when you call an action</span>
+        </a><a class="card card--mini" href="/ApacheSparkCheatSheet/">
+          <span class="card--mini__date">Sep 25, 2026</span>
+          <span class="card--mini__title">Apache Spark: the complete cheat sheet</span>
+        </a></div>
+    </section>
+
+    
+<nav class="post-nav" aria-label="Previous and next post">
+  <a class="post-nav__link post-nav__link--prev" href="/DataModelingForDataEngineers/" rel="prev">
+    <span class="post-nav__label"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Previous</span>
+    <span class="post-nav__title">Data Modeling for Data Engineers: From Foundations to Lakehouse Design</span>
+  </a>
+</nav>
+
+    <section class="share">
+  <h2 class="share__title">Found this useful? Pass it on</h2>
+  <ul class="share__list">
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text=Apache%20Iceberg%201.12.0:%20what's%20new,%20breaking%20changes,%20and%20upgrade%20guide&url=https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/&via=avula_ranga">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>Share on X</span>
+      </a>
+    </li>
+    <li>
+      <a class="share__link" target="_blank" rel="noopener"
+         href="https://www.linkedin.com/sharing/share-offsite/?url=https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>Share on LinkedIn</span>
+      </a>
+    </li>
+    <li>
+      <button class="share__link" type="button" id="copyLink" data-url="https://rangareddy.github.io/ApacheIceberg1120UpgradeGuide/">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15"/></svg><span class="copyLink__label">Copy link</span>
+      </button>
+    </li>
+  </ul>
+</section>
+
+    <section class="support">
+  <div class="support__body">
+    <h2>Found this useful?</h2>
+    <p>These posts and tools are free. If one saved you an afternoon, you can buy me a coffee.</p>
+  </div>
+  <a class="btn btn--primary" href="https://www.paypal.com/paypalme/rangareddyavula" target="_blank" rel="noopener">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg>Buy me a coffee
+  </a>
+</section>
+
+    
+
+  </article>
+
+  <aside class="rail" aria-label="Sidebar">
+  <div class="rail__inner">
+    
+<section class="panel panel--toc" id="tocPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>On this page</h2>
+  <nav class="toc" id="toc"></nav>
+</section>
+<section class="panel panel--popular" id="popularPanel" hidden>
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>Most read</h2>
+  <ol class="rail-list rail-list--numbered" id="popularList">
+    <li data-views-for="/ApacheIceberg1120UpgradeGuide/" hidden>
+      <a href="/ApacheIceberg1120UpgradeGuide/">Apache Iceberg 1.12.0 Upgrade Guide</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/DataModelingForDataEngineers/" hidden>
+      <a href="/DataModelingForDataEngineers/">Data Modeling</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkOnKubernetes/" hidden>
+      <a href="/SparkOnKubernetes/">Spark on Kubernetes</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkArchitecture/" hidden>
+      <a href="/ApacheSparkArchitecture/">Apache Spark Architecture: From Action to Task Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheSparkCheatSheet/" hidden>
+      <a href="/ApacheSparkCheatSheet/">Apache Spark Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/OpenTableFormats/" hidden>
+      <a href="/OpenTableFormats/">Hudi vs Iceberg vs Delta Lake</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/DatalakeDockerDemos/" hidden>
+      <a href="/DatalakeDockerDemos/">Datalake Docker Demos</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/WhyIcebergExists/" hidden>
+      <a href="/WhyIcebergExists/">Why Iceberg Exists</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiGuide/" hidden>
+      <a href="/ApacheHudiGuide/">Getting Started with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergLocalPlayground/" hidden>
+      <a href="/IcebergLocalPlayground/">Iceberg Playground</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ParquetTools/" hidden>
+      <a href="/ParquetTools/">Parquet Command Line Tools</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkSubmitFormatter/" hidden>
+      <a href="/SparkSubmitFormatter/">Spark Submit Formatter</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConfigurationGenerator/" hidden>
+      <a href="/SparkConfigurationGenerator/">Spark Configuration Generator</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergThreeTierArchitecture/" hidden>
+      <a href="/IcebergThreeTierArchitecture/">Iceberg Three Tiers</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergCheatSheet/" hidden>
+      <a href="/ApacheIcebergCheatSheet/">Apache Iceberg Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/CatalystOptimizer/" hidden>
+      <a href="/CatalystOptimizer/">Inside the Catalyst Optimizer</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkAQE/" hidden>
+      <a href="/SparkAQE/">Spark Adaptive Query Execution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkJoinsInDepth/" hidden>
+      <a href="/SparkJoinsInDepth/">Join Strategies in Apache Spark</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkMemoryManagement/" hidden>
+      <a href="/SparkMemoryManagement/">Spark Memory Management: Heap, Execution, Storage, and Container Sizing</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiArchitecture/" hidden>
+      <a href="/ApacheHudiArchitecture/">Inside Apache Hudi Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIndexTypes/" hidden>
+      <a href="/HudiIndexTypes/">Hudi Index Types</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiMergeOnRead/" hidden>
+      <a href="/HudiMergeOnRead/">Hudi Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheHudiCheatSheet/" hidden>
+      <a href="/ApacheHudiCheatSheet/">Apache Hudi Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheIcebergArchitecture/" hidden>
+      <a href="/ApacheIcebergArchitecture/">Inside Apache Iceberg Architecture</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCatalogs/" hidden>
+      <a href="/IcebergCatalogs/">Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergWritePath/" hidden>
+      <a href="/IcebergWritePath/">Iceberg Write Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergReadPath/" hidden>
+      <a href="/IcebergReadPath/">Iceberg Read Path</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergFormatVersions/" hidden>
+      <a href="/IcebergFormatVersions/">Iceberg Format Versions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSchemaEvolution/" hidden>
+      <a href="/IcebergSchemaEvolution/">Iceberg Schema Evolution</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergPartitioning/" hidden>
+      <a href="/IcebergPartitioning/">Iceberg Partitioning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergIngestion/" hidden>
+      <a href="/IcebergIngestion/">Iceberg Ingestion</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/XTableIncrementalSync/" hidden>
+      <a href="/XTableIncrementalSync/">XTable Incremental Sync</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/ApacheXTableCheatSheet/" hidden>
+      <a href="/ApacheXTableCheatSheet/">Apache XTable Cheat Sheet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkShuffleInternals/" hidden>
+      <a href="/SparkShuffleInternals/">Spark Shuffle Internals: Writer Selection, Spill, and Fetch Recovery</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataSkew/" hidden>
+      <a href="/SparkDataSkew/">Spark Data Skew: Diagnose Hot Partitions and Choose the Right Fix</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkPerformanceOptimization/" hidden>
+      <a href="/SparkPerformanceOptimization/">Spark Performance Tuning</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkDataFusionComet/" hidden>
+      <a href="/SparkDataFusionComet/">Native Spark Execution: Gluten vs. DataFusion Comet</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkReleaseHistory/" hidden>
+      <a href="/SparkReleaseHistory/">Apache Spark Release History: Defaults, Removals, and Upgrade Risks</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnect/" hidden>
+      <a href="/SparkConnect/">Apache Spark Connect: How the Client-Server Protocol Works</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/StructuredStreamingInternals/" hidden>
+      <a href="/StructuredStreamingInternals/">Structured Streaming Checkpoints: Offsets, State, Watermarks, and Recovery</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergStreamingIngestion/" hidden>
+      <a href="/IcebergStreamingIngestion/">Streaming Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCopyOnWriteMergeOnRead/" hidden>
+      <a href="/IcebergCopyOnWriteMergeOnRead/">Copy-on-Write vs Merge-on-Read</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergCdcPipelines/" hidden>
+      <a href="/IcebergCdcPipelines/">CDC Into Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergTimeTravel/" hidden>
+      <a href="/IcebergTimeTravel/">Iceberg Time Travel</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectIceberg/" hidden>
+      <a href="/SparkConnectIceberg/">Spark Connect with Apache Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkConnectHudi/" hidden>
+      <a href="/SparkConnectHudi/">Spark Connect with Apache Hudi</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergPolaris/" hidden>
+      <a href="/SparkIcebergPolaris/">Iceberg on Polaris</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiKeyGenerators/" hidden>
+      <a href="/HudiKeyGenerators/">Hudi Key Generators</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkIcebergSubmitCommand/" hidden>
+      <a href="/SparkIcebergSubmitCommand/">Generate spark-submit Commands for Iceberg Catalogs</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergBranchingTagging/" hidden>
+      <a href="/IcebergBranchingTagging/">Iceberg Branching and Tagging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/TableMaintenance/" hidden>
+      <a href="/TableMaintenance/">Table Maintenance</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiConcurrencyControl/" hidden>
+      <a href="/HudiConcurrencyControl/">Hudi Concurrency Control</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergInteroperability/" hidden>
+      <a href="/IcebergInteroperability/">Lakehouse Interoperability</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergViews/" hidden>
+      <a href="/IcebergViews/">Iceberg Views</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergHiveMigration/" hidden>
+      <a href="/IcebergHiveMigration/">Hive To Iceberg</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergSortingClustering/" hidden>
+      <a href="/IcebergSortingClustering/">Iceberg Sorting and Clustering</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/IcebergProductionGuide/" hidden>
+      <a href="/IcebergProductionGuide/">Iceberg In Production</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/HudiIncrementalProcessing/" hidden>
+      <a href="/HudiIncrementalProcessing/">Hudi Incremental Processing</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkHudiCustomLogging/" hidden>
+      <a href="/SparkHudiCustomLogging/">Spark and Hudi Logging</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkTroubleshootingPlaybook/" hidden>
+      <a href="/SparkTroubleshootingPlaybook/">Spark JVM Troubleshooting: Logging, Class Loading, Stack Size, and Proxies</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkStreamingCustomLogging/" hidden>
+      <a href="/SparkStreamingCustomLogging/">Structured Streaming Logging: Control Log Volume Without</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/KerberoSetup/" hidden>
+      <a href="/KerberoSetup/">Kerberos Setup on Linux</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+    <li data-views-for="/SparkInterviewQuestions/" hidden>
+      <a href="/SparkInterviewQuestions/">Top Apache Spark Interview Questions</a>
+      <span class="rail-list__meta"><span class="views-n"></span> views</span>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg>Start here</h2>
+  <ol class="rail-list rail-list--numbered">
+    <li>
+      <a href="/ApacheIceberg1120UpgradeGuide/">
+        Apache Iceberg 1.12.0: what's new, breaking changes, and upgrade guide
+        <time datetime="2026-10-07T10:00:00+05:30">Oct 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/DataModelingForDataEngineers/">
+        Data Modeling for Data Engineers: From Foundations to Lakehouse Design
+        <time datetime="2026-10-01T10:00:00+05:30">Oct 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/SparkOnKubernetes/">
+        Spark on Kubernetes on your Mac: kind, spark-submit, the Spark Operator and Iceberg
+        <time datetime="2026-09-30T08:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/ApacheSparkArchitecture/">
+        Apache Spark architecture: what actually happens when you call an action
+        <time datetime="2026-09-27T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/ApacheSparkCheatSheet/">
+        Apache Spark: the complete cheat sheet
+        <time datetime="2026-09-25T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/OpenTableFormats/">
+        Open table formats in practice: what actually differs between Iceberg, Hudi and Delta Lake
+        <time datetime="2026-09-23T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/DatalakeDockerDemos/">
+        Run every demo on this blog locally: one compose stack for Hudi, Iceberg and Delta
+        <time datetime="2026-09-21T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+    <li>
+      <a href="/WhyIcebergExists/">
+        What Hive tables could not do, and why Iceberg exists
+        <time datetime="2026-09-19T10:00:00+05:30">Sep 2026</time>
+      </a>
+    </li>
+  </ol>
+</section>
+<section class="panel">
+  <h2 class="panel__title"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg>Categories</h2>
+  <ul class="rail-list rail-list--rows">
+    <li>
+      <a href="/category/#hudi">
+        <span>Hudi</span>
+        <span class="badge">10</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#iceberg">
+        <span>Iceberg</span>
+        <span class="badge">24</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#lakehouse">
+        <span>Lakehouse</span>
+        <span class="badge">6</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#linux">
+        <span>Linux</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#modeling">
+        <span>Modeling</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#spark">
+        <span>Spark</span>
+        <span class="badge">20</span>
+      </a>
+    </li>
+    <li>
+      <a href="/category/#tools">
+        <span>Tools</span>
+        <span class="badge">1</span>
+      </a>
+    </li>
+  </ul>
+</section>
+
+
+  </div>
+</aside>
+
+</div>
+
+  </main>
+
+  <footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__about">
+      <a href="/" class="brand brand--footer">
+        <span class="brand__mark" aria-hidden="true">RR</span>
+        <span class="brand__name">Ranga Reddy</span>
+      </a>
+      <p>Deep-dives, troubleshooting playbooks and interactive tools for Apache Spark, Iceberg, Hudi and Kafka — from an Apache Hudi contributor and Cloudera's former Spark–Iceberg backline engineer.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>Explore</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="/"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/></svg><span>Home</span></a>
+        </li>
+        <li>
+          <a href="/guides/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M17 5h3"/></svg><span>Guides</span>
+          </a>
+        </li>
+        <li>
+          <a href="/archive/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M9.5 12h5"/></svg><span>Archive</span>
+          </a>
+        </li>
+        <li>
+          <a href="/category/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg><span>Categories</span>
+          </a>
+        </li>
+        <li>
+          <a href="/links/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l3.5-3.5a3.5 3.5 0 0 0-5-5L12 6.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L5.5 14a3.5 3.5 0 0 0 5 5L12 17.5"/></svg><span>Links</span>
+          </a>
+        </li>
+        <li>
+          <a href="/about/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.4A4.1 4.1 0 0 1 12 7.5a4.1 4.1 0 0 1 7 3.1c0 5-7 9.4-7 9.4Z"/></svg><span>About Me</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="site-footer__col">
+      <h2>You can contact me</h2>
+      <ul class="footer-links">
+        <li>
+          <a href="https://github.com/rangareddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.72-.23.72-.5v-1.76c-2.92.64-3.54-1.4-3.54-1.4-.48-1.22-1.17-1.55-1.17-1.55-.95-.65.07-.64.07-.64 1.06.08 1.61 1.09 1.61 1.09.94 1.6 2.46 1.14 3.06.87.1-.68.37-1.14.67-1.4-2.33-.27-4.79-1.17-4.79-5.2 0-1.15.42-2.09 1.1-2.83-.11-.27-.47-1.34.1-2.79 0 0 .88-.28 2.9 1.08a10.1 10.1 0 0 1 5.28 0c2.01-1.36 2.9-1.08 2.9-1.08.57 1.45.21 2.52.1 2.79.68.74 1.1 1.68 1.1 2.83 0 4.04-2.47 4.93-4.81 5.19.38.33.72.97.72 1.96v2.9c0 .28.19.61.73.5A10.5 10.5 0 0 0 12 1.5Z"/></svg><span>GitHub</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/rangareddy1988/">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM3 9.5h4V21H3zM9.5 9.5h3.83v1.57h.05a4.2 4.2 0 0 1 3.78-2.07c4.04 0 4.79 2.66 4.79 6.11V21h-4v-5.06c0-1.5-.03-3.44-2.1-3.44-2.1 0-2.42 1.64-2.42 3.33V21h-3.93Z"/></svg><span>LinkedIn</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://twitter.com/avula_ranga">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.4 3h3.3l-7.2 8.2L22 21h-6.2l-4.4-5.8L6.3 21H3l7.5-8.6L2.7 3H9l4.1 5.4Zm-1.1 16h1.8L7.2 4.8H5.3Z"/></svg><span>X</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://stackoverflow.com/users/1918962/ranga-reddy">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" stroke="none"><path d="M17.6 21v-5h2v7H4.4v-7h2v5Zm-9.2-2.4h9v-2h-9Zm.2-4.3 8.8 1.85.42-1.95-8.8-1.86Zm1.16-4.3 8.15 3.8.85-1.82-8.15-3.8ZM12 3l-1.6 1.2 5.4 7.25 1.6-1.2Z"/></svg><span>Stack Overflow</span>
+          </a>
+        </li>
+        <li>
+          <a href="mailto:rangareddy.avula@gmail.com">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Email</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="shell site-footer__legal"><p>&copy; <span id="footerYear">2026</span> Ranga Reddy. All rights reserved.</p><p class="site-footer__stats" id="siteTotals" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg><span id="siteVisits"></span> visits
+      <span aria-hidden="true">&middot;</span>
+      <span id="siteVisitors"></span> unique visitors
+      <a href="/stats/">See all stats</a>
+    </p>
+  </div>
+</footer>
+
+<a class="back-to-top" id="backToTop" href="#top" aria-label="Back to top" title="Back to top">
+  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</a>
+
+  <script>window.GOATCOUNTER_CODE = "rangareddy";</script>
+  <script src="/js/site.js"></script>
+  
+<script data-goatcounter="https://rangareddy.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+
+</html>
