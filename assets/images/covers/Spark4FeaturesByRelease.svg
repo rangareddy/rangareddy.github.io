@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- cover:recolor hand-built; make_covers.py swaps the palette per post -->
+  <defs>
+    <linearGradient id="heroBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A192F"/>
+      <stop offset="100%" stop-color="#1B2A4E"/>
+    </linearGradient>
+    <linearGradient id="waterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14B8A6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0A192F" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#heroBg)"/>
+
+  <g opacity="0.08" stroke="#4DD0E1" stroke-width="1">
+    <line x1="0" y1="100" x2="1200" y2="100"/><line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="200" y1="0" x2="200" y2="630"/><line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <text x="80" y="200" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="62" font-weight="800" fill="#FFFFFF" letter-spacing="-2">Spark 4 Features</text>
+  <text x="80" y="275" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="62" font-weight="800" fill="#4DD0E1" letter-spacing="-2">Release by Release</text>
+
+  <text x="80" y="345" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="24" font-weight="400" fill="#E0F7FA" opacity="0.8">What each one is, its syntax &amp; a real run</text>
+
+  <rect x="80" y="400" width="60" height="4" fill="#14B8A6"/>
+  <text x="80" y="450" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="16" font-weight="500" fill="#4DD0E1" letter-spacing="2">APACHE SPARK · SQL · STREAMING · PYSPARK</text>
+
+  <rect y="380" width="1200" height="250" fill="url(#waterGrad)"/>
+
+  <!-- four releases climbing left to right -->
+  <g font-family="Inter, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <polyline points="770,460 880,380 990,300 1100,220" fill="none" stroke="#4DD0E1" stroke-width="2.5" opacity="0.9"/>
+    <rect x="1052" y="194" width="96" height="52" rx="14" fill="#0A192F"/>
+    <g stroke="#4DD0E1" stroke-width="2.5" fill="#0A192F" filter="url(#glow)">
+      <rect x="722" y="434" width="96" height="52" rx="14"/>
+      <rect x="832" y="354" width="96" height="52" rx="14"/>
+      <rect x="942" y="274" width="96" height="52" rx="14"/>
+      <rect x="1052" y="194" width="96" height="52" rx="14" fill="#14B8A6" fill-opacity="0.35"/>
+    </g>
+    <g fill="#FFFFFF" font-size="20" font-weight="800">
+      <text x="770" y="456">4.0</text><text x="880" y="376">4.1</text>
+      <text x="990" y="296">4.2</text><text x="1100" y="216">4.3</text>
+    </g>
+    <g fill="#B2EBF2" font-size="14" font-weight="600">
+      <text x="770" y="475">SQL</text><text x="880" y="395">Pipelines</text>
+      <text x="990" y="315">Types</text><text x="1100" y="235">Streaming</text>
+    </g>
+  </g>
+</svg>

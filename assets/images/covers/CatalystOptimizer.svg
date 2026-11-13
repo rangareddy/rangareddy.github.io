@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- cover:recolor hand-built; make_covers.py swaps the palette per post -->
+  <defs>
+    <linearGradient id="heroBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A192F"/>
+      <stop offset="100%" stop-color="#1B2A4E"/>
+    </linearGradient>
+    <linearGradient id="waterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14B8A6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0A192F" stop-opacity="1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4DD0E1"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#heroBg)"/>
+
+  <g opacity="0.08" stroke="#4DD0E1" stroke-width="1">
+    <line x1="0" y1="100" x2="1200" y2="100"/><line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="200" y1="0" x2="200" y2="630"/><line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <text x="80" y="200" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="62" font-weight="800" fill="#FFFFFF" letter-spacing="-2">Inside Spark's</text>
+  <text x="80" y="275" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="62" font-weight="800" fill="#4DD0E1" letter-spacing="-2">Catalyst Optimizer</text>
+
+  <text x="80" y="345" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="24" font-weight="400" fill="#E0F7FA" opacity="0.8">How query plans are analyzed, rewritten &amp; planned</text>
+
+  <rect x="80" y="400" width="60" height="4" fill="#14B8A6"/>
+  <text x="80" y="450" font-family="Inter, Helvetica, Arial, sans-serif"
+        font-size="16" font-weight="500" fill="#4DD0E1" letter-spacing="2">APACHE SPARK · SQL · RULE BATCHES · CODEGEN</text>
+
+  <rect y="380" width="1200" height="250" fill="url(#waterGrad)"/>
+
+  <!-- query plan tree: a Filter pushed below the Join -->
+  <g font-family="Inter, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle">
+    <g stroke="#4DD0E1" stroke-width="2.5" opacity="0.9" fill="none">
+      <line x1="950" y1="168" x2="950" y2="262"/>
+      <line x1="950" y1="298" x2="850" y2="352"/>
+      <line x1="950" y1="298" x2="1050" y2="432"/>
+      <line x1="850" y1="388" x2="850" y2="432"/>
+    </g>
+
+    <!-- original Filter position, now a ghost -->
+    <rect x="895" y="195" width="110" height="36" rx="18" fill="none" stroke="#4DD0E1" stroke-width="2" stroke-dasharray="6 5" opacity="0.55"/>
+    <text x="950" y="219" fill="#4DD0E1" opacity="0.55">Filter</text>
+
+    <!-- pushdown arrow -->
+    <path d="M895,213 C820,213 790,270 818,336" fill="none" stroke="#4DD0E1" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arr)"/>
+    <rect x="660" y="236" width="150" height="28" rx="14" fill="#0A192F" stroke="#14B8A6" stroke-width="1.5"/>
+    <text x="735" y="255" font-size="13" fill="#B2EBF2">PushDownPredicate</text>
+
+    <g stroke="#4DD0E1" stroke-width="2.5" fill="#0A192F" filter="url(#glow)">
+      <rect x="895" y="132" width="110" height="36" rx="18"/>
+      <rect x="895" y="262" width="110" height="36" rx="18"/>
+      <rect x="795" y="352" width="110" height="36" rx="18" fill="#14B8A6" fill-opacity="0.35"/>
+      <rect x="795" y="432" width="110" height="36" rx="18"/>
+      <rect x="995" y="432" width="110" height="36" rx="18"/>
+    </g>
+    <g fill="#E0F7FA">
+      <text x="950" y="156">Project</text>
+      <text x="950" y="286">Join</text>
+      <text x="850" y="376">Filter</text>
+      <text x="850" y="456">Scan A</text>
+      <text x="1050" y="456">Scan B</text>
+    </g>
+  </g>
+</svg>
