@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630">
+<!-- hand-built Iceberg-series cover (light, hue 120); kept as is by make_covers.py -->
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F3FCF3"/><stop offset="55%" stop-color="#E0F5E0"/><stop offset="100%" stop-color="#C4E9C4"/></linearGradient>
+<filter id="shadow" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.22"/></filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<polygon points="0,630 300,430 520,630" fill="#FFFFFF" opacity="0.35"/>
+<polygon points="760,630 980,470 1200,600 1200,630" fill="#FFFFFF" opacity="0.3"/>
+
+<g transform="translate(600,315) scale(0.93) translate(-600,-309)">
+<rect x="48" y="58" width="112" height="38" rx="9" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5"/><image x="56" y="61" width="96" height="32" xlink:href="../logos/iceberg.png"/>
+<text x="172" y="90" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="900" fill="#103710" letter-spacing="-1">LOCAL ICEBERG PLAYGROUND</text>
+<rect x="174" y="99" width="200" height="4" rx="2" fill="#0B8E0B"/>
+<text x="48" y="140" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#334155">Spark, MinIO and a REST catalog in one compose file</text>
+<rect x="48" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="48" y="189" width="6" height="96" rx="3" fill="#0B840B"/>
+<text x="68" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Why three services?</text>
+<text x="68" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Storage, a catalog and an</text>
+<text x="68" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">engine have to agree</text>
+<text x="68" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0B840B">Three moving parts</text>
+<rect x="428" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="428" y="189" width="6" height="96" rx="3" fill="#0A7F7F"/>
+<text x="448" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">The compose file</text>
+<text x="448" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Everything on a laptop</text>
+<text x="448" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">in one file</text>
+<text x="448" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0A7F7F">Copy and run</text>
+<rect x="808" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="808" y="189" width="6" height="96" rx="3" fill="#0F0FBD"/>
+<text x="828" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Pointing Spark at it</text>
+<text x="828" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">The configuration that makes</text>
+<text x="828" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Spark reach all three</text>
+<text x="828" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0F0FBD">Catalog and S3</text>
+<rect x="48" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="48" y="329" width="6" height="96" rx="3" fill="#BD0FBD"/>
+<text x="68" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">What landed in storage</text>
+<text x="68" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">The files a first table</text>
+<text x="68" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">leaves in object storage</text>
+<text x="68" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#BD0FBD">Look at the bucket</text>
+<rect x="428" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="428" y="329" width="6" height="96" rx="3" fill="#BD0F0F"/>
+<text x="448" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Checking from the other side</text>
+<text x="448" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Read the same table from</text>
+<text x="448" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">a second client</text>
+<text x="448" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#BD0F0F">Does it agree?</text>
+<rect x="808" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="808" y="329" width="6" height="96" rx="3" fill="#76760A"/>
+<text x="828" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Common setup failures</text>
+<text x="828" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">The errors that eat the</text>
+<text x="828" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">first hour</text>
+<text x="828" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#76760A">Cause and fix</text>
+<rect x="48" y="478" width="1104" height="76" rx="16" fill="#FFFFFF" stroke="#B3DBB3" stroke-width="1.5" filter="url(#shadow)"/>
+<clipPath id="av"><circle cx="92" cy="516" r="28"/></clipPath><image x="64" y="488" width="56" height="56" clip-path="url(#av)" xlink:href="../logos/ranga-avatar-clear.png"/><circle cx="92" cy="516" r="28" fill="none" stroke="#0B840B" stroke-width="2.5"/>
+<text x="138" y="525" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="#0B1B33">Ranga Reddy</text>
+<text x="330" y="512" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#0F0FBD">linkedin.com/in/rangareddy1988</text>
+<text x="330" y="534" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#BD0F0F">rangareddy.github.io</text>
+<text x="1136" y="525" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#334155" text-anchor="end">Apache Iceberg series</text>
+</g></svg>

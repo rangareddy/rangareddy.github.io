@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630">
+<!-- hand-built Iceberg-series cover (light, hue 270); kept as is by make_covers.py -->
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F7F3FC"/><stop offset="55%" stop-color="#EBE0F5"/><stop offset="100%" stop-color="#D6C4E9"/></linearGradient>
+<filter id="shadow" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000000" flood-opacity="0.22"/></filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<polygon points="0,630 300,430 520,630" fill="#FFFFFF" opacity="0.35"/>
+<polygon points="760,630 980,470 1200,600 1200,630" fill="#FFFFFF" opacity="0.3"/>
+
+<g transform="translate(600,315) scale(0.93) translate(-600,-309)">
+<rect x="48" y="58" width="112" height="38" rx="9" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5"/><image x="56" y="61" width="96" height="32" xlink:href="../logos/iceberg.png"/>
+<text x="172" y="90" font-family="Helvetica, Arial, sans-serif" font-size="44" font-weight="900" fill="#241037" letter-spacing="-1">ICEBERG IN PRODUCTION</text>
+<rect x="174" y="99" width="200" height="4" rx="2" fill="#4C0B8E"/>
+<text x="48" y="140" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#334155">File sizes, object-storage paths and the jobs you must schedule</text>
+<rect x="48" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="48" y="189" width="6" height="96" rx="3" fill="#660FBD"/>
+<text x="68" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">What actually degrades</text>
+<text x="68" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">The settings set at create</text>
+<text x="68" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">time that decide speed</text>
+<text x="68" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#660FBD">Slow tables, early</text>
+<rect x="428" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="428" y="189" width="6" height="96" rx="3" fill="#BD0F66"/>
+<text x="448" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Object-storage paths</text>
+<text x="448" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">What the paths look like when</text>
+<text x="448" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">the option is enabled</text>
+<text x="448" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#BD0F66">Spread the load</text>
+<rect x="808" y="175" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="808" y="189" width="6" height="96" rx="3" fill="#AA5C0E"/>
+<text x="828" y="207" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Target file size</text>
+<text x="828" y="235" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">What it really does, and how</text>
+<text x="828" y="255" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">to size against your queries</text>
+<text x="828" y="283" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#AA5C0E">Not a guarantee</text>
+<rect x="48" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="48" y="329" width="6" height="96" rx="3" fill="#457F0A"/>
+<text x="68" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">Monitoring queries</text>
+<text x="68" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">A small query set that shows</text>
+<text x="68" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">when a table drifts</text>
+<text x="68" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#457F0A">Run them weekly</text>
+<rect x="428" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="428" y="329" width="6" height="96" rx="3" fill="#0A7F45"/>
+<text x="448" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">The three jobs</text>
+<text x="448" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Maintenance nobody schedules</text>
+<text x="448" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">until the table is slow</text>
+<text x="448" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0A7F45">Compaction and expiry</text>
+<rect x="808" y="315" width="364" height="124" rx="14" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="808" y="329" width="6" height="96" rx="3" fill="#0F66BD"/>
+<text x="828" y="347" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#0B1B33">A production checklist</text>
+<text x="828" y="375" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">Properties worth setting at</text>
+<text x="828" y="395" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="500" fill="#334155">create time</text>
+<text x="828" y="423" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0F66BD">Before the first write</text>
+<rect x="48" y="478" width="1104" height="76" rx="16" fill="#FFFFFF" stroke="#C7B3DB" stroke-width="1.5" filter="url(#shadow)"/>
+<clipPath id="av"><circle cx="92" cy="516" r="28"/></clipPath><image x="64" y="488" width="56" height="56" clip-path="url(#av)" xlink:href="../logos/ranga-avatar-clear.png"/><circle cx="92" cy="516" r="28" fill="none" stroke="#660FBD" stroke-width="2.5"/>
+<text x="138" y="525" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="#0B1B33">Ranga Reddy</text>
+<text x="330" y="512" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#AA5C0E">linkedin.com/in/rangareddy1988</text>
+<text x="330" y="534" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#0A7F45">rangareddy.github.io</text>
+<text x="1136" y="525" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#334155" text-anchor="end">Apache Iceberg series</text>
+</g></svg>
